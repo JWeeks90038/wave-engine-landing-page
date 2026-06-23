@@ -1,0 +1,11 @@
+/* TEAM */
+Wave Engine
+Site: https://waveenginemusic.com
+Focus: cinematic gym music, workout music, motivational music
+
+/* THANKS */
+Listeners, lifters, runners, and everyone training with Wave Engine.
+
+/* SITE */
+Built with HTML, CSS, and vanilla JavaScript.
+Deployed on Vercel / GitHub Pages compatible static hosting.

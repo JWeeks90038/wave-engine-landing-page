@@ -99,6 +99,42 @@ iframe {
   color: var(--muted);
 }
 
+.brand-link {
+  font-family: "Archivo", sans-serif;
+  font-size: 1rem;
+  font-weight: 900;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.site-nav {
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.nav-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.85rem 1.1rem;
+}
+
+.nav-links a,
+.topbar-link,
+.brand-link {
+  transition: color 180ms ease, transform 180ms ease;
+}
+
+.nav-links a:hover,
+.nav-links a:focus-visible,
+.topbar-link:hover,
+.topbar-link:focus-visible,
+.brand-link:hover,
+.brand-link:focus-visible {
+  color: var(--green);
+  transform: translateY(-1px);
+}
+
 .hero-content,
 .hero-actions,
 .hero-panel,
@@ -282,6 +318,86 @@ iframe {
   background: linear-gradient(180deg, rgba(10, 18, 37, 0.92), rgba(7, 11, 23, 0.92));
   box-shadow: var(--shadow);
   text-align: center;
+}
+
+.site-header,
+.page-main {
+  display: grid;
+  gap: 1.2rem;
+}
+
+.page-header {
+  padding-top: 0.75rem;
+}
+
+.page-hero,
+.content-section {
+  padding: 1.6rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.page-hero {
+  display: grid;
+  gap: 0.8rem;
+  justify-items: center;
+  text-align: center;
+}
+
+.page-hero h1 {
+  margin: 0;
+  max-width: 12ch;
+  text-align: center;
+}
+
+.page-intro {
+  margin: 0;
+  max-width: 44rem;
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.grid-two,
+.link-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.info-card,
+.prose-card {
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: var(--surface-strong);
+}
+
+.prose-card h2,
+.info-card h2 {
+  margin-top: 0;
+  font-family: "Archivo", sans-serif;
+}
+
+.prose-card p,
+.info-card p,
+.bullet-list li {
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.bullet-list {
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+.text-link {
+  color: var(--green);
+}
+
+.text-link:hover,
+.text-link:focus-visible {
+  text-decoration: underline;
 }
 
 .hero-image-frame {
@@ -550,7 +666,9 @@ main {
   }
 
   .embed-grid,
-  .drops-grid {
+  .drops-grid,
+  .grid-two,
+  .link-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -567,7 +685,9 @@ main {
 
   .featured,
   .drops,
-  .footer {
+  .footer,
+  .page-hero,
+  .content-section {
     padding: 2rem;
   }
 
