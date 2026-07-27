@@ -60,6 +60,105 @@
   gap: 0.85rem;
 }
 
+.credit-panel {
+  display: grid;
+  gap: 0.9rem;
+  padding: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.wallet-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.wallet-connect-button {
+  min-height: 52px;
+}
+
+.wallet-identity {
+  display: grid;
+  justify-items: end;
+  gap: 0.2rem;
+}
+
+.wallet-label,
+.wallet-address {
+  margin: 0;
+}
+
+.wallet-label {
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.wallet-address {
+  font-family: "Archivo", sans-serif;
+  font-size: 0.95rem;
+  color: #ffffff;
+}
+
+.credit-summary {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.credit-heading,
+.credit-balance,
+.credit-note,
+.payment-status {
+  margin: 0;
+}
+
+.credit-heading {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.credit-balance {
+  font-family: "Archivo", sans-serif;
+  font-size: 1.6rem;
+  font-weight: 900;
+  color: #ffffff;
+}
+
+.credit-note,
+.payment-status {
+  color: var(--muted);
+}
+
+.credit-pack-grid {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.credit-pack-button {
+  width: 100%;
+}
+
+.credit-pack-button span {
+  display: block;
+}
+
+.credit-pack-label {
+  font-size: 1rem;
+}
+
+.credit-pack-meta {
+  margin-top: 0.15rem;
+  font-size: 0.82rem;
+  opacity: 0.88;
+}
+
 .generator-actions .cta-button[disabled] {
   cursor: not-allowed;
   opacity: 0.55;
@@ -138,5 +237,19 @@
 @media (max-width: 599px) {
   .generator-textarea {
     min-height: 220px;
+  }
+
+  .credit-summary {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .wallet-panel {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .wallet-identity {
+    justify-items: start;
   }
 }

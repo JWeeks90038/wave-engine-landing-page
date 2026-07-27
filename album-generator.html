@@ -35,7 +35,9 @@
     <meta name="twitter:image" content="https://waveenginemusic.com/Images/wave-engine-social-card-4k-v1.png" />
     <meta name="twitter:image:alt" content="Wave Engine cinematic motivational music artwork with logo, waveform, and mountain landscape." />
     <meta name="theme-color" content="#050816" />
+    <meta name="robots" content="noindex, nofollow" />
     <meta name="album-generator-api" content="/api/album-cover" />
+    <meta http-equiv="refresh" content="0; url=index.html" />
     <link rel="icon" type="image/jpeg" href="Images/we_favicon.jpg" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -45,6 +47,10 @@
     />
     <link rel="stylesheet" href="style.css" />
     <link rel="stylesheet" href="album-generator.css" />
+    <script src="https://unpkg.com/@solana/web3.js@1.98.2/lib/index.iife.min.js"></script>
+    <script>
+      window.location.replace("index.html");
+    </script>
     <script defer src="album-generator.js"></script>
   </head>
   <body>
@@ -59,7 +65,6 @@
             <a href="about.html">About</a>
             <a href="contact.html">Contact</a>
             <a href="blog.html">Blog</a>
-            <a href="album-generator.html" aria-current="page">AI Generator</a>
           </div>
         </nav>
         <section class="page-hero">
@@ -91,6 +96,23 @@ A hyper-realistic underground gym with an enormous muscular athlete curling dumb
                 rows="10"
                 required
               ></textarea>
+
+              <section class="credit-panel" aria-label="Credits and payments">
+                <div class="wallet-panel">
+                  <button class="cta-button cta-outline wallet-connect-button" type="button" id="connect-wallet-button">Connect Wallet</button>
+                  <div class="wallet-identity">
+                    <p class="wallet-label">Wallet</p>
+                    <p class="wallet-address" id="wallet-address">Not connected</p>
+                  </div>
+                </div>
+                <div class="credit-summary">
+                  <p class="credit-heading">Credits</p>
+                  <p class="credit-balance" id="credit-balance">0</p>
+                </div>
+                <p class="credit-note" id="credit-note">You need additional credits before generating artwork.</p>
+                <div class="credit-pack-grid" id="credit-pack-grid"></div>
+                <p class="payment-status" id="payment-status" aria-live="polite"></p>
+              </section>
 
               <div class="generator-actions">
                 <button class="cta-button cta-primary" type="submit" id="generate-button">Generate Image</button>
@@ -125,6 +147,15 @@ A hyper-realistic underground gym with an enormous muscular athlete curling dumb
         <p class="footer-tagline">Soundtrack the journey.</p>
         <p class="footer-copy">&copy; 2026 Wave Engine. All rights reserved.</p>
       </footer>
+
+      <noscript>
+        <main class="page-main">
+          <section class="content-section prose-card">
+            <h2>AI Generator Unavailable</h2>
+            <p>The AI Generator is temporarily unavailable. Return to the <a class="text-link" href="index.html">homepage</a>.</p>
+          </section>
+        </main>
+      </noscript>
     </div>
   </body>
 </html>
