@@ -1,0 +1,142 @@
+.album-generator-main {
+  gap: 1.2rem;
+}
+
+.album-generator-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.generator-panel,
+.preview-panel {
+  display: grid;
+  gap: 1rem;
+}
+
+.generator-panel h2,
+.preview-panel h2 {
+  margin: 0;
+}
+
+.generator-copy {
+  margin: 0;
+}
+
+.generator-form {
+  display: grid;
+  gap: 1rem;
+}
+
+.generator-label {
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.generator-textarea {
+  width: 100%;
+  min-height: 260px;
+  padding: 1rem 1.1rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  font: inherit;
+  line-height: 1.6;
+  resize: vertical;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.generator-textarea::placeholder {
+  color: rgba(166, 179, 214, 0.88);
+}
+
+.generator-textarea:focus-visible {
+  outline: 2px solid rgba(30, 215, 96, 0.6);
+  outline-offset: 3px;
+}
+
+.generator-actions {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.generator-actions .cta-button[disabled] {
+  cursor: not-allowed;
+  opacity: 0.55;
+  transform: none;
+  box-shadow: none;
+}
+
+.generator-status,
+.generator-error {
+  min-height: 1.5rem;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.generator-status {
+  color: #dfe7ff;
+}
+
+.generator-error {
+  padding: 0.85rem 1rem;
+  border: 1px solid rgba(255, 77, 109, 0.24);
+  border-radius: 16px;
+  background: rgba(255, 77, 109, 0.1);
+  color: #ffd9e1;
+}
+
+.preview-header {
+  display: grid;
+  gap: 0.75rem;
+  justify-items: center;
+  text-align: center;
+}
+
+.preview-frame {
+  position: relative;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at top, rgba(30, 215, 96, 0.12), transparent 40%),
+    radial-gradient(circle at bottom, rgba(255, 77, 109, 0.1), transparent 44%),
+    rgba(255, 255, 255, 0.03);
+}
+
+.preview-empty {
+  width: min(100%, 22rem);
+  margin: 0;
+  padding: 1.25rem;
+  color: var(--muted);
+  line-height: 1.6;
+  text-align: center;
+}
+
+.preview-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+@media (min-width: 860px) {
+  .album-generator-grid {
+    grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);
+    align-items: start;
+  }
+
+  .preview-panel {
+    position: sticky;
+    top: 1rem;
+  }
+}
+
+@media (max-width: 599px) {
+  .generator-textarea {
+    min-height: 220px;
+  }
+}

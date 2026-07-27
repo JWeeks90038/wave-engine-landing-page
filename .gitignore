@@ -10,3 +10,11 @@ Thumbs.db
 
 # Python local server cache
 __pycache__/
+
+# Local environment secrets
+.env
+.env.*
+server/.env
+server/.env.*
+!.env.example
+!server/.env.example

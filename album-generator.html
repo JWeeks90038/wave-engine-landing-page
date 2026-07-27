@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI Album Cover Generator | Wave Engine</title>
+    <meta
+      name="description"
+      content="Generate professional album cover artwork with Wave Engine's AI Album Cover Generator powered by OpenAI image generation."
+    />
+    <meta
+      name="keywords"
+      content="AI album cover generator, Wave Engine, OpenAI images, music artwork, album cover art"
+    />
+    <link rel="canonical" href="https://waveenginemusic.com/album-generator.html" />
+    <meta property="og:title" content="AI Album Cover Generator | Wave Engine" />
+    <meta
+      property="og:description"
+      content="Generate professional album cover artwork using OpenAI through Wave Engine's secure AI generator workflow."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://waveenginemusic.com/album-generator.html" />
+    <meta property="og:image" content="https://waveenginemusic.com/Images/wave-engine-social-card-4k-v1.png" />
+    <meta property="og:image:secure_url" content="https://waveenginemusic.com/Images/wave-engine-social-card-4k-v1.png" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="2400" />
+    <meta property="og:image:height" content="1260" />
+    <meta property="og:image:alt" content="Wave Engine cinematic motivational music artwork with logo, waveform, and mountain landscape." />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="AI Album Cover Generator | Wave Engine" />
+    <meta
+      name="twitter:description"
+      content="Generate professional album cover artwork using OpenAI."
+    />
+    <meta name="twitter:image" content="https://waveenginemusic.com/Images/wave-engine-social-card-4k-v1.png" />
+    <meta name="twitter:image:alt" content="Wave Engine cinematic motivational music artwork with logo, waveform, and mountain landscape." />
+    <meta name="theme-color" content="#050816" />
+    <meta name="album-generator-api" content="/api/album-cover" />
+    <link rel="icon" type="image/jpeg" href="Images/we_favicon.jpg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;900&family=Space+Grotesk:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="album-generator.css" />
+    <script defer src="album-generator.js"></script>
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="site-header page-header">
+        <nav class="topbar site-nav" aria-label="Primary">
+          <a class="brand-link" href="index.html">Wave Engine</a>
+          <div class="nav-links">
+            <a href="index.html">Home</a>
+            <a href="music.html">Music</a>
+            <a href="stream.html">Stream</a>
+            <a href="about.html">About</a>
+            <a href="contact.html">Contact</a>
+            <a href="blog.html">Blog</a>
+            <a href="album-generator.html" aria-current="page">AI Generator</a>
+          </div>
+        </nav>
+        <section class="page-hero">
+          <p class="eyebrow">Creative Tools</p>
+          <h1>AI Album Cover Generator</h1>
+          <p class="page-intro">Generate professional album cover artwork using OpenAI.</p>
+        </section>
+      </header>
+
+      <main class="page-main album-generator-main">
+        <section class="content-section album-generator-grid">
+          <article class="prose-card generator-panel">
+            <h2>Create your artwork</h2>
+            <p class="generator-copy">
+              Describe the mood, setting, subject, colors, and energy you want. The generator automatically formats the request for polished square streaming artwork.
+            </p>
+
+            <form class="generator-form" id="album-generator-form" novalidate>
+              <label class="generator-label" for="album-prompt">Artwork prompt</label>
+              <textarea
+                id="album-prompt"
+                name="prompt"
+                class="generator-textarea"
+                placeholder="Describe your album artwork...
+
+Example:
+
+A hyper-realistic underground gym with an enormous muscular athlete curling dumbbells under dramatic red and blue lighting, cinematic shadows, intense atmosphere, square album cover composition."
+                rows="10"
+                required
+              ></textarea>
+
+              <div class="generator-actions">
+                <button class="cta-button cta-primary" type="submit" id="generate-button">Generate Image</button>
+                <button class="cta-button cta-outline" type="button" id="download-button" disabled>Download Image</button>
+              </div>
+
+              <p class="generator-status" id="generator-status" aria-live="polite"></p>
+              <p class="generator-error" id="generator-error" aria-live="polite" hidden></p>
+            </form>
+          </article>
+
+          <article class="prose-card preview-panel">
+            <div class="preview-header">
+              <span class="stream-pill">Preview</span>
+              <h2>Generated cover</h2>
+            </div>
+            <div class="preview-frame" id="preview-frame">
+              <p class="preview-empty" id="preview-empty">Your generated album artwork will appear here.</p>
+              <img class="preview-image" id="preview-image" alt="Generated album cover artwork preview" hidden />
+            </div>
+          </article>
+        </section>
+      </main>
+
+      <footer class="footer">
+        <div class="footer-links" aria-label="Site links">
+          <a href="index.html">Home</a>
+          <a href="music.html">Music</a>
+          <a href="stream.html">Stream</a>
+          <a href="contact.html">Contact</a>
+        </div>
+        <p class="footer-tagline">Soundtrack the journey.</p>
+        <p class="footer-copy">&copy; 2026 Wave Engine. All rights reserved.</p>
+      </footer>
+    </div>
+  </body>
+</html>
