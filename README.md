@@ -28,6 +28,11 @@ High-conversion, mobile-first landing page for Wave Engine built with plain HTML
 - `server/session-service.js` - anonymous signed user session helper for future auth upgrades
 - `server/storage/database.js` - pluggable storage layer with local JSON persistence
 - `server/album-generator-server.js` - secure local/backend proxy for OpenAI image generation
+- `apparel.html`, `apparel.css`, `apparel.js` - LISTEN UP AMERICA! storefront and browser cart
+- `apparel-success.html`, `apparel-cancel.html`, `apparel-status.js` - Stripe return pages and payment-status verification
+- `server/apparel-catalog.js` - trusted apparel catalog, variants, and placeholder prices
+- `api/apparel-*.js` - apparel catalog, checkout, payment-status, and webhook endpoints
+- `Images/apparel/` - replaceable product image placeholders
 - `Images/` - local artwork used by the page
 
 ## Local Preview
@@ -51,6 +56,8 @@ http://127.0.0.1:4173/index.html
 The album cover generator page uses a separate backend endpoint so the OpenAI API key never appears in the browser.
 
 The generator now includes a credit system with direct SOL wallet payments. Credits are enforced on the server before any OpenAI image generation call is made.
+
+Run `npm install` once before starting the Node backend to install its dependencies.
 
 1. Set the `OPENAI_API_KEY` environment variable.
 2. Set the Solana environment variables.
@@ -117,6 +124,83 @@ Setup:
 3. Deploy.
 
 In this setup, no frontend endpoint change is needed because `album-generator.html` already defaults to `/api/album-cover`.
+
+## Apparel marketplace and Stripe live mode
+
+**Checkout charges real money, but no apparel will be shipped or fulfilled.** The product images,
+descriptions, and the Freedom Edition price are placeholders. There is no shipping address collection, shipping/tax
+calculation, durable order database, inventory management, or fulfillment integration. The
+storefront and Stripe Checkout disclose this before payment. A verified webhook logs the event
+and session IDs; it does not create or fulfill an order. The cart stays in browser storage after
+checkout, including after a successful payment. Monitor Stripe directly and handle any customer
+inquiries and refunds manually.
+
+### Local setup
+
+Node.js 18 or newer is required. Install dependencies with `npm install`. Configure a Stripe
+**live** secret or restricted key privately in your environment, then start the existing API server.
+The example below uses placeholders; do not put real keys in the repository or share them in chat:
+
+```powershell
+$env:STRIPE_SECRET_KEY="sk_live_replace_me"
+$env:APPAREL_SITE_URL="http://127.0.0.1:4173/"
+$env:STRIPE_WEBHOOK_SECRET="whsec_replace_me"
+node .\server\album-generator-server.js
+```
+
+Serve the repository as a static site on port 4173 (for example, `python -m http.server 4173`)
+and visit `http://127.0.0.1:4173/apparel.html`. The browser uses the local API at port 8787.
+Any completed checkout with a live key is a real charge, even locally. The publishable key is
+not needed for this server-created Stripe Checkout flow.
+
+### Deployment and live-readiness
+
+Deploy the same repository to Vercel for the Node API and set `STRIPE_SECRET_KEY`,
+`STRIPE_WEBHOOK_SECRET`, and `APPAREL_SITE_URL` in the Vercel environment. Use the exact
+public site base URL, including any GitHub Pages path and a trailing slash, for
+`APPAREL_SITE_URL`; the server never derives return URLs from a request header. Register
+`https://your-vercel-project.vercel.app/api/apparel-webhook` as a Stripe **live-mode** webhook
+endpoint for `checkout.session.completed` and `checkout.session.async_payment_succeeded`, and
+use that endpoint's signing secret. Deploy after setting the variables.
+
+When the static site is hosted on GitHub Pages separately from Vercel, set the
+`apparel-api-base` meta tag in **both** `apparel.html` and `apparel-success.html` to the API
+origin, for example `https://your-vercel-project.vercel.app` (without `/api`). When the
+site and API share an origin, leave both values empty. A static-only deployment without the
+API cannot load the catalog or take checkout payments.
+
+Edit `server/apparel-catalog.js` to add products or update trusted price IDs, colors, sizes, and the
+front/back/model image paths. Original Edition uses the configured live Stripe Price ID. The
+catalog endpoint retrieves its current amount from Stripe; checkout uses that same Stripe Price
+ID and stores selected sizes and colors in Checkout Session metadata (`variants_1`, etc.).
+The Stripe product name is displayed at checkout; size and color selections are recorded in
+session metadata rather than shown as separate Stripe line-item descriptions. The price must be
+active, live, one-time, fixed per-unit, in USD, and not tax-inclusive. If Stripe is unavailable
+or the price is unsupported, the collection shows the catalog's unverified `previewPrice` if
+available. Items can be added to the cart, but checkout is disabled until every cart price is
+verified. Update this amount when the expected price changes;
+Stripe's verified price always takes precedence. Loading the verified price locally needs the live key or a
+configured remote API. The Freedom Edition still uses a placeholder price in integer
+cents. The three SVG illustrations in each
+product's `images` array are placeholders, not actual product photography. Replace them with
+optimized photos before launch. The catalog endpoint supplies the same trusted data to the
+storefront; checkout independently validates IDs, selections, and quantities and ignores any
+browser-submitted price.
+
+The navigation and collection background uses `Images/apparel/apparel-background.jpg.png`.
+Replace that file with your own artwork, or update the image URL in
+the `.apparel-stage` rule in `apparel.css`. The dark overlay keeps the navigation and heading
+legible; the cart keeps its separate dark background.
+
+Before offering actual apparel for sale, replace placeholder content and pricing, implement durable
+and idempotent order recording keyed by Stripe event/session ID, reliable fulfillment and webhook
+retry handling, shipping/tax and customer support policies, and thoroughly verify the entire flow.
+The code rejects test keys, test sessions, and test webhook events. A separate live webhook
+signing secret is required; the API secret key and publishable key are not webhook secrets.
+
+Run the focused automated checks with `npm test`.
+
+## Album generator: GitHub Pages and Railway
 
 ### Option 2: Keep GitHub Pages for the site and use Vercel only for the API
 

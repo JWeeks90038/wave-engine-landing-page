@@ -21,3 +21,4 @@ server/.env.*
 
 # Local credit/payment store
 server/data/*.json
+node_modules/

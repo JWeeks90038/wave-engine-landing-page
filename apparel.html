@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Discover LISTEN UP AMERICA! apparel at Wave Engine." />
+    <meta name="apparel-api-base" content="" />
+    <title>Apparel | Wave Engine</title>
+    <link rel="icon" type="image/jpeg" href="Images/we_favicon.jpg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;900&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="apparel.css" />
+    <script defer src="apparel.js"></script>
+  </head>
+  <body class="apparel-page">
+    <div class="page-shell">
+      <main>
+        <div class="apparel-stage">
+          <header>
+            <nav class="topbar site-nav" aria-label="Primary">
+              <a class="brand-link" href="index.html">Wave Engine</a>
+              <div class="nav-links">
+                <a href="index.html">Home</a><a href="music.html">Music</a><a href="stream.html">Stream</a>
+                <a href="apparel.html" aria-current="page">Apparel</a><a href="about.html">About</a>
+                <a href="contact.html">Contact</a><a href="blog.html">Blog</a>
+              </div>
+            </nav>
+          </header>
+          <section id="collection" class="collection" aria-labelledby="collection-title">
+            <div class="section-heading">
+              <div><p class="apparel-kicker">Built on belief</p><h1 id="collection-title">The collection.</h1></div>
+              <a href="#cart" class="cart-link">Your cart <span id="cart-count">0</span></a>
+            </div>
+            <p id="catalog-status" role="status">Loading the collection...</p>
+            <noscript>JavaScript is required to load the collection and use the cart.</noscript>
+            <div id="products" class="products"></div>
+          </section>
+        </div>
+        <section id="cart" class="cart-section" aria-labelledby="cart-title">
+          <div class="section-heading"><div><p class="apparel-kicker">Your selection</p><h2 id="cart-title">Shopping cart.</h2></div></div>
+          <p id="cart-notice" role="status" aria-live="polite"></p>
+          <div id="cart-items"></div>
+          <div class="cart-total"><span>Subtotal</span><strong id="cart-subtotal">$0.00</strong></div>
+          <p class="cart-note"><strong>Please click check out to continue.</strong> </p>
+          <button id="checkout" class="shop-button" type="button" disabled>Checkout</button>
+        </section>
+      </main>
+      <footer class="apparel-footer"><span>LISTEN UP AMERICA!</span><a href="index.html">Back to Wave Engine &rarr;</a></footer>
+    </div>
+    <dialog id="image-dialog" class="image-dialog" aria-label="Product image">
+      <button type="button" class="dialog-close" aria-label="Close image">Close &times;</button>
+      <img alt="" />
+    </dialog>
+    <template id="product-template">
+      <article class="product-card">
+        <div class="gallery">
+          <button class="main-image" type="button" aria-label="View larger product image"><img alt="" /></button>
+          <div class="thumbnails" aria-label="Product images"></div>
+        </div>
+        <div class="product-info">
+          <p class="apparel-kicker">Listen Up America! / Collection 01</p>
+          <h3></h3><p class="product-description"></p><p class="product-price"></p>
+          <p class="product-disclaimer"></p>
+          <form class="product-form">
+            <label>Color<select name="color" required><option value="">Select color</option></select></label>
+            <label>Size<select name="size" required><option value="">Select size</option></select></label>
+            <label>Quantity<input name="quantity" type="number" min="1" max="20" value="1" required /></label>
+            <div class="product-actions"><button class="shop-button" type="submit">Add to cart</button><button class="outline-button buy-now" type="button">Buy now</button></div>
+            <p class="product-feedback" role="status" aria-live="polite"></p>
+          </form>
+        </div>
+      </article>
+    </template>
+  </body>
+</html>

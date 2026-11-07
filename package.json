@@ -1,0 +1,10 @@
+{
+  "name": "wave-engine-landing-page",
+  "private": true,
+  "scripts": {
+    "test": "node --test tests/*.test.js"
+  },
+  "dependencies": {
+    "stripe": "^18.5.0"
+  }
+}
