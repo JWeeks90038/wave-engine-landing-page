@@ -1,7 +1,7 @@
 const { readJsonBody, sendJson, setCorsHeaders } = require("../server/api-utils");
 const { validateCart } = require("../server/apparel-catalog");
-const { getStripe, getSiteUrl } = require("../server/apparel-stripe");
-const { validateStripePrice, cartMetadata } = require("../server/apparel-pricing");
+const { getStripe, getSiteUrl, getMode, getPriceId } = require("../server/apparel-stripe");
+const { validateStripePrice, cartMetadata, shippingForSubtotal } = require("../server/apparel-pricing");
 
 module.exports = async (request, response) => {
   if (request.method === "OPTIONS") {
@@ -21,37 +21,44 @@ module.exports = async (request, response) => {
   }
 
   try {
+    if (getMode() === "live" && process.env.APPAREL_LIVE_CHECKOUT_ENABLED !== "true") {
+      throw new Error("Live apparel checkout is not enabled.");
+    }
     const site = getSiteUrl();
     const stripe = getStripe();
     const stripePrices = new Map();
     for (const { product } of items) {
-      if (product.stripePriceId && !stripePrices.has(product.stripePriceId)) {
-        const price = await stripe.prices.retrieve(product.stripePriceId);
-        validateStripePrice(price, product);
-        stripePrices.set(product.stripePriceId, price);
+      if (!stripePrices.has(product.id)) {
+        const price = await stripe.prices.retrieve(getPriceId(product));
+        stripePrices.set(product.id, validateStripePrice(price, product));
       }
     }
+    const subtotal = items.reduce((sum, { product, quantity }) => sum + stripePrices.get(product.id) * quantity, 0);
+    const shipping = shippingForSubtotal(subtotal);
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
       metadata: cartMetadata(items),
-      custom_text: {
-        submit: { message: "This is a real payment. No apparel will be shipped or fulfilled." }
-      },
-      line_items: items.map(({ product, size, color, quantity }) => product.stripePriceId ? ({
-        price: product.stripePriceId,
-        quantity
-      }) : ({
+      shipping_address_collection: { allowed_countries: ["US"] },
+      phone_number_collection: { enabled: true },
+      shipping_options: [{
+        shipping_rate_data: {
+          type: "fixed_amount",
+          fixed_amount: { amount: shipping, currency: "usd" },
+          display_name: shipping ? "Standard shipping" : "Free shipping"
+        }
+      }],
+      line_items: items.map(({ product, size, color, quantity }) => ({
         price_data: {
           currency: product.currency,
-          unit_amount: product.price,
-          product_data: { name: product.name, description: `Size: ${size} | Color: ${color}` }
+          unit_amount: stripePrices.get(product.id),
+          product_data: { name: `${product.name} - ${size} / ${color}`, description: product.description }
         },
         quantity
       })),
       success_url: new URL("apparel-success.html?session_id={CHECKOUT_SESSION_ID}", site).href.replace("%7BCHECKOUT_SESSION_ID%7D", "{CHECKOUT_SESSION_ID}"),
       cancel_url: new URL("apparel-cancel.html", site).href
     });
-    if (!session.url || session.livemode !== true) throw new Error("Stripe did not return a live checkout session.");
+    if (!session.url || session.livemode !== (getMode() === "live")) throw new Error("Stripe returned a checkout session in the wrong mode.");
     sendJson(response, 200, { url: session.url });
   } catch (error) {
     console.error("Apparel checkout error:", error.message);

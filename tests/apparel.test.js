@@ -4,7 +4,7 @@ const { Readable } = require("node:stream");
 const Stripe = require("stripe");
 const { products, validateCart } = require("../server/apparel-catalog");
 const stripeConfig = require("../server/apparel-stripe");
-const { validateStripePrice, getPublicProducts, cartMetadata } = require("../server/apparel-pricing");
+const { validateStripePrice, getPublicProducts, cartMetadata, shippingForSubtotal } = require("../server/apparel-pricing");
 
 function request(method, body, headers = {}, url = "/") {
   const stream = Readable.from(body ? [Buffer.from(body)] : []);
@@ -22,7 +22,7 @@ function response() {
   };
 }
 const item = { id: "original", size: "XL", color: "Black", quantity: 2 };
-const stripePrice = { id: products[0].stripePriceId, livemode: true, active: true, type: "one_time", currency: "usd", unit_amount: 4500, billing_scheme: "per_unit", tax_behavior: "unspecified" };
+const stripePrice = { id: products[0].stripePriceId, livemode: true, active: true, type: "one_time", currency: "usd", unit_amount: 2499, billing_scheme: "per_unit", tax_behavior: "unspecified" };
 const freedomPrice = { ...stripePrice, id: "price_1UZGZ3I1ucU6ficLtysDHW1K", unit_amount: 2999 };
 
 test("catalog has two products with distinct image paths and all requested sizes", () => {
@@ -59,7 +59,7 @@ test("server validates every cart variant and quantity", () => {
 test("catalog uses Stripe's current price and fails closed on unsupported prices", async () => {
   const stripe = { prices: { retrieve: async (id) => id === stripePrice.id ? stripePrice : freedomPrice } };
   const publicProducts = await getPublicProducts(products, () => stripe);
-  assert.equal(publicProducts[0].price, 4500);
+  assert.equal(publicProducts[0].price, 2499);
   assert.equal(publicProducts[0].stripePriceId, undefined);
   assert.equal(publicProducts[0].previewPrice, undefined);
   assert.equal(publicProducts[1].price, 2999);
@@ -68,7 +68,7 @@ test("catalog uses Stripe's current price and fails closed on unsupported prices
   for (const invalid of [
     { active: false }, { livemode: false }, { type: "recurring" }, { currency: "eur" },
     { unit_amount: null }, { billing_scheme: "tiered" }, { transform_quantity: {} },
-    { custom_unit_amount: {} }, { tax_behavior: "inclusive" }, { id: "price_wrong" }
+    { custom_unit_amount: {} }, { tax_behavior: "inclusive" }, { id: "price_wrong" }, { unit_amount: 2500 }
   ]) assert.throws(() => validateStripePrice({ ...stripePrice, ...invalid }, products[0]));
   const unavailable = await getPublicProducts(products, () => ({ prices: { retrieve: async () => { throw new Error("unavailable"); } } }));
   assert.equal(unavailable[0].price, null);
@@ -127,6 +127,8 @@ test("variant metadata preserves size, color, and quantities within Stripe limit
 });
 
 test("checkout ignores client price and uses the configured return origin", async () => {
+  const previousEnabled = process.env.APPAREL_LIVE_CHECKOUT_ENABLED;
+  process.env.APPAREL_LIVE_CHECKOUT_ENABLED = "true";
   const originalStripe = stripeConfig.getStripe;
   const originalSite = stripeConfig.getSiteUrl;
   let params;
@@ -139,15 +141,23 @@ test("checkout ignores client price and uses the configured return origin", asyn
   delete require.cache[require.resolve("../api/apparel-checkout")];
   const handler = require("../api/apparel-checkout");
   try {
+    delete process.env.APPAREL_LIVE_CHECKOUT_ENABLED;
+    const disabled = response();
+    await handler(request("POST", JSON.stringify({ items: [item] })), disabled);
+    assert.equal(disabled.status, 503);
+    process.env.APPAREL_LIVE_CHECKOUT_ENABLED = "true";
     const res = response();
     await handler(request("POST", JSON.stringify({ items: [{ ...item, price: 1 }] })), res);
     assert.equal(res.status, 200);
-    assert.equal(params.line_items[0].price, stripePrice.id);
+    assert.equal(params.line_items[0].price_data.unit_amount, 2499);
+    assert.match(params.line_items[0].price_data.product_data.name, /XL \/ Black/);
+    assert.equal(params.line_items[0].price_data.product_data.description, products[0].description);
     assert.equal(params.line_items[0].quantity, 2);
+    assert.deepEqual(params.shipping_address_collection.allowed_countries, ["US"]);
+    assert.equal(params.phone_number_collection.enabled, true);
+    assert.equal(params.shipping_options[0].shipping_rate_data.fixed_amount.amount, 599);
     assert.equal(params.metadata.storefront, "wave-apparel-v1");
     assert.deepEqual(JSON.parse(params.metadata.variants_1), [["original", "XL", "Black", 2]]);
-    assert.match(params.custom_text.submit.message, /real payment/i);
-    assert.match(params.custom_text.submit.message, /no apparel will be shipped/i);
     assert.equal(params.success_url, "https://example.com/subsite/apparel-success.html?session_id={CHECKOUT_SESSION_ID}");
     assert.equal(params.cancel_url, "https://example.com/subsite/apparel-cancel.html");
     const invalid = response();
@@ -161,13 +171,22 @@ test("checkout ignores client price and uses the configured return origin", asyn
     const freedom = response();
     await handler(request("POST", JSON.stringify({ items: [{ id: "freedom", size: "S", color: "White", quantity: 1, price: 1 }] })), freedom);
     assert.equal(freedom.status, 200);
-    assert.equal(params.line_items[0].price, freedomPrice.id);
+    assert.equal(params.line_items[0].price_data.unit_amount, freedomPrice.unit_amount);
     assert.equal(params.line_items[0].quantity, 1);
     assert.deepEqual(JSON.parse(params.metadata.variants_1), [["freedom", "S", "White", 1]]);
     const mixed = response();
     await handler(request("POST", JSON.stringify({ items: [item, { id: "freedom", size: "S", color: "White", quantity: 1 }] })), mixed);
     assert.equal(mixed.status, 200);
-    assert.deepEqual(params.line_items.map((line) => line.price), [stripePrice.id, freedomPrice.id]);
+    assert.deepEqual(params.line_items.map((line) => line.price_data.unit_amount), [2499, 2999]);
+    assert.equal(params.shipping_options[0].shipping_rate_data.fixed_amount.amount, 0);
+    const three = response();
+    await handler(request("POST", JSON.stringify({ items: [{ ...item, quantity: 3 }] })), three);
+    assert.equal(three.status, 200);
+    assert.equal(params.shipping_options[0].shipping_rate_data.fixed_amount.amount, 599);
+    const four = response();
+    await handler(request("POST", JSON.stringify({ items: [{ ...item, quantity: 4 }] })), four);
+    assert.equal(four.status, 200);
+    assert.equal(params.shipping_options[0].shipping_rate_data.fixed_amount.amount, 0);
     liveMode = false;
     const nonLive = response();
     await handler(request("POST", JSON.stringify({ items: [item] })), nonLive);
@@ -175,15 +194,66 @@ test("checkout ignores client price and uses the configured return origin", asyn
   } finally {
     stripeConfig.getStripe = originalStripe;
     stripeConfig.getSiteUrl = originalSite;
+    if (previousEnabled === undefined) delete process.env.APPAREL_LIVE_CHECKOUT_ENABLED; else process.env.APPAREL_LIVE_CHECKOUT_ENABLED = previousEnabled;
   }
 });
 
-test("only live keys are accepted and unsafe return URLs are rejected", () => {
+test("shipping threshold uses the pre-tax merchandise subtotal", () => {
+  assert.equal(shippingForSubtotal(7497), 599);
+  assert.equal(shippingForSubtotal(7499), 599);
+  assert.equal(shippingForSubtotal(7500), 0);
+  assert.equal(shippingForSubtotal(7997), 0);
+});
+
+test("test mode uses test prices and accepts only test sessions", async () => {
+  const previous = {
+    mode: process.env.APPAREL_STRIPE_MODE,
+    price: process.env.APPAREL_TEST_PRICE_ORIGINAL,
+    enabled: process.env.APPAREL_LIVE_CHECKOUT_ENABLED
+  };
+  const originalStripe = stripeConfig.getStripe;
+  const originalSite = stripeConfig.getSiteUrl;
+  process.env.APPAREL_STRIPE_MODE = "test";
+  process.env.APPAREL_TEST_PRICE_ORIGINAL = "price_testOriginal";
+  delete process.env.APPAREL_LIVE_CHECKOUT_ENABLED;
+  let params;
+  stripeConfig.getStripe = () => ({
+    prices: { retrieve: async (id) => ({ ...stripePrice, id, livemode: false }) },
+    checkout: { sessions: { create: async (value) => { params = value; return { url: "https://checkout.stripe.com/test", livemode: false }; } } }
+  });
+  stripeConfig.getSiteUrl = () => new URL("http://127.0.0.1:5500/");
+  delete require.cache[require.resolve("../api/apparel-checkout")];
+  const handler = require("../api/apparel-checkout");
+  try {
+    const res = response();
+    await handler(request("POST", JSON.stringify({ items: [item] })), res);
+    assert.equal(res.status, 200);
+    assert.equal(params.line_items[0].price_data.unit_amount, 2499);
+    assert.equal(params.shipping_options[0].shipping_rate_data.fixed_amount.amount, 599);
+  } finally {
+    stripeConfig.getStripe = originalStripe;
+    stripeConfig.getSiteUrl = originalSite;
+    for (const [key, value] of Object.entries({
+      APPAREL_STRIPE_MODE: previous.mode,
+      APPAREL_TEST_PRICE_ORIGINAL: previous.price,
+      APPAREL_LIVE_CHECKOUT_ENABLED: previous.enabled
+    })) {
+      if (value === undefined) delete process.env[key]; else process.env[key] = value;
+    }
+  }
+});
+
+test("Stripe keys must match the configured mode and unsafe return URLs are rejected", () => {
   const previousKey = process.env.STRIPE_SECRET_KEY;
   const previousSite = process.env.APPAREL_SITE_URL;
+  const previousMode = process.env.APPAREL_STRIPE_MODE;
   try {
+    delete process.env.APPAREL_STRIPE_MODE;
     process.env.STRIPE_SECRET_KEY = "sk_test_example";
     assert.throws(() => stripeConfig.getStripe(), /live mode/);
+    process.env.APPAREL_STRIPE_MODE = "test";
+    assert.ok(stripeConfig.getStripe());
+    process.env.APPAREL_STRIPE_MODE = "live";
     process.env.STRIPE_SECRET_KEY = "sk_live_example";
     assert.ok(stripeConfig.getStripe());
     process.env.STRIPE_SECRET_KEY = "rk_live_example";
@@ -195,6 +265,7 @@ test("only live keys are accepted and unsafe return URLs are rejected", () => {
   } finally {
     if (previousKey === undefined) delete process.env.STRIPE_SECRET_KEY; else process.env.STRIPE_SECRET_KEY = previousKey;
     if (previousSite === undefined) delete process.env.APPAREL_SITE_URL; else process.env.APPAREL_SITE_URL = previousSite;
+    if (previousMode === undefined) delete process.env.APPAREL_STRIPE_MODE; else process.env.APPAREL_STRIPE_MODE = previousMode;
   }
 });
 
@@ -207,34 +278,54 @@ test("order confirmation reports paid only for a verified live session", async (
   try {
     const paid = response();
     await handler(request("GET", "", {}, "/api/apparel-order-status?session_id=cs_live_example"), paid);
-    assert.deepEqual(paid.body, { paid: true });
+    assert.deepEqual(paid.body, { mode: "live", paid: true });
     assert.equal(paid.headers["Cache-Control"], "no-store");
     session = { livemode: true, payment_status: "unpaid", metadata: { storefront: "wave-apparel-v1" } };
     const pending = response();
     await handler(request("GET", "", {}, "/api/apparel-order-status?session_id=cs_live_example"), pending);
-    assert.deepEqual(pending.body, { paid: false });
+    assert.deepEqual(pending.body, { mode: "live", paid: false });
     session = { livemode: false, payment_status: "paid", metadata: { storefront: "wave-apparel-v1" } };
     const testSession = response();
     await handler(request("GET", "", {}, "/api/apparel-order-status?session_id=cs_live_example"), testSession);
-    assert.deepEqual(testSession.body, { paid: false });
+    assert.deepEqual(testSession.body, { mode: "live", paid: false });
     session = { livemode: true, payment_status: "paid", metadata: {} };
     const unrelated = response();
     await handler(request("GET", "", {}, "/api/apparel-order-status?session_id=cs_live_example"), unrelated);
-    assert.deepEqual(unrelated.body, { paid: false });
+    assert.deepEqual(unrelated.body, { mode: "live", paid: false });
     const invalid = response();
     await handler(request("GET", "", {}, "/api/apparel-order-status?session_id=cs_test_example"), invalid);
     assert.equal(invalid.status, 400);
+    const previousMode = process.env.APPAREL_STRIPE_MODE;
+    try {
+      process.env.APPAREL_STRIPE_MODE = "test";
+      session = { livemode: false, payment_status: "paid", metadata: { storefront: "wave-apparel-v1" } };
+      const verifiedTest = response();
+      await handler(request("GET", "", {}, "/api/apparel-order-status?session_id=cs_test_example"), verifiedTest);
+      assert.deepEqual(verifiedTest.body, { mode: "test", paid: true });
+      const wrongMode = response();
+      await handler(request("GET", "", {}, "/api/apparel-order-status?session_id=cs_live_example"), wrongMode);
+      assert.equal(wrongMode.status, 400);
+    } finally {
+      if (previousMode === undefined) delete process.env.APPAREL_STRIPE_MODE; else process.env.APPAREL_STRIPE_MODE = previousMode;
+    }
   } finally {
     stripeConfig.getStripe = originalStripe;
   }
 });
 
-test("webhook requires a valid Stripe signature and rejects test events", async () => {
+test("webhook verifies signatures, retrieves paid sessions, and rejects wrong modes", async () => {
   const previousKey = process.env.STRIPE_SECRET_KEY;
   const previousSecret = process.env.STRIPE_WEBHOOK_SECRET;
   process.env.STRIPE_SECRET_KEY = "sk_live_example";
   process.env.STRIPE_WEBHOOK_SECRET = "whsec_example";
   const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+  const originalStripe = stripeConfig.getStripe;
+  let session = {
+    id: "cs_live_example", livemode: true, payment_status: "paid", metadata: { storefront: "wave-apparel-v1" },
+    collected_information: { shipping_details: { name: "Customer", address: { line1: "1 Main St", city: "City", state: "CA", postal_code: "90210", country: "US" } } }
+  };
+  stripeConfig.getStripe = () => ({ webhooks: stripe.webhooks, checkout: { sessions: { retrieve: async () => session } } });
+  delete require.cache[require.resolve("../api/apparel-webhook")];
   const handler = require("../api/apparel-webhook");
   const payload = JSON.stringify({ id: "evt_live_example", type: "checkout.session.completed", livemode: true, data: { object: { id: "cs_live_example", payment_status: "paid", metadata: { storefront: "wave-apparel-v1" } } } });
   const signature = stripe.webhooks.generateTestHeaderString({ payload, secret: process.env.STRIPE_WEBHOOK_SECRET });
@@ -242,6 +333,24 @@ test("webhook requires a valid Stripe signature and rejects test events", async 
     const valid = response();
     await handler(request("POST", payload, { "stripe-signature": signature }), valid);
     assert.equal(valid.status, 200);
+    const duplicate = response();
+    await handler(request("POST", payload, { "stripe-signature": signature }), duplicate);
+    assert.equal(duplicate.status, 200);
+    session.collected_information.shipping_details = null;
+    const missingAddress = response();
+    await handler(request("POST", payload, { "stripe-signature": signature }), missingAddress);
+    assert.equal(missingAddress.status, 503);
+    session.payment_status = "unpaid";
+    const pending = response();
+    await handler(request("POST", payload, { "stripe-signature": signature }), pending);
+    assert.equal(pending.status, 200);
+    for (const type of ["checkout.session.async_payment_succeeded", "checkout.session.async_payment_failed"]) {
+      const asyncPayload = payload.replace("checkout.session.completed", type);
+      const asyncSignature = stripe.webhooks.generateTestHeaderString({ payload: asyncPayload, secret: process.env.STRIPE_WEBHOOK_SECRET });
+      const asyncResponse = response();
+      await handler(request("POST", asyncPayload, { "stripe-signature": asyncSignature }), asyncResponse);
+      assert.equal(asyncResponse.status, 200);
+    }
     const invalid = response();
     await handler(request("POST", payload, { "stripe-signature": "invalid" }), invalid);
     assert.equal(invalid.status, 400);
@@ -251,7 +360,58 @@ test("webhook requires a valid Stripe signature and rejects test events", async 
     await handler(request("POST", testPayload, { "stripe-signature": testSignature }), testEvent);
     assert.equal(testEvent.status, 400);
   } finally {
+    stripeConfig.getStripe = originalStripe;
     if (previousKey === undefined) delete process.env.STRIPE_SECRET_KEY; else process.env.STRIPE_SECRET_KEY = previousKey;
     if (previousSecret === undefined) delete process.env.STRIPE_WEBHOOK_SECRET; else process.env.STRIPE_WEBHOOK_SECRET = previousSecret;
   }
+});
+
+test("order review retains variants, address and Stripe totals", () => {
+  const { orderFromSession } = require("../server/apparel-orders");
+  const session = {
+    id: "cs_test_example", livemode: false, created: 1700000000, payment_status: "paid",
+    payment_intent: "pi_test_example", currency: "usd", amount_subtotal: 7997, amount_total: 7997,
+    total_details: { amount_tax: 0, amount_shipping: 0 },
+    customer_details: { email: "customer@example.test", phone: null },
+    collected_information: { shipping_details: { name: "Customer", address: { line1: "1 Main St", line2: "Unit 2", city: "City", state: "CA", postal_code: "90210", country: "US" } } },
+    metadata: cartMetadata(validateCart([item, { id: "freedom", size: "S", color: "White", quantity: 1 }]))
+  };
+  const lines = [{ description: "Original", quantity: 2, amount_total: 4998 }, { description: "Freedom", quantity: 1, amount_total: 2999 }];
+  const order = orderFromSession(session, lines);
+  assert.equal(order.mode, "test");
+  assert.equal(order.customer.shippingAddress.line2, "Unit 2");
+  assert.deepEqual(order.items, [
+    { design: "original", size: "XL", color: "Black", quantity: 2 },
+    { design: "freedom", size: "S", color: "White", quantity: 1 }
+  ]);
+  assert.equal(order.shippingCharge, 0);
+  assert.equal(order.salesTax, 0);
+  assert.equal(order.totalPaid, 7997);
+  session.collected_information.shipping_details = null;
+  assert.throws(() => orderFromSession(session, lines), /missing customer or shipping/);
+});
+
+test("order review reports incomplete paid sessions without hiding other orders", async () => {
+  const { listPaidOrders } = require("../server/apparel-orders");
+  const paid = {
+    id: "cs_live_valid", livemode: true, created: 1700000000, payment_status: "paid",
+    currency: "usd", amount_subtotal: 2499, amount_total: 3098,
+    total_details: { amount_tax: 0, amount_shipping: 599 },
+    customer_details: { email: "customer@example.test" },
+    collected_information: { shipping_details: { name: "Customer", address: { line1: "1 Main St", city: "City", state: "CA", postal_code: "90210", country: "US" } } },
+    metadata: cartMetadata(validateCart([{ ...item, quantity: 1 }]))
+  };
+  const stripe = { checkout: { sessions: {
+    async *list() {
+      yield paid;
+      yield { ...paid, id: "cs_live_missing", collected_information: null };
+      yield { ...paid, id: "cs_live_unpaid", payment_status: "unpaid" };
+      yield { ...paid, id: "cs_test_paid", livemode: false };
+    },
+    async *listLineItems() { yield { description: "Original", quantity: 1, amount_total: 2499 }; }
+  } } };
+  const report = await listPaidOrders(stripe);
+  assert.equal(report.mode, "live");
+  assert.deepEqual(report.orders.map((order) => order.sessionId), ["cs_live_valid"]);
+  assert.deepEqual(report.review.map((order) => order.sessionId), ["cs_live_missing"]);
 });

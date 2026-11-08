@@ -125,77 +125,100 @@ Setup:
 
 In this setup, no frontend endpoint change is needed because `album-generator.html` already defaults to `/api/album-cover`.
 
-## Apparel marketplace and Stripe live mode
+## Apparel Checkout and manual fulfillment
 
-**Checkout charges real money, but no apparel will be shipped or fulfilled.** Product descriptions
-are placeholders. There is no shipping address collection, shipping/tax
-calculation, durable order database, inventory management, or fulfillment integration. The
-storefront and Stripe Checkout disclose this before payment. A verified webhook logs the event
-and session IDs; it does not create or fulfill an order. The cart stays in browser storage after
-checkout, including after a successful payment. Monitor Stripe directly and handle any customer
-inquiries and refunds manually.
+The Original Edition costs $24.99 and the Freedom Edition $29.99. The server verifies each
+configured Stripe Price is active, one-time, USD, not tax-inclusive, in the selected mode and
+exactly the expected amount. A mismatch disables checkout for that product. For an unavailable
+price, the storefront shows an unverified preview and disables checkout. Checkout calculates
+shipping from the combined pre-tax merchandise subtotal: $5.99 below $75.00, otherwise free.
+The U.S. shipping address and phone number are collected by Stripe; Checkout collects the email.
+Stripe stores variant IDs, sizes, colors and quantities in session metadata, not customer data.
 
-### Local setup
+**Sales tax is not currently calculated or collected by this integration.** Determine your tax
+obligations and configure and test a suitable tax solution before live sales; Stripe Tax is not
+enabled by this code and may involve additional costs. Inventory, label printing, shipping,
+refunds and customer support remain manual. The cart stays saved after payment.
 
-Node.js 18 or newer is required. Install dependencies with `npm install`. Configure a Stripe
-**live** secret or restricted key privately in your environment, then start the existing API server.
-The example below uses placeholders; do not put real keys in the repository or share them in chat:
+### Test locally before launch
+
+Node.js 18 or newer and `npm install` are required. In Stripe's **test mode**, create separate
+one-time USD Prices for $24.99 and $29.99. The live Price IDs in the catalog cannot be used with
+test keys. In a private PowerShell terminal set the following values (replace placeholders; do
+not commit or share keys):
 
 ```powershell
-$env:STRIPE_SECRET_KEY="sk_live_replace_me"
-$env:APPAREL_SITE_URL="http://127.0.0.1:4173/"
+$env:APPAREL_STRIPE_MODE="test"
+$env:STRIPE_SECRET_KEY="sk_test_replace_me"
+$env:APPAREL_TEST_PRICE_ORIGINAL="price_replace_original"
+$env:APPAREL_TEST_PRICE_FREEDOM="price_replace_freedom"
+$env:APPAREL_SITE_URL="http://127.0.0.1:5500/"
 $env:STRIPE_WEBHOOK_SECRET="whsec_replace_me"
 node .\server\album-generator-server.js
 ```
 
-Serve the repository as a static site on port 4173 (for example, `python -m http.server 4173`)
-and visit `http://127.0.0.1:4173/apparel.html`. The browser uses the local API at port 8787.
-Any completed checkout with a live key is a real charge, even locally. The publishable key is
-not needed for this server-created Stripe Checkout flow.
+Serve the site with Live Server on port 5500 and open `http://127.0.0.1:5500/apparel.html`.
+Match `APPAREL_SITE_URL` to your actual Live Server origin. The local API is at port 8787.
+For webhook testing, run the Stripe CLI in a separate terminal:
 
-### Deployment and live-readiness
+```powershell
+stripe listen --forward-to http://127.0.0.1:8787/api/apparel-webhook
+```
 
-Deploy the same repository to Vercel for the Node API and set `STRIPE_SECRET_KEY`,
-`STRIPE_WEBHOOK_SECRET`, and `APPAREL_SITE_URL` in the Vercel environment. Use the exact
-public site base URL, including any GitHub Pages path and a trailing slash, for
-`APPAREL_SITE_URL`; the server never derives return URLs from a request header. Register
-`https://your-vercel-project.vercel.app/api/apparel-webhook` as a Stripe **live-mode** webhook
-endpoint for `checkout.session.completed` and `checkout.session.async_payment_succeeded`, and
-use that endpoint's signing secret. Deploy after setting the variables.
+Set `STRIPE_WEBHOOK_SECRET` to the signing secret printed by that CLI, restart the API, and keep
+the CLI listening. Use Stripe's documented test card `4242 4242 4242 4242`, a future expiry and
+any valid test CVC, with test customer information. Verify the test-mode banner, address requirement,
+both prices, variant labels, and totals: three Original shirts are $74.97 plus $5.99 shipping;
+two Original plus one Freedom are $79.97 with free shipping. Verify the success page and CLI
+webhook delivery, then inspect the paid order as described below. An uncompleted or failed payment
+must not appear as paid. Test async payment methods only if enabled in your Stripe account.
+No live keys, IDs, sessions, events or signing secrets should be used in a test deployment.
 
-When the static site is hosted on GitHub Pages separately from Vercel, set the
-`apparel-api-base` meta tag in **both** `apparel.html` and `apparel-success.html` to the API
-origin, for example `https://your-vercel-project.vercel.app` (without `/api`). When the
-site and API share an origin, leave both values empty. A static-only deployment without the
-API cannot load the catalog or take checkout payments.
+### Reviewing and fulfilling paid orders
 
-Edit `server/apparel-catalog.js` to add products or update trusted price IDs, colors, sizes, and the
-front/back/model image paths. Both editions use their configured live Stripe Price IDs. The
-catalog endpoint retrieves their current amounts from Stripe; checkout uses the same Stripe Price
-IDs and stores selected sizes and colors in Checkout Session metadata (`variants_1`, etc.).
-The Stripe product name is displayed at checkout; size and color selections are recorded in
-session metadata rather than shown as separate Stripe line-item descriptions. The price must be
-active, live, one-time, fixed per-unit, in USD, and not tax-inclusive. If Stripe is unavailable
-or the price is unsupported, the collection shows the catalog's unverified `previewPrice` if
-available. Items can be added to the cart, but checkout is disabled until every cart price is
-verified. Update this amount when the expected price changes;
-Stripe's verified price always takes precedence. Loading the verified prices locally needs the live key or a
-configured remote API. The catalog endpoint supplies the same trusted data to the
-storefront; checkout independently validates IDs, selections, and quantities and ignores any
-browser-submitted price.
+Stripe is the source of order data; the webhook verifies signatures and retrieves sessions but
+does not create records, ship orders or prevent manual duplicate shipments. Duplicate webhook
+deliveries are harmless because the handler performs no fulfillment. Failed/unpaid sessions are
+not treated as paid. Missing required shipping data or a Stripe retrieval failure returns an
+error for Stripe to retry. Monitor failed webhook deliveries and reconcile in the Dashboard.
 
-The navigation and collection background uses `Images/apparel/apparel-background.jpg.png`.
-Replace that file with your own artwork, or update the image URL in
-the `.apparel-stage` rule in `apparel.css`. The dark overlay keeps the navigation and heading
-legible; the cart keeps its separate dark background.
+With the same mode and secret key set in a **private** terminal, run:
 
-Before offering actual apparel for sale, replace placeholder content and pricing, implement durable
-and idempotent order recording keyed by Stripe event/session ID, reliable fulfillment and webhook
-retry handling, shipping/tax and customer support policies, and thoroughly verify the entire flow.
-The code rejects test keys, test sessions, and test webhook events. A separate live webhook
-signing secret is required; the API secret key and publishable key are not webhook secrets.
+```powershell
+node .\server\apparel-orders.js
+```
 
-Run the focused automated checks with `npm test`.
+The JSON report lists paid, complete apparel sessions, customer/contact and shipping details,
+variants, Stripe line items, payment reference, date and amounts in cents. It paginates sessions
+and line items. The `review` list identifies paid sessions that could not be decoded (including
+older orders without shipping details); the command exits nonzero when review is needed. Inspect
+those sessions manually in Stripe and never overlook them. The output contains personal data:
+do not post it, commit it, or store it in a publicly served directory.
+
+Keep a private, access-restricted spreadsheet outside the website with one row per **mode and
+Checkout Session ID**. Record payment status, fulfillment status, shipment date and tracking
+number; never mark an order shipped before confirming the carrier label. Reconcile all paid Stripe
+sessions against the sheet regularly, check the session ID before printing a label, and investigate
+failed webhook deliveries and `review` entries. Use a single person or coordinated process to
+avoid two people shipping the same order. Check refunds and disputes directly in Stripe before
+shipping; the report's paid status alone does not reflect subsequent refunds. Do not mix test and
+live sheets. Stripe events and logs are not a fulfillment checklist.
+
+### Deploying live
+
+Live mode is the default, but **live checkout is disabled** until
+`APPAREL_LIVE_CHECKOUT_ENABLED=true` is explicitly set on the server. First verify the existing
+live Stripe Price IDs in `server/apparel-catalog.js` match the required prices and complete the
+test and fulfillment checks above. Set `APPAREL_STRIPE_MODE=live`, a live `STRIPE_SECRET_KEY`,
+`APPAREL_SITE_URL` (the exact public site base URL with trailing slash), and a live
+`STRIPE_WEBHOOK_SECRET` privately in Vercel. Register the live `/api/apparel-webhook` endpoint for
+`checkout.session.completed`, `checkout.session.async_payment_succeeded`, and
+`checkout.session.async_payment_failed`. Check its deliveries. Only then enable live checkout.
+Live charges are real. Never expose secret keys in browser code.
+
+When the static site is hosted separately, configure the `apparel-api-base` meta tag in both
+`apparel.html` and `apparel-success.html` to the API origin. A static-only deployment cannot
+load the catalog or take payments. Run automated checks with `npm test`.
 
 ## Album generator: GitHub Pages and Railway
 

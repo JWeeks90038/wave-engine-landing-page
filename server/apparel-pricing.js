@@ -1,7 +1,9 @@
+const { getMode, getPriceId } = require("./apparel-stripe");
+
 function validateStripePrice(price, product) {
-  if (!price || price.id !== product.stripePriceId || price.livemode !== true ||
+  if (!price || price.id !== getPriceId(product) || price.livemode !== (getMode() === "live") ||
       !price.active || price.type !== "one_time" || price.currency !== product.currency ||
-      !Number.isSafeInteger(price.unit_amount) || price.unit_amount < 0 ||
+      price.unit_amount !== product.previewPrice ||
       price.billing_scheme !== "per_unit" || price.custom_unit_amount || price.transform_quantity ||
       price.tax_behavior === "inclusive") {
     throw new Error(`Stripe price is unavailable or unsupported for ${product.id}.`);
@@ -12,9 +14,8 @@ function validateStripePrice(price, product) {
 async function getPublicProducts(products, getStripe) {
   return Promise.all(products.map(async (product) => {
     const { stripePriceId, previewPrice, ...publicProduct } = product;
-    if (!stripePriceId) return publicProduct;
     try {
-      const price = await getStripe().prices.retrieve(stripePriceId);
+      const price = await getStripe().prices.retrieve(getPriceId(product));
       return { ...publicProduct, price: validateStripePrice(price, product) };
     } catch (error) {
       console.error(`Apparel price unavailable for ${product.id}:`, error.message);
@@ -39,4 +40,9 @@ function cartMetadata(items) {
   return metadata;
 }
 
-module.exports = { validateStripePrice, getPublicProducts, cartMetadata };
+function shippingForSubtotal(subtotal) {
+  if (!Number.isSafeInteger(subtotal) || subtotal < 0) throw new Error("Invalid merchandise subtotal.");
+  return subtotal >= 7500 ? 0 : 599;
+}
+
+module.exports = { validateStripePrice, getPublicProducts, cartMetadata, shippingForSubtotal };

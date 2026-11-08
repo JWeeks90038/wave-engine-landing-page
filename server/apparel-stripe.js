@@ -1,11 +1,24 @@
 const Stripe = require("stripe");
 
+function getMode() {
+  const mode = process.env.APPAREL_STRIPE_MODE || "live";
+  if (!["live", "test"].includes(mode)) throw new Error("APPAREL_STRIPE_MODE must be live or test.");
+  return mode;
+}
+
 function getStripe() {
   const key = process.env.STRIPE_SECRET_KEY || "";
-  if (!/^(sk|rk)_live_/.test(key)) {
-    throw new Error("Stripe live mode is not configured. A live secret or restricted key is required.");
+  if (!new RegExp(`^(sk|rk)_${getMode()}_`).test(key)) {
+    throw new Error(`Stripe ${getMode()} mode requires a matching secret or restricted key.`);
   }
   return new Stripe(key);
+}
+
+function getPriceId(product) {
+  if (getMode() === "live") return product.stripePriceId;
+  const id = process.env[`APPAREL_TEST_PRICE_${product.id.toUpperCase()}`];
+  if (!id || !/^price_[a-zA-Z0-9]+$/.test(id)) throw new Error(`Test price is not configured for ${product.id}.`);
+  return id;
 }
 
 function getSiteUrl() {
@@ -20,4 +33,4 @@ function getSiteUrl() {
   return url;
 }
 
-module.exports = { getStripe, getSiteUrl };
+module.exports = { getStripe, getSiteUrl, getMode, getPriceId };

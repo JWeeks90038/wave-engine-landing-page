@@ -114,7 +114,7 @@ function addItem(item) {
 async function checkout(items, feedback) {
   if (busy) return;
   function checkoutMessage(text) { message(text); if (feedback) feedback.textContent = text; }
-  busy = true; renderCart(); checkoutMessage("Opening secure Stripe checkout for a real payment...");
+  busy = true; renderCart(); checkoutMessage("Opening secure Stripe checkout...");
   try {
     const response = await fetch(`${apiBase}/api/apparel-checkout`, {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ items })
@@ -190,6 +190,7 @@ fetch(`${apiBase}/api/apparel-catalog`)
   .then((response) => { if (!response.ok) throw new Error("The collection could not be loaded."); return response.json(); })
   .then((data) => {
     if (!Array.isArray(data.products)) throw new Error("The collection response was invalid.");
+    document.querySelector("#store-mode").textContent = data.mode === "test" ? "TEST MODE: No real payments or orders." : "";
     products = data.products;
     products.forEach(renderProduct);
     document.querySelector("#catalog-status").textContent = products.length ? "" : "The collection is currently empty.";

@@ -1,6 +1,6 @@
 const { products } = require("../server/apparel-catalog");
 const { sendJson, setCorsHeaders } = require("../server/api-utils");
-const { getStripe } = require("../server/apparel-stripe");
+const { getStripe, getMode } = require("../server/apparel-stripe");
 const { getPublicProducts } = require("../server/apparel-pricing");
 
 module.exports = async (request, response) => {
@@ -14,7 +14,7 @@ module.exports = async (request, response) => {
   try {
     const publicProducts = await getPublicProducts(products, getStripe);
     response.setHeader("Cache-Control", "no-store");
-    sendJson(response, 200, { products: publicProducts });
+    sendJson(response, 200, { products: publicProducts, mode: getMode() });
   } catch (error) {
     console.error("Apparel catalog error:", error.message);
     sendJson(response, 503, { error: "The collection is unavailable. Please try again later." });

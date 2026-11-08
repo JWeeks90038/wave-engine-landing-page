@@ -8,7 +8,9 @@ if (!sessionId) {
   fetch(`${apiBase}/api/apparel-order-status?session_id=${encodeURIComponent(sessionId)}`, { cache: "no-store" })
     .then((response) => { if (!response.ok) throw new Error("Payment could not be verified."); return response.json(); })
     .then((data) => {
-      statusElement.textContent = data.paid ? "Your payment is confirmed. Thank you!" : "Your payment is not confirmed yet. Please check again later.";
+      statusElement.textContent = data.paid
+        ? (data.mode === "test" ? "TEST MODE: Your test payment is confirmed. No real order was placed." : "Your payment is confirmed. Thank you!")
+        : "Your payment is not confirmed yet. Please check again later.";
     })
     .catch(() => { statusElement.textContent = "Payment status could not be verified. Please try again later."; });
 }
