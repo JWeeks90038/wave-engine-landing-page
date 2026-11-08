@@ -30,7 +30,7 @@ High-conversion, mobile-first landing page for Wave Engine built with plain HTML
 - `server/album-generator-server.js` - secure local/backend proxy for OpenAI image generation
 - `apparel.html`, `apparel.css`, `apparel.js` - LISTEN UP AMERICA! storefront and browser cart
 - `apparel-success.html`, `apparel-cancel.html`, `apparel-status.js` - Stripe return pages and payment-status verification
-- `server/apparel-catalog.js` - trusted apparel catalog, variants, and placeholder prices
+- `server/apparel-catalog.js` - trusted apparel catalog, variants, Stripe Price IDs, and preview prices
 - `api/apparel-*.js` - apparel catalog, checkout, payment-status, and webhook endpoints
 - `Images/apparel/` - replaceable product image placeholders
 - `Images/` - local artwork used by the page
@@ -127,8 +127,8 @@ In this setup, no frontend endpoint change is needed because `album-generator.ht
 
 ## Apparel marketplace and Stripe live mode
 
-**Checkout charges real money, but no apparel will be shipped or fulfilled.** The product images,
-descriptions, and the Freedom Edition price are placeholders. There is no shipping address collection, shipping/tax
+**Checkout charges real money, but no apparel will be shipped or fulfilled.** The product images
+and descriptions are placeholders. There is no shipping address collection, shipping/tax
 calculation, durable order database, inventory management, or fulfillment integration. The
 storefront and Stripe Checkout disclose this before payment. A verified webhook logs the event
 and session IDs; it does not create or fulfill an order. The cart stays in browser storage after
@@ -170,18 +170,17 @@ site and API share an origin, leave both values empty. A static-only deployment 
 API cannot load the catalog or take checkout payments.
 
 Edit `server/apparel-catalog.js` to add products or update trusted price IDs, colors, sizes, and the
-front/back/model image paths. Original Edition uses the configured live Stripe Price ID. The
-catalog endpoint retrieves its current amount from Stripe; checkout uses that same Stripe Price
-ID and stores selected sizes and colors in Checkout Session metadata (`variants_1`, etc.).
+front/back/model image paths. Both editions use their configured live Stripe Price IDs. The
+catalog endpoint retrieves their current amounts from Stripe; checkout uses the same Stripe Price
+IDs and stores selected sizes and colors in Checkout Session metadata (`variants_1`, etc.).
 The Stripe product name is displayed at checkout; size and color selections are recorded in
 session metadata rather than shown as separate Stripe line-item descriptions. The price must be
 active, live, one-time, fixed per-unit, in USD, and not tax-inclusive. If Stripe is unavailable
 or the price is unsupported, the collection shows the catalog's unverified `previewPrice` if
 available. Items can be added to the cart, but checkout is disabled until every cart price is
 verified. Update this amount when the expected price changes;
-Stripe's verified price always takes precedence. Loading the verified price locally needs the live key or a
-configured remote API. The Freedom Edition still uses a placeholder price in integer
-cents. The three SVG illustrations in each
+Stripe's verified price always takes precedence. Loading the verified prices locally needs the live key or a
+configured remote API. The three SVG illustrations in each
 product's `images` array are placeholders, not actual product photography. Replace them with
 optimized photos before launch. The catalog endpoint supplies the same trusted data to the
 storefront; checkout independently validates IDs, selections, and quantities and ignores any

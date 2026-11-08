@@ -23,6 +23,7 @@ function response() {
 }
 const item = { id: "original", size: "XL", color: "Black", quantity: 2 };
 const stripePrice = { id: products[0].stripePriceId, livemode: true, active: true, type: "one_time", currency: "usd", unit_amount: 4500, billing_scheme: "per_unit", tax_behavior: "unspecified" };
+const freedomPrice = { ...stripePrice, id: "price_1UZGZ3I1ucU6ficLtysDHW1K", unit_amount: 2999 };
 
 test("catalog has two products with three distinct image paths and all requested sizes", () => {
   assert.equal(products.length, 2);
@@ -44,12 +45,14 @@ test("server validates every cart variant and quantity", () => {
 });
 
 test("catalog uses Stripe's current price and fails closed on unsupported prices", async () => {
-  const stripe = { prices: { retrieve: async () => stripePrice } };
+  const stripe = { prices: { retrieve: async (id) => id === stripePrice.id ? stripePrice : freedomPrice } };
   const publicProducts = await getPublicProducts(products, () => stripe);
   assert.equal(publicProducts[0].price, 4500);
   assert.equal(publicProducts[0].stripePriceId, undefined);
   assert.equal(publicProducts[0].previewPrice, undefined);
-  assert.equal(publicProducts[1].price, 3400);
+  assert.equal(publicProducts[1].price, 2999);
+  assert.equal(publicProducts[1].stripePriceId, undefined);
+  assert.equal(publicProducts[1].previewPrice, undefined);
   for (const invalid of [
     { active: false }, { livemode: false }, { type: "recurring" }, { currency: "eur" },
     { unit_amount: null }, { billing_scheme: "tiered" }, { transform_quantity: {} },
@@ -57,19 +60,26 @@ test("catalog uses Stripe's current price and fails closed on unsupported prices
   ]) assert.throws(() => validateStripePrice({ ...stripePrice, ...invalid }, products[0]));
   const unavailable = await getPublicProducts(products, () => ({ prices: { retrieve: async () => { throw new Error("unavailable"); } } }));
   assert.equal(unavailable[0].price, null);
-  assert.equal(unavailable[0].previewPrice, 2500);
-  assert.equal(unavailable[1].price, 3400);
+  assert.equal(unavailable[0].previewPrice, products[0].previewPrice);
+  assert.equal(unavailable[1].price, null);
+  assert.equal(unavailable[1].previewPrice, 2999);
   const unconfigured = await getPublicProducts(products, () => { throw new Error("missing key"); });
   assert.equal(unconfigured[0].price, null);
-  assert.equal(unconfigured[1].price, 3400);
+  assert.equal(unconfigured[1].price, null);
+  const partial = await getPublicProducts(products, () => ({ prices: { retrieve: async (id) => {
+    if (id === freedomPrice.id) throw new Error("unavailable");
+    return stripePrice;
+  } } }));
+  assert.equal(partial[0].price, stripePrice.unit_amount);
+  assert.equal(partial[1].price, null);
 });
 
 test("catalog endpoint returns Stripe pricing and surfaces Stripe failures", async () => {
   const originalStripe = stripeConfig.getStripe;
   let shouldFail = false;
-  stripeConfig.getStripe = () => ({ prices: { retrieve: async () => {
+  stripeConfig.getStripe = () => ({ prices: { retrieve: async (id) => {
     if (shouldFail) throw new Error("unavailable");
-    return stripePrice;
+    return id === stripePrice.id ? stripePrice : freedomPrice;
   } } });
   delete require.cache[require.resolve("../api/apparel-catalog")];
   const handler = require("../api/apparel-catalog");
@@ -78,14 +88,16 @@ test("catalog endpoint returns Stripe pricing and surfaces Stripe failures", asy
     await handler(request("GET"), success);
     assert.equal(success.status, 200);
     assert.equal(success.body.products[0].price, stripePrice.unit_amount);
+    assert.equal(success.body.products[1].price, 2999);
     assert.equal(success.headers["Cache-Control"], "no-store");
     shouldFail = true;
     const failure = response();
     await handler(request("GET"), failure);
     assert.equal(failure.status, 200);
     assert.equal(failure.body.products[0].price, null);
-    assert.equal(failure.body.products[0].previewPrice, 2500);
-    assert.equal(failure.body.products[1].price, 3400);
+    assert.equal(failure.body.products[0].previewPrice, products[0].previewPrice);
+    assert.equal(failure.body.products[1].price, null);
+    assert.equal(failure.body.products[1].previewPrice, 2999);
   } finally {
     stripeConfig.getStripe = originalStripe;
   }
@@ -108,7 +120,7 @@ test("checkout ignores client price and uses the configured return origin", asyn
   let params;
   let liveMode = true;
   let retrievedPrice = stripePrice;
-  stripeConfig.getStripe = () => ({ prices: { retrieve: async () => retrievedPrice }, checkout: { sessions: { create: async (value) => {
+  stripeConfig.getStripe = () => ({ prices: { retrieve: async (id) => id === freedomPrice.id ? freedomPrice : retrievedPrice }, checkout: { sessions: { create: async (value) => {
     params = value; return { url: "https://checkout.stripe.com/live", livemode: liveMode };
   } } } });
   stripeConfig.getSiteUrl = () => new URL("https://example.com/subsite/");
@@ -137,7 +149,13 @@ test("checkout ignores client price and uses the configured return origin", asyn
     const freedom = response();
     await handler(request("POST", JSON.stringify({ items: [{ id: "freedom", size: "S", color: "White", quantity: 1, price: 1 }] })), freedom);
     assert.equal(freedom.status, 200);
-    assert.equal(params.line_items[0].price_data.unit_amount, 3400);
+    assert.equal(params.line_items[0].price, freedomPrice.id);
+    assert.equal(params.line_items[0].quantity, 1);
+    assert.deepEqual(JSON.parse(params.metadata.variants_1), [["freedom", "S", "White", 1]]);
+    const mixed = response();
+    await handler(request("POST", JSON.stringify({ items: [item, { id: "freedom", size: "S", color: "White", quantity: 1 }] })), mixed);
+    assert.equal(mixed.status, 200);
+    assert.deepEqual(params.line_items.map((line) => line.price), [stripePrice.id, freedomPrice.id]);
     liveMode = false;
     const nonLive = response();
     await handler(request("POST", JSON.stringify({ items: [item] })), nonLive);

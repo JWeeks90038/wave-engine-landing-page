@@ -1,15 +1,15 @@
 const sizes = ["S", "M", "L", "XL", "XXL", "XXXL"];
 
-// Product imagery and the Freedom Edition price are placeholders.
+// Product imagery is placeholder artwork.
 const products = [
   {
     id: "original",
     name: "LISTEN UP AMERICA! - Original Edition",
     description: "Our flagship tee. A small left-chest wordmark meets a bold eagle-inspired back design.",
-    stripePriceId: "price_1UZFkYI1ucU6ficLIUVgRFAe",
-    previewPrice: 2500,
+    stripePriceId: "price_1UZMA9I1ucU6ficLXaq2QZkD",
+    previewPrice: 2499,
     currency: "usd",
-    colors: ["Black", "Charcoal", "White"],
+    colors: ["Black", "White"],
     sizes,
     images: [
       { src: "Images/apparel/original-front.svg", label: "Front" },
@@ -21,8 +21,8 @@ const products = [
     id: "freedom",
     name: "LISTEN UP AMERICA! - Freedom Edition",
     description: "A distinct take on the American spirit, made for everyday expression.",
-    price: 3400,
-    pricePlaceholder: true,
+    stripePriceId: "price_1UZGZ3I1ucU6ficLtysDHW1K",
+    previewPrice: 2999,
     currency: "usd",
     colors: ["Black", "White"],
     sizes,
