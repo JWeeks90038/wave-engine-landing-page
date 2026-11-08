@@ -25,11 +25,23 @@ const item = { id: "original", size: "XL", color: "Black", quantity: 2 };
 const stripePrice = { id: products[0].stripePriceId, livemode: true, active: true, type: "one_time", currency: "usd", unit_amount: 4500, billing_scheme: "per_unit", tax_behavior: "unspecified" };
 const freedomPrice = { ...stripePrice, id: "price_1UZGZ3I1ucU6ficLtysDHW1K", unit_amount: 2999 };
 
-test("catalog has two products with three distinct image paths and all requested sizes", () => {
+test("catalog has two products with distinct image paths and all requested sizes", () => {
   assert.equal(products.length, 2);
+  assert.deepEqual(products[0].images.map((image) => image.src), [
+    "Images/apparel/Logo Shirt Front 1.png",
+    "Images/apparel/Logo Shirt Back 1.png",
+    "Images/apparel/Prod Img Front 1.png",
+    "Images/apparel/Prod Img Back 1.png"
+  ]);
+  assert.deepEqual(products[1].images.map((image) => image.src), [
+    "Images/apparel/Logo Shirt Front 2.png",
+    "Images/apparel/Logo Shirt Back 2.png",
+    "Images/apparel/Prod Img Front 2.png",
+    "Images/apparel/Prod Img Back 2.png"
+  ]);
   for (const product of products) {
     assert.deepEqual(product.sizes, ["S", "M", "L", "XL", "XXL", "XXXL"]);
-    assert.equal(new Set(product.images.map((image) => image.src)).size, 3);
+    assert.equal(new Set(product.images.map((image) => image.src)).size, product.images.length);
     for (const image of product.images) assert.ok(require("node:fs").existsSync(image.src));
   }
 });

@@ -127,8 +127,8 @@ In this setup, no frontend endpoint change is needed because `album-generator.ht
 
 ## Apparel marketplace and Stripe live mode
 
-**Checkout charges real money, but no apparel will be shipped or fulfilled.** The product images
-and descriptions are placeholders. There is no shipping address collection, shipping/tax
+**Checkout charges real money, but no apparel will be shipped or fulfilled.** Product descriptions
+are placeholders. There is no shipping address collection, shipping/tax
 calculation, durable order database, inventory management, or fulfillment integration. The
 storefront and Stripe Checkout disclose this before payment. A verified webhook logs the event
 and session IDs; it does not create or fulfill an order. The cart stays in browser storage after
@@ -180,9 +180,7 @@ or the price is unsupported, the collection shows the catalog's unverified `prev
 available. Items can be added to the cart, but checkout is disabled until every cart price is
 verified. Update this amount when the expected price changes;
 Stripe's verified price always takes precedence. Loading the verified prices locally needs the live key or a
-configured remote API. The three SVG illustrations in each
-product's `images` array are placeholders, not actual product photography. Replace them with
-optimized photos before launch. The catalog endpoint supplies the same trusted data to the
+configured remote API. The catalog endpoint supplies the same trusted data to the
 storefront; checkout independently validates IDs, selections, and quantities and ignores any
 browser-submitted price.
 

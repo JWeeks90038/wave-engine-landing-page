@@ -148,7 +148,7 @@ function renderProduct(product) {
     thumbnail.src = image.src; thumbnail.alt = ""; thumbnail.loading = "lazy"; thumbnail.decoding = "async";
     button.append(thumbnail); thumbs.append(button);
     button.addEventListener("click", () => {
-      mainImage.src = image.src; mainImage.alt = `${product.name}, ${image.label} placeholder`;
+      mainImage.src = image.src; mainImage.alt = `${product.name}, ${image.label}`;
       thumbs.querySelectorAll("button").forEach((thumb) => thumb.setAttribute("aria-pressed", String(thumb === button)));
     });
     if (index === 0) button.click();

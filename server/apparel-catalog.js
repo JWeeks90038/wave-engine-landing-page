@@ -1,6 +1,5 @@
 const sizes = ["S", "M", "L", "XL", "XXL", "XXXL"];
 
-// Product imagery is placeholder artwork.
 const products = [
   {
     id: "original",
@@ -12,9 +11,10 @@ const products = [
     colors: ["Black", "White"],
     sizes,
     images: [
-      { src: "Images/apparel/original-front.svg", label: "Front" },
-      { src: "Images/apparel/original-back.svg", label: "Back" },
-      { src: "Images/apparel/original-model.svg", label: "On model" }
+      { src: "Images/apparel/Logo Shirt Front 1.png", label: "Front" },
+      { src: "Images/apparel/Logo Shirt Back 1.png", label: "Back" },
+      { src: "Images/apparel/Prod Img Front 1.png", label: "On model, front" },
+      { src: "Images/apparel/Prod Img Back 1.png", label: "On model, back" }
     ]
   },
   {
@@ -27,9 +27,10 @@ const products = [
     colors: ["Black", "White"],
     sizes,
     images: [
-      { src: "Images/apparel/freedom-front.svg", label: "Front" },
-      { src: "Images/apparel/freedom-back.svg", label: "Back" },
-      { src: "Images/apparel/freedom-model.svg", label: "On model" }
+      { src: "Images/apparel/Logo Shirt Front 2.png", label: "Front" },
+      { src: "Images/apparel/Logo Shirt Back 2.png", label: "Back" },
+      { src: "Images/apparel/Prod Img Front 2.png", label: "On model, front" },
+      { src: "Images/apparel/Prod Img Back 2.png", label: "On model, back" }
     ]
   }
 ];
