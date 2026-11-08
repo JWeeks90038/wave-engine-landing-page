@@ -135,6 +135,11 @@ iframe {
   gap: 0.85rem 1.1rem;
 }
 
+/* Temporarily hide the apparel tab; direct store links remain available. */
+.nav-links a[href="apparel.html"] {
+  display: none;
+}
+
 .nav-links a,
 .topbar-link,
 .brand-link {
