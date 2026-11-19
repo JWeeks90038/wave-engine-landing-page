@@ -27,12 +27,12 @@ function validItem(item) {
     Number.isInteger(item.quantity) && item.quantity >= 1 && item.quantity <= 20);
 }
 function saveCart() {
-  try { localStorage.setItem(storageKey, JSON.stringify(cart)); }
+  try { sessionStorage.setItem(storageKey, JSON.stringify(cart)); }
   catch (error) { message("Your cart could not be saved in this browser; it may be lost when you leave."); }
 }
 function loadCart() {
   try {
-    const saved = localStorage.getItem(storageKey);
+    const saved = sessionStorage.getItem(storageKey);
     if (saved) {
       const parsed = JSON.parse(saved);
       if (!Array.isArray(parsed)) throw new Error("Invalid cart");

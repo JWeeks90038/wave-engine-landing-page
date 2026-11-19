@@ -41,6 +41,23 @@
 .section-heading h1, .section-heading h2 { font-size: clamp(2.4rem, 5vw, 4rem); margin: .3rem 0; }
 .cart-link { white-space: nowrap; border-bottom: 1px solid #ad6d67; padding-bottom: .4rem; }
 .cart-link span { display: inline-block; margin-left: .5rem; padding: .25rem .55rem; background: #a64b46; border-radius: 50%; }
+.size-guide { margin: 0 0 2rem; border: 1px solid #494341; background: rgba(17, 17, 17, .72); }
+.size-guide summary { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: 1rem 1.2rem; color: #f5f2ee; font-weight: 700; letter-spacing: .04em; cursor: pointer; }
+.size-guide summary::-webkit-details-marker { display: none; }
+.size-guide summary::after { content: "+"; color: #e4a39c; font-size: 1.3rem; line-height: 1; }
+.size-guide[open] summary::after { content: "\2212"; }
+.size-guide summary:hover { color: #e4a39c; }
+.size-guide-content { max-width: 52rem; padding: 0 1.2rem 1.2rem; }
+.size-guide-content p { color: #bdb8b4; line-height: 1.6; margin: .6rem 0 1rem; }
+.size-guide-content h2, .size-guide-content h3 { font-family: "Archivo", sans-serif; font-weight: 700; margin: 1.3rem 0 .6rem; }
+.size-guide-content h2 { font-size: 1.15rem; }
+.size-guide-content h3 { font-size: 1rem; }
+.size-guide-table-wrap { overflow-x: auto; margin: .5rem 0 1rem; }
+.size-guide-table { width: 100%; min-width: 22rem; border-collapse: collapse; text-align: left; }
+.size-guide-table caption { padding: .35rem 0; color: #bdb8b4; text-align: left; font-size: .8rem; }
+.size-guide-table th, .size-guide-table td { padding: .65rem .75rem; border-bottom: 1px solid #3c3937; }
+.size-guide-table th { color: #f5f2ee; }
+.size-guide-note { font-size: .8rem; }
 .products { display: grid; gap: 3rem; }
 .product-card { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, .95fr); background: #191919; border: 1px solid #363432; }
 .gallery { padding: clamp(1rem, 3vw, 2rem); }
