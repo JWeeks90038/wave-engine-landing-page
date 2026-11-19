@@ -27,7 +27,7 @@ function response() {
 }
 const item = { id: products[0].id, size: "XL", color: "Black", quantity: 2 };
 const stripePrice = { id: products[0].stripePriceId, livemode: true, active: true, type: "one_time", currency: "usd", unit_amount: products[0].previewPrice, billing_scheme: "per_unit", tax_behavior: "unspecified" };
-const freedomPrice = { ...stripePrice, id: "price_1UZGZ3I1ucU6ficLtysDHW1K", unit_amount: 2999 };
+const freedomPrice = { ...stripePrice, id: products[1].stripePriceId, unit_amount: 2999 };
 
 test("each product has at least six distinct gallery images that exist", () => {
   for (const product of products) {

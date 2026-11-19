@@ -24,7 +24,7 @@ const products = [
     id: "freedom 2",
     name: "FREEDOM UNFILTERED - Henry Edition",
     description: "A distinct take on the American spirit, made for everyday expression.",
-    stripePriceId: "price_1UZGZ3I1ucU6ficLtysDHW1K",
+    stripePriceId: "price_1UdJpQI1ucU6ficLQKwj9UYD",
     previewPrice: 2999,
     currency: "usd",
     colors: ["Black"],
