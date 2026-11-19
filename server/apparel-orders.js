@@ -50,6 +50,19 @@ async function listPaidOrders(stripe) {
   for await (const session of stripe.checkout.sessions.list({ status: "complete", limit: 100 })) {
     if (session.livemode !== (getMode() === "live") || session.metadata?.storefront !== "wave-apparel-v1" || session.payment_status !== "paid") continue;
     try {
+      if (session.metadata.inventoryVersion === "1") {
+        const { database } = require("./apparel-inventory");
+        const record = await database().collection("orders").doc(session.id).get();
+        if (!record.exists || record.data().paymentStatus !== "paid" ||
+            record.data().fulfillmentStatus !== "unfulfilled") {
+          throw new Error("Inventory confirmation is pending or the order is not fulfillable; review in Stripe and Firestore.");
+        }
+        const intent = await stripe.paymentIntents.retrieve(record.data().paymentIntent, { expand: ["latest_charge"] });
+        if (!intent.latest_charge || typeof intent.latest_charge === "string" ||
+            intent.latest_charge.amount_refunded > 0) {
+          throw new Error("Payment has a refund or cannot be verified; review before fulfillment.");
+        }
+      }
       const items = [];
       for await (const item of stripe.checkout.sessions.listLineItems(session.id, { limit: 100 })) items.push(item);
       orders.push(orderFromSession(session, items));

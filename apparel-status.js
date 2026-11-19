@@ -1,5 +1,7 @@
-const apiSetting = document.querySelector('meta[name="apparel-api-base"]').content.trim();
-const apiBase = apiSetting.replace(/\/$/, "") || (location.protocol === "file:" || ["localhost", "127.0.0.1"].includes(location.hostname) ? "http://127.0.0.1:8787" : "");
+const apiConfig = document.querySelector('meta[name="apparel-api-base"]');
+const isLocal = location.protocol === "file:" || ["localhost", "127.0.0.1"].includes(location.hostname);
+const apiSetting = (isLocal && apiConfig.dataset.localApiBase || apiConfig.content).trim();
+const apiBase = apiSetting.replace(/\/$/, "") || (isLocal ? "http://127.0.0.1:8787" : "");
 const statusElement = document.querySelector("#payment-status");
 const sessionId = new URLSearchParams(location.search).get("session_id");
 if (!sessionId) {
@@ -8,7 +10,13 @@ if (!sessionId) {
   fetch(`${apiBase}/api/apparel-order-status?session_id=${encodeURIComponent(sessionId)}`, { cache: "no-store" })
     .then((response) => { if (!response.ok) throw new Error("Payment could not be verified."); return response.json(); })
     .then((data) => {
-      statusElement.textContent = data.paid
+      statusElement.textContent = data.orderStatus === "refunded"
+        ? "Sorry, this size is no longer available. Your payment has been refunded."
+        : data.orderStatus === "refund_pending"
+          ? "Sorry, this size is no longer available. Your refund is being processed."
+          : data.orderStatus === "processing"
+            ? "Payment received. Your order is being confirmed; please check again shortly."
+            : data.paid
         ? (data.mode === "test" ? "TEST MODE: Your test payment is confirmed. No real order was placed." : "Your payment is confirmed. Thank you!")
         : "Your payment is not confirmed yet. Please check again later.";
     })

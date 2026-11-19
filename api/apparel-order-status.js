@@ -1,5 +1,6 @@
 const { sendJson, setCorsHeaders } = require("../server/api-utils");
 const { getStripe, getMode } = require("../server/apparel-stripe");
+const { database } = require("../server/apparel-inventory");
 
 module.exports = async (request, response) => {
   if (request.method === "OPTIONS") {
@@ -14,10 +15,18 @@ module.exports = async (request, response) => {
     const live = getMode() === "live";
     if (!new RegExp(`^cs_${live ? "live" : "test"}_[a-zA-Z0-9]+$`).test(id)) return sendJson(response, 400, { error: "Invalid checkout session." });
     const session = await getStripe().checkout.sessions.retrieve(id);
+    let orderStatus = null;
+    if (session.livemode === live && session.metadata?.storefront === "wave-apparel-v1" &&
+        session.metadata.inventoryVersion === "1" && session.payment_status === "paid") {
+      const order = await database().collection("orders").doc(id).get();
+      orderStatus = order.exists ? order.data().paymentStatus : "processing";
+    }
     response.setHeader("Cache-Control", "no-store");
     sendJson(response, 200, {
       mode: live ? "live" : "test",
-      paid: session.livemode === live && session.metadata?.storefront === "wave-apparel-v1" && session.payment_status === "paid"
+      paid: session.livemode === live && session.metadata?.storefront === "wave-apparel-v1" &&
+        session.payment_status === "paid" && (session.metadata.inventoryVersion !== "1" || orderStatus === "paid"),
+      ...(orderStatus ? { orderStatus } : {})
     });
   } catch (error) {
     console.error("Apparel order status error:", error.message);

@@ -1,36 +1,42 @@
-const sizes = ["S", "M", "L", "XL", "XXL", "XXXL"];
+const sizes = ["S", "M", "L", "XL", "XXL"];
 
 const products = [
   {
-    id: "original",
-    name: "LISTEN UP AMERICA! - Original Edition",
+    id: "freedom 1",
+    name: "FREEDOM UNFILTERED - Jones Edition",
     description: "Our flagship tee. A small left-chest wordmark meets a bold eagle-inspired back design.",
-    stripePriceId: "price_1UZMA9I1ucU6ficLXaq2QZkD",
-    previewPrice: 2499,
+    stripePriceId: "price_1UdJoFI1ucU6ficLNv2OpOsZ",
+    previewPrice: 2999,
     currency: "usd",
-    colors: ["Black", "White"],
+    colors: ["Black"],
     sizes,
     images: [
-      { src: "Images/apparel/Logo Shirt Front 1.png", label: "Front" },
-      { src: "Images/apparel/Logo Shirt Back 1.png", label: "Back" },
-      { src: "Images/apparel/Prod Img Front 1.png", label: "On model, front" },
-      { src: "Images/apparel/Prod Img Back 1.png", label: "On model, back" }
+      { src: "Images/apparel/Freedom Unfiltered T-shirt in patriotic studio light.png", label: "Front" },
+      { src: "Images/apparel/Freedom Unfiltered shirt on dark patriotic backdrop.png", label: "Back" },
+      { src: "Images/apparel/Freedom Unfiltered T-Shirt Studio Portrait (1).png", label: "On model, front" },
+      { src: "Images/apparel/Freedom Unfiltered Black T-Shirt Portrait.png", label: "On model, back" },
+      { src: "Images/apparel/Freedom eagle shirt back print.png", label: "Alternate front" },
+      { src: "Images/apparel/Freedom Unfiltered Eagle T-Shirt Showcase.png", label: "Alternate back" },
+      { src: "Images/apparel/Freedom Unfiltered four-model apparel showcase.png", label: "Alternate back" }
     ]
   },
   {
-    id: "freedom",
-    name: "LISTEN UP AMERICA! - Freedom Edition",
+    id: "freedom 2",
+    name: "FREEDOM UNFILTERED - Henry Edition",
     description: "A distinct take on the American spirit, made for everyday expression.",
     stripePriceId: "price_1UZGZ3I1ucU6ficLtysDHW1K",
     previewPrice: 2999,
     currency: "usd",
-    colors: ["Black", "White"],
+    colors: ["Black"],
     sizes,
     images: [
-      { src: "Images/apparel/Logo Shirt Front 2.png", label: "Front" },
-      { src: "Images/apparel/Logo Shirt Back 2.png", label: "Back" },
-      { src: "Images/apparel/Prod Img Front 2.png", label: "On model, front" },
-      { src: "Images/apparel/Prod Img Back 2.png", label: "On model, back" }
+      { src: "Images/apparel/Freedom Unfiltered T-shirt in patriotic studio light.png", label: "Front" },
+      { src: "Images/apparel/Black Freedom Unfiltered shirt, patriotic studio backdrop.png", label: "Back" },
+      { src: "Images/apparel/Freedom Unfiltered T-Shirt Studio Portrait (1).png", label: "On model, front" },
+      { src: "Images/apparel/Freedom Unfiltered Black T-Shirt Portrait.png", label: "On model, back" },
+      { src: "Images/apparel/Freedom Eagle Graphic T-Shirt.png", label: "Alternate front" },
+      { src: "Images/apparel/Freedom_Unfiltered_Woman_Back_Product_1312x1199_Close_Crop.png", label: "Alternate back" },
+      { src: "Images/apparel/Freedom Unfiltered four-model apparel showcase.png", label: "Alternate back" }
     ]
   }
 ];

@@ -1,7 +1,7 @@
 function setCorsHeaders(response) {
   response.setHeader("Access-Control-Allow-Origin", "*");
   response.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  response.setHeader("Access-Control-Allow-Headers", "Content-Type, X-Wave-User-Id, X-Wave-User-Token");
+  response.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Wave-User-Id, X-Wave-User-Token");
 }
 
 function sendJson(response, statusCode, payload) {

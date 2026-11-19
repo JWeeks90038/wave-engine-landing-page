@@ -76,6 +76,12 @@
 .return-page h1 { font-size: clamp(3rem, 7vw, 6rem); margin: 1rem 0; }
 .return-page p { max-width: 42rem; line-height: 1.6; }
 .return-page .shop-button { margin-top: 1rem; }
+.inventory-table-wrap { overflow-x: auto; margin-top: 1.5rem; }
+.inventory-table { width: 100%; border-collapse: collapse; }
+.inventory-table th, .inventory-table td { padding: .6rem; border-bottom: 1px solid #3c3937; text-align: left; }
+.inventory-table input { width: 5rem; padding: .5rem; background: #222; color: #fff; border: 1px solid #69635f; }
+#admin-login label { display: block; margin: 1rem 0; }
+#admin-login input { padding: .5rem; }
 @media (max-width: 720px) {
   .product-card { grid-template-columns: 1fr; }
   .product-info { padding-top: .5rem; }

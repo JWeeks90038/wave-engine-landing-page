@@ -16,7 +16,7 @@ function getStripe() {
 
 function getPriceId(product) {
   if (getMode() === "live") return product.stripePriceId;
-  const id = process.env[`APPAREL_TEST_PRICE_${product.id.toUpperCase()}`];
+  const id = process.env[`APPAREL_TEST_PRICE_${product.id.toUpperCase().replace(/ /g, "_")}`];
   if (!id || !/^price_[a-zA-Z0-9]+$/.test(id)) throw new Error(`Test price is not configured for ${product.id}.`);
   return id;
 }

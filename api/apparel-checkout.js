@@ -2,6 +2,7 @@ const { readJsonBody, sendJson, setCorsHeaders } = require("../server/api-utils"
 const { validateCart } = require("../server/apparel-catalog");
 const { getStripe, getSiteUrl, getMode, getPriceId } = require("../server/apparel-stripe");
 const { validateStripePrice, cartMetadata, shippingForSubtotal } = require("../server/apparel-pricing");
+const { checkAvailability } = require("../server/apparel-inventory");
 
 module.exports = async (request, response) => {
   if (request.method === "OPTIONS") {
@@ -13,9 +14,14 @@ module.exports = async (request, response) => {
   if (request.method !== "POST") return sendJson(response, 405, { error: "Method not allowed." });
 
   let items;
+  let requestId;
   try {
     const body = await readJsonBody(request);
     items = validateCart(body.items);
+    requestId = body.requestId;
+    if (typeof requestId !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestId)) {
+      throw new Error("Invalid checkout request. Please try again.");
+    }
   } catch (error) {
     return sendJson(response, error.statusCode || 400, { error: error.message });
   }
@@ -26,6 +32,7 @@ module.exports = async (request, response) => {
     }
     const site = getSiteUrl();
     const stripe = getStripe();
+    await checkAvailability(items);
     const stripePrices = new Map();
     for (const { product } of items) {
       if (!stripePrices.has(product.id)) {
@@ -37,7 +44,7 @@ module.exports = async (request, response) => {
     const shipping = shippingForSubtotal(subtotal);
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
-      metadata: cartMetadata(items),
+      metadata: { ...cartMetadata(items), inventoryVersion: "1" },
       shipping_address_collection: { allowed_countries: ["US"] },
       phone_number_collection: { enabled: true },
       shipping_options: [{
@@ -57,12 +64,13 @@ module.exports = async (request, response) => {
       })),
       success_url: new URL("apparel-success.html?session_id={CHECKOUT_SESSION_ID}", site).href.replace("%7BCHECKOUT_SESSION_ID%7D", "{CHECKOUT_SESSION_ID}"),
       cancel_url: new URL("apparel-cancel.html", site).href
-    });
+    }, { idempotencyKey: `apparel-checkout-${requestId}` });
     if (!session.url || session.livemode !== (getMode() === "live")) throw new Error("Stripe returned a checkout session in the wrong mode.");
     sendJson(response, 200, { url: session.url });
   } catch (error) {
     console.error("Apparel checkout error:", error.message);
-    sendJson(response, 503, { error: "Checkout is unavailable. Please try again later." });
+    sendJson(response, error.statusCode || 503, { error: error.statusCode === 409
+      ? error.message : "Checkout is unavailable. Please try again later." });
   }
 };
 module.exports.config = { api: { bodyParser: false } };

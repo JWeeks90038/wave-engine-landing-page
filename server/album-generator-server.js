@@ -8,6 +8,8 @@ const apparelCatalogHandler = require("../api/apparel-catalog");
 const apparelCheckoutHandler = require("../api/apparel-checkout");
 const apparelOrderStatusHandler = require("../api/apparel-order-status");
 const apparelWebhookHandler = require("../api/apparel-webhook");
+const apparelAdminHandler = require("../api/apparel-admin");
+const apparelFirebaseConfigHandler = require("../api/apparel-firebase-config");
 const { sendJson } = require("./api-utils");
 
 const HOST = process.env.ALBUM_GENERATOR_HOST || "127.0.0.1";
@@ -22,7 +24,9 @@ const routeHandlers = {
   "/api/apparel-catalog": apparelCatalogHandler,
   "/api/apparel-checkout": apparelCheckoutHandler,
   "/api/apparel-order-status": apparelOrderStatusHandler,
-  "/api/apparel-webhook": apparelWebhookHandler
+  "/api/apparel-webhook": apparelWebhookHandler,
+  "/api/apparel-admin": apparelAdminHandler,
+  "/api/apparel-firebase-config": apparelFirebaseConfigHandler
 };
 
 const server = http.createServer(async (request, response) => {

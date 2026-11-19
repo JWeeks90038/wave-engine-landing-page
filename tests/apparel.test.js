@@ -7,6 +7,10 @@ const stripeConfig = require("../server/apparel-stripe");
 const { validateStripePrice, getPublicProducts, cartMetadata, shippingForSubtotal } = require("../server/apparel-pricing");
 
 function request(method, body, headers = {}, url = "/") {
+  if (body && url === "/") {
+    const parsed = JSON.parse(body);
+    if (parsed.items) body = JSON.stringify({ ...parsed, requestId: "9ac019d5-8357-4e8d-a5b1-b97ef5f55137" });
+  }
   const stream = Readable.from(body ? [Buffer.from(body)] : []);
   stream.method = method;
   stream.headers = headers;
@@ -21,28 +25,23 @@ function response() {
     end(body) { this.body = body ? JSON.parse(body) : undefined; }
   };
 }
-const item = { id: "original", size: "XL", color: "Black", quantity: 2 };
-const stripePrice = { id: products[0].stripePriceId, livemode: true, active: true, type: "one_time", currency: "usd", unit_amount: 2499, billing_scheme: "per_unit", tax_behavior: "unspecified" };
+const item = { id: products[0].id, size: "XL", color: "Black", quantity: 2 };
+const stripePrice = { id: products[0].stripePriceId, livemode: true, active: true, type: "one_time", currency: "usd", unit_amount: products[0].previewPrice, billing_scheme: "per_unit", tax_behavior: "unspecified" };
 const freedomPrice = { ...stripePrice, id: "price_1UZGZ3I1ucU6ficLtysDHW1K", unit_amount: 2999 };
 
-test("catalog has two products with distinct image paths and all requested sizes", () => {
-  assert.equal(products.length, 2);
-  assert.deepEqual(products[0].images.map((image) => image.src), [
-    "Images/apparel/Logo Shirt Front 1.png",
-    "Images/apparel/Logo Shirt Back 1.png",
-    "Images/apparel/Prod Img Front 1.png",
-    "Images/apparel/Prod Img Back 1.png"
-  ]);
-  assert.deepEqual(products[1].images.map((image) => image.src), [
-    "Images/apparel/Logo Shirt Front 2.png",
-    "Images/apparel/Logo Shirt Back 2.png",
-    "Images/apparel/Prod Img Front 2.png",
-    "Images/apparel/Prod Img Back 2.png"
-  ]);
+test("each product has at least six distinct gallery images that exist", () => {
   for (const product of products) {
-    assert.deepEqual(product.sizes, ["S", "M", "L", "XL", "XXL", "XXXL"]);
+    assert.ok(product.images.length >= 6);
     assert.equal(new Set(product.images.map((image) => image.src)).size, product.images.length);
     for (const image of product.images) assert.ok(require("node:fs").existsSync(image.src));
+  }
+});
+
+test("catalog has two distinct products and all requested sizes", () => {
+  assert.equal(products.length, 2);
+  assert.equal(new Set(products.map((product) => product.id)).size, products.length);
+  for (const product of products) {
+    assert.deepEqual(product.sizes, ["S", "M", "L", "XL", "XXL"]);
   }
 });
 
@@ -59,7 +58,7 @@ test("server validates every cart variant and quantity", () => {
 test("catalog uses Stripe's current price and fails closed on unsupported prices", async () => {
   const stripe = { prices: { retrieve: async (id) => id === stripePrice.id ? stripePrice : freedomPrice } };
   const publicProducts = await getPublicProducts(products, () => stripe);
-  assert.equal(publicProducts[0].price, 2499);
+  assert.equal(publicProducts[0].price, products[0].previewPrice);
   assert.equal(publicProducts[0].stripePriceId, undefined);
   assert.equal(publicProducts[0].previewPrice, undefined);
   assert.equal(publicProducts[1].price, 2999);
@@ -87,6 +86,11 @@ test("catalog uses Stripe's current price and fails closed on unsupported prices
 });
 
 test("catalog endpoint returns Stripe pricing and surfaces Stripe failures", async () => {
+  const inventory = require("../server/apparel-inventory");
+  const originalInventory = inventory.inventoryForProducts;
+  inventory.inventoryForProducts = async () => products.map((product) => ({
+    id: product.id, active: true, quantities: Object.fromEntries(product.sizes.map((size) => [size, 10]))
+  }));
   const originalStripe = stripeConfig.getStripe;
   let shouldFail = false;
   stripeConfig.getStripe = () => ({ prices: { retrieve: async (id) => {
@@ -112,6 +116,29 @@ test("catalog endpoint returns Stripe pricing and surfaces Stripe failures", asy
     assert.equal(failure.body.products[1].previewPrice, 2999);
   } finally {
     stripeConfig.getStripe = originalStripe;
+    inventory.inventoryForProducts = originalInventory;
+  }
+});
+
+test("catalog returns real product images but no availability when inventory fails", async () => {
+  const inventory = require("../server/apparel-inventory");
+  const originalInventory = inventory.inventoryForProducts;
+  const originalStripe = stripeConfig.getStripe;
+  inventory.inventoryForProducts = async () => { throw new Error("Firestore unavailable"); };
+  stripeConfig.getStripe = () => ({ prices: { retrieve: async (id) => id === stripePrice.id ? stripePrice : freedomPrice } });
+  delete require.cache[require.resolve("../api/apparel-catalog")];
+  const handler = require("../api/apparel-catalog");
+  try {
+    const res = response();
+    await handler(request("GET"), res);
+    assert.equal(res.status, 503);
+    assert.match(res.body.error, /shopping is disabled/i);
+    assert.deepEqual(res.body.products.map((product) => product.images), products.map((product) => product.images));
+    assert.ok(res.body.products.every((product) => product.availabilityUnavailable && product.inventory === undefined));
+  } finally {
+    inventory.inventoryForProducts = originalInventory;
+    stripeConfig.getStripe = originalStripe;
+    delete require.cache[require.resolve("../api/apparel-catalog")];
   }
 });
 
@@ -127,6 +154,9 @@ test("variant metadata preserves size, color, and quantities within Stripe limit
 });
 
 test("checkout ignores client price and uses the configured return origin", async () => {
+  const inventory = require("../server/apparel-inventory");
+  const originalCheck = inventory.checkAvailability;
+  inventory.checkAvailability = async () => {};
   const previousEnabled = process.env.APPAREL_LIVE_CHECKOUT_ENABLED;
   process.env.APPAREL_LIVE_CHECKOUT_ENABLED = "true";
   const originalStripe = stripeConfig.getStripe;
@@ -149,7 +179,7 @@ test("checkout ignores client price and uses the configured return origin", asyn
     const res = response();
     await handler(request("POST", JSON.stringify({ items: [{ ...item, price: 1 }] })), res);
     assert.equal(res.status, 200);
-    assert.equal(params.line_items[0].price_data.unit_amount, 2499);
+    assert.equal(params.line_items[0].price_data.unit_amount, products[0].previewPrice);
     assert.match(params.line_items[0].price_data.product_data.name, /XL \/ Black/);
     assert.equal(params.line_items[0].price_data.product_data.description, products[0].description);
     assert.equal(params.line_items[0].quantity, 2);
@@ -157,7 +187,7 @@ test("checkout ignores client price and uses the configured return origin", asyn
     assert.equal(params.phone_number_collection.enabled, true);
     assert.equal(params.shipping_options[0].shipping_rate_data.fixed_amount.amount, 599);
     assert.equal(params.metadata.storefront, "wave-apparel-v1");
-    assert.deepEqual(JSON.parse(params.metadata.variants_1), [["original", "XL", "Black", 2]]);
+    assert.deepEqual(JSON.parse(params.metadata.variants_1), [[products[0].id, "XL", "Black", 2]]);
     assert.equal(params.success_url, "https://example.com/subsite/apparel-success.html?session_id={CHECKOUT_SESSION_ID}");
     assert.equal(params.cancel_url, "https://example.com/subsite/apparel-cancel.html");
     const invalid = response();
@@ -169,20 +199,20 @@ test("checkout ignores client price and uses the configured return origin", asyn
     assert.equal(inactive.status, 503);
     retrievedPrice = stripePrice;
     const freedom = response();
-    await handler(request("POST", JSON.stringify({ items: [{ id: "freedom", size: "S", color: "White", quantity: 1, price: 1 }] })), freedom);
+    await handler(request("POST", JSON.stringify({ items: [{ id: products[1].id, size: "S", color: "Black", quantity: 1, price: 1 }] })), freedom);
     assert.equal(freedom.status, 200);
     assert.equal(params.line_items[0].price_data.unit_amount, freedomPrice.unit_amount);
     assert.equal(params.line_items[0].quantity, 1);
-    assert.deepEqual(JSON.parse(params.metadata.variants_1), [["freedom", "S", "White", 1]]);
+    assert.deepEqual(JSON.parse(params.metadata.variants_1), [[products[1].id, "S", "Black", 1]]);
     const mixed = response();
-    await handler(request("POST", JSON.stringify({ items: [item, { id: "freedom", size: "S", color: "White", quantity: 1 }] })), mixed);
+    await handler(request("POST", JSON.stringify({ items: [item, { id: products[1].id, size: "S", color: "Black", quantity: 1 }] })), mixed);
     assert.equal(mixed.status, 200);
-    assert.deepEqual(params.line_items.map((line) => line.price_data.unit_amount), [2499, 2999]);
+    assert.deepEqual(params.line_items.map((line) => line.price_data.unit_amount), [products[0].previewPrice, 2999]);
     assert.equal(params.shipping_options[0].shipping_rate_data.fixed_amount.amount, 0);
     const three = response();
     await handler(request("POST", JSON.stringify({ items: [{ ...item, quantity: 3 }] })), three);
     assert.equal(three.status, 200);
-    assert.equal(params.shipping_options[0].shipping_rate_data.fixed_amount.amount, 599);
+    assert.equal(params.shipping_options[0].shipping_rate_data.fixed_amount.amount, 0);
     const four = response();
     await handler(request("POST", JSON.stringify({ items: [{ ...item, quantity: 4 }] })), four);
     assert.equal(four.status, 200);
@@ -194,6 +224,7 @@ test("checkout ignores client price and uses the configured return origin", asyn
   } finally {
     stripeConfig.getStripe = originalStripe;
     stripeConfig.getSiteUrl = originalSite;
+    inventory.checkAvailability = originalCheck;
     if (previousEnabled === undefined) delete process.env.APPAREL_LIVE_CHECKOUT_ENABLED; else process.env.APPAREL_LIVE_CHECKOUT_ENABLED = previousEnabled;
   }
 });
@@ -206,15 +237,18 @@ test("shipping threshold uses the pre-tax merchandise subtotal", () => {
 });
 
 test("test mode uses test prices and accepts only test sessions", async () => {
+  const inventory = require("../server/apparel-inventory");
+  const originalCheck = inventory.checkAvailability;
+  inventory.checkAvailability = async () => {};
   const previous = {
     mode: process.env.APPAREL_STRIPE_MODE,
-    price: process.env.APPAREL_TEST_PRICE_ORIGINAL,
+    price: process.env.APPAREL_TEST_PRICE_FREEDOM_1,
     enabled: process.env.APPAREL_LIVE_CHECKOUT_ENABLED
   };
   const originalStripe = stripeConfig.getStripe;
   const originalSite = stripeConfig.getSiteUrl;
   process.env.APPAREL_STRIPE_MODE = "test";
-  process.env.APPAREL_TEST_PRICE_ORIGINAL = "price_testOriginal";
+  process.env.APPAREL_TEST_PRICE_FREEDOM_1 = "price_testOriginal";
   delete process.env.APPAREL_LIVE_CHECKOUT_ENABLED;
   let params;
   stripeConfig.getStripe = () => ({
@@ -228,14 +262,15 @@ test("test mode uses test prices and accepts only test sessions", async () => {
     const res = response();
     await handler(request("POST", JSON.stringify({ items: [item] })), res);
     assert.equal(res.status, 200);
-    assert.equal(params.line_items[0].price_data.unit_amount, 2499);
+    assert.equal(params.line_items[0].price_data.unit_amount, products[0].previewPrice);
     assert.equal(params.shipping_options[0].shipping_rate_data.fixed_amount.amount, 599);
   } finally {
     stripeConfig.getStripe = originalStripe;
     stripeConfig.getSiteUrl = originalSite;
+    inventory.checkAvailability = originalCheck;
     for (const [key, value] of Object.entries({
       APPAREL_STRIPE_MODE: previous.mode,
-      APPAREL_TEST_PRICE_ORIGINAL: previous.price,
+      APPAREL_TEST_PRICE_FREEDOM_1: previous.price,
       APPAREL_LIVE_CHECKOUT_ENABLED: previous.enabled
     })) {
       if (value === undefined) delete process.env[key]; else process.env[key] = value;
@@ -374,15 +409,15 @@ test("order review retains variants, address and Stripe totals", () => {
     total_details: { amount_tax: 0, amount_shipping: 0 },
     customer_details: { email: "customer@example.test", phone: null },
     collected_information: { shipping_details: { name: "Customer", address: { line1: "1 Main St", line2: "Unit 2", city: "City", state: "CA", postal_code: "90210", country: "US" } } },
-    metadata: cartMetadata(validateCart([item, { id: "freedom", size: "S", color: "White", quantity: 1 }]))
+    metadata: cartMetadata(validateCart([item, { id: products[1].id, size: "S", color: "Black", quantity: 1 }]))
   };
   const lines = [{ description: "Original", quantity: 2, amount_total: 4998 }, { description: "Freedom", quantity: 1, amount_total: 2999 }];
   const order = orderFromSession(session, lines);
   assert.equal(order.mode, "test");
   assert.equal(order.customer.shippingAddress.line2, "Unit 2");
   assert.deepEqual(order.items, [
-    { design: "original", size: "XL", color: "Black", quantity: 2 },
-    { design: "freedom", size: "S", color: "White", quantity: 1 }
+    { design: products[0].id, size: "XL", color: "Black", quantity: 2 },
+    { design: products[1].id, size: "S", color: "Black", quantity: 1 }
   ]);
   assert.equal(order.shippingCharge, 0);
   assert.equal(order.salesTax, 0);

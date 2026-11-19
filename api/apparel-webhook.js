@@ -1,5 +1,6 @@
 const { readRawBody, sendJson } = require("../server/api-utils");
 const { getStripe, getMode } = require("../server/apparel-stripe");
+const { processPaidSession } = require("../server/apparel-inventory");
 
 // Stripe signature verification requires the original bytes, not parsed JSON.
 module.exports = async (request, response) => {
@@ -32,6 +33,7 @@ module.exports = async (request, response) => {
               !address.postal_code || address.country !== "US") {
             throw new Error("Paid apparel session is missing required US shipping details.");
           }
+          if (session.metadata.inventoryVersion === "1") await processPaidSession(stripe, session);
           console.log("Verified apparel payment:", event.id, session.id);
         } else {
           console.log("Apparel payment not confirmed:", event.id, session.id);

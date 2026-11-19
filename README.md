@@ -28,7 +28,7 @@ High-conversion, mobile-first landing page for Wave Engine built with plain HTML
 - `server/session-service.js` - anonymous signed user session helper for future auth upgrades
 - `server/storage/database.js` - pluggable storage layer with local JSON persistence
 - `server/album-generator-server.js` - secure local/backend proxy for OpenAI image generation
-- `apparel.html`, `apparel.css`, `apparel.js` - LISTEN UP AMERICA! storefront and browser cart
+- `apparel.html`, `apparel.css`, `apparel.js` - FREEDOM UNFILTERED storefront and browser cart
 - `apparel-success.html`, `apparel-cancel.html`, `apparel-status.js` - Stripe return pages and payment-status verification
 - `server/apparel-catalog.js` - trusted apparel catalog, variants, Stripe Price IDs, and preview prices
 - `api/apparel-*.js` - apparel catalog, checkout, payment-status, and webhook endpoints
@@ -127,7 +127,7 @@ In this setup, no frontend endpoint change is needed because `album-generator.ht
 
 ## Apparel Checkout and manual fulfillment
 
-The Original Edition costs $24.99 and the Freedom Edition $29.99. The server verifies each
+Both current editions have a $29.99 configured price. The server verifies each
 configured Stripe Price is active, one-time, USD, not tax-inclusive, in the selected mode and
 exactly the expected amount. A mismatch disables checkout for that product. For an unavailable
 price, the storefront shows an unverified preview and disables checkout. Checkout calculates
@@ -137,21 +137,95 @@ Stripe stores variant IDs, sizes, colors and quantities in session metadata, not
 
 **Sales tax is not currently calculated or collected by this integration.** Determine your tax
 obligations and configure and test a suitable tax solution before live sales; Stripe Tax is not
-enabled by this code and may involve additional costs. Inventory, label printing, shipping,
-refunds and customer support remain manual. The cart stays saved after payment.
+enabled by this code and may involve additional costs. Label printing, shipping, ordinary
+returns and customer support remain manual. The cart stays saved after payment.
+
+### Firebase inventory setup
+
+Inventory is required for apparel checkout. The existing Vercel/Node API uses the Firebase
+Admin SDK and a Firestore transaction; no Firebase Cloud Function is required. Do not enable
+live checkout until this configuration, the webhook, refund permissions and reconciliation
+have been tested end to end. Deploy the API with your existing Vercel Git integration or
+`vercel --prod` from the project directory; there is no Cloud Function deployment command.
+
+1. Create a Firebase project, enable Firestore and Firebase Authentication with email/password,
+   and register a web app. Use a separate Firebase project for test and live deployments.
+2. Set these **server-side** environment variables in Vercel and the local API:
+   - `FIREBASE_PROJECT_ID`: Firebase project ID.
+   - `FIREBASE_WEB_API_KEY` and `FIREBASE_AUTH_DOMAIN`: the web app's public Firebase config;
+     these are exposed by the API to initialize Firebase Auth, not Admin credentials.
+   - `FIREBASE_SERVICE_ACCOUNT_JSON`: the complete service-account JSON as a single secret
+     environment variable. Alternatively, omit it when Application Default Credentials are
+     available (for local development, set `GOOGLE_APPLICATION_CREDENTIALS` to the private
+     service-account file). The service account needs Firestore access and Firebase Auth
+     permissions. Never commit the file or place it in the public site directory.
+3. Install dependencies with `npm install`. Deploy the rules from a trusted terminal after
+   authenticating the Firebase CLI:
+
+   ```powershell
+   firebase deploy --only firestore:rules --project YOUR_FIREBASE_PROJECT_ID
+   ```
+
+   [firestore.rules](firestore.rules) denies all direct client reads and writes. The public
+   catalog API returns only availability; the admin API verifies Firebase ID tokens and the
+   `admin: true` custom claim before any inventory access. Restrict service-account IAM and
+   access to the project and secrets; Admin SDK access bypasses Firestore rules.
+4. Create an email/password user in Firebase Authentication. In a private terminal with the
+   same project ID and credentials, grant the claim using the user's Firebase UID:
+
+   ```powershell
+   $env:FIREBASE_PROJECT_ID="YOUR_FIREBASE_PROJECT_ID"
+   $env:GOOGLE_APPLICATION_CREDENTIALS="C:\private\firebase-service-account.json"
+   node .\server\apparel-grant-admin.js YOUR_USER_UID
+   ```
+
+   The user must sign out and back in to receive the new claim. To revoke access, remove
+   the claim and revoke the user's refresh tokens using Firebase Admin; disabling a user
+   also blocks revoked-token verification.
+5. Open `apparel-admin.html`, sign in, and enter non-negative quantities for all five sizes
+   of each product. Save each row. A missing product or size is unavailable until initialized;
+   inactive products are also unavailable. Use Refresh after a conflicting update and re-enter
+   your changes. Restock returns or cancellations manually only after physical inspection.
+   The storefront, success, and admin pages use the configured Vercel API origin; their
+   `data-local-api-base` attributes keep local previews pointed at the local API. Update these
+   values if the API moves. Add the admin page's domain to Firebase Authentication authorized
+   domains and serve it over HTTPS.
+
+Firestore documents are `products/{mode}_{productId}` with `name`, `price` (cents), `image`
+and `active`; `products/{mode}_{productId}/inventory/{size}` with `size`, `quantity`,
+`updatedAt` and `updatedBy`; and `orders/{stripeSessionId}` with customer/shipping details,
+items (product ID/name, size, quantity, unit price in cents), payment and fulfillment status,
+creation time, and inventory deductions including before/after counts. Mode prefixes prevent
+test stock from affecting live stock even if the same project is accidentally configured.
+Product identifiers and Stripe prices remain server-controlled in the apparel catalog.
+Firestore orders contain personal data and require restricted IAM and appropriate retention.
+
+Stock is checked before redirecting to Stripe, but that check does not reserve stock. After a
+verified successful Stripe payment, the webhook atomically creates the order and deducts stock.
+If another paid order has already taken the last item, the order is marked unfulfillable and
+the webhook initiates a full Stripe refund with a stable idempotency key. A customer may
+therefore briefly be charged before the refund. Failed payments and abandoned carts do not
+deduct inventory. Refunds, cancellations and returns do not automatically restock.
+Monitor failed webhook deliveries and `refund_pending` orders, including pending/failed Stripe
+refunds; retry failed webhook deliveries and reconcile them with Stripe before fulfillment.
+The Stripe key must have permission to create refunds. A delayed or failed webhook leaves the
+success page in a processing state. Existing sessions created before inventory integration
+retain their previous manual fulfillment flow and are not deducted retroactively.
+If inventory cannot be loaded, the catalog still displays its real product images and an
+availability warning, but all purchasing controls remain disabled until inventory returns.
 
 ### Test locally before launch
 
 Node.js 18 or newer and `npm install` are required. In Stripe's **test mode**, create separate
-one-time USD Prices for $24.99 and $29.99. The live Price IDs in the catalog cannot be used with
+one-time USD Prices for $29.99. The live Price IDs in the catalog cannot be used with
 test keys. In a private PowerShell terminal set the following values (replace placeholders; do
 not commit or share keys):
 
 ```powershell
 $env:APPAREL_STRIPE_MODE="test"
 $env:STRIPE_SECRET_KEY="sk_test_replace_me"
-$env:APPAREL_TEST_PRICE_ORIGINAL="price_replace_original"
-$env:APPAREL_TEST_PRICE_FREEDOM="price_replace_freedom"
+$env:APPAREL_TEST_PRICE_FREEDOM_1="price_replace_jones"
+$env:APPAREL_TEST_PRICE_FREEDOM_2="price_replace_henry"
 $env:APPAREL_SITE_URL="http://127.0.0.1:5500/"
 $env:STRIPE_WEBHOOK_SECRET="whsec_replace_me"
 node .\server\album-generator-server.js
@@ -168,19 +242,19 @@ stripe listen --forward-to http://127.0.0.1:8787/api/apparel-webhook
 Set `STRIPE_WEBHOOK_SECRET` to the signing secret printed by that CLI, restart the API, and keep
 the CLI listening. Use Stripe's documented test card `4242 4242 4242 4242`, a future expiry and
 any valid test CVC, with test customer information. Verify the test-mode banner, address requirement,
-both prices, variant labels, and totals: three Original shirts are $74.97 plus $5.99 shipping;
-two Original plus one Freedom are $79.97 with free shipping. Verify the success page and CLI
+both prices, variant labels, and totals: two shirts are $59.98 plus $5.99 shipping;
+three shirts are $89.97 with free shipping. Verify the success page and CLI
 webhook delivery, then inspect the paid order as described below. An uncompleted or failed payment
 must not appear as paid. Test async payment methods only if enabled in your Stripe account.
 No live keys, IDs, sessions, events or signing secrets should be used in a test deployment.
 
 ### Reviewing and fulfilling paid orders
 
-Stripe is the source of order data; the webhook verifies signatures and retrieves sessions but
-does not create records, ship orders or prevent manual duplicate shipments. Duplicate webhook
-deliveries are harmless because the handler performs no fulfillment. Failed/unpaid sessions are
-not treated as paid. Missing required shipping data or a Stripe retrieval failure returns an
-error for Stripe to retry. Monitor failed webhook deliveries and reconcile in the Dashboard.
+Stripe is the source of payment data. The webhook verifies signatures and retrieves sessions,
+then records new inventory-enabled orders and deductions transactionally. It does not ship
+orders or prevent manual duplicate shipments. Failed/unpaid sessions are not treated as paid.
+Missing required shipping data, refund problems or a Stripe/Firestore failure returns an error
+for Stripe to retry. Monitor failed webhook deliveries and reconcile in the Dashboard.
 
 With the same mode and secret key set in a **private** terminal, run:
 
@@ -202,7 +276,9 @@ sessions against the sheet regularly, check the session ID before printing a lab
 failed webhook deliveries and `review` entries. Use a single person or coordinated process to
 avoid two people shipping the same order. Check refunds and disputes directly in Stripe before
 shipping; the report's paid status alone does not reflect subsequent refunds. Do not mix test and
-live sheets. Stripe events and logs are not a fulfillment checklist.
+live sheets. Inventory-enabled orders with a refunded charge are placed in `review`, not the
+fulfillment list; check Stripe again immediately before shipping. Stripe events and logs are not
+a fulfillment checklist.
 
 ### Deploying live
 
@@ -216,9 +292,10 @@ test and fulfillment checks above. Set `APPAREL_STRIPE_MODE=live`, a live `STRIP
 `checkout.session.async_payment_failed`. Check its deliveries. Only then enable live checkout.
 Live charges are real. Never expose secret keys in browser code.
 
-When the static site is hosted separately, configure the `apparel-api-base` meta tag in both
-`apparel.html` and `apparel-success.html` to the API origin. A static-only deployment cannot
-load the catalog or take payments. Run automated checks with `npm test`.
+When the static site is hosted separately, the `apparel-api-base` meta tags in `apparel.html`,
+`apparel-success.html`, and `apparel-admin.html` must point to the deployed API origin.
+A static-only deployment cannot load the catalog or take payments. Run automated checks with
+`npm test`.
 
 ## Album generator: GitHub Pages and Railway
 

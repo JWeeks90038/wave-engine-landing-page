@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <meta name="apparel-api-base" content="https://wave-engine-landing-page.vercel.app" data-local-api-base="http://127.0.0.1:8787" />
+    <title>Inventory | Wave Engine</title>
+    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="apparel.css" />
+    <script type="module" src="apparel-admin.js"></script>
+  </head>
+  <body class="apparel-page">
+    <div class="page-shell">
+      <nav class="topbar site-nav" aria-label="Primary"><a class="brand-link" href="index.html">Wave Engine</a><a href="apparel.html">Apparel</a></nav>
+      <main class="collection">
+        <p class="apparel-kicker">Administrator</p><h1>Apparel inventory</h1>
+        <p id="admin-status" role="status" aria-live="polite">Loading authentication...</p>
+        <form id="admin-login" hidden>
+          <label>Email <input type="email" name="email" autocomplete="username" required /></label>
+          <label>Password <input type="password" name="password" autocomplete="current-password" required /></label>
+          <button class="shop-button" type="submit">Sign in</button>
+        </form>
+        <div id="admin-content" hidden>
+          <p id="admin-mode"></p>
+          <button id="admin-refresh" class="outline-button" type="button">Refresh</button>
+          <button id="admin-logout" class="outline-button" type="button">Sign out</button>
+          <div class="inventory-table-wrap">
+            <table class="inventory-table">
+              <thead><tr><th>Product</th><th>S</th><th>M</th><th>L</th><th>XL</th><th>XXL</th><th>Status</th><th>Last updated</th><th>Action</th></tr></thead>
+              <tbody id="inventory-rows"></tbody>
+            </table>
+          </div>
+        </div>
+      </main>
+    </div>
+  </body>
+</html>

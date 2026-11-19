@@ -1,5 +1,7 @@
-const apiSetting = document.querySelector('meta[name="apparel-api-base"]').content.trim();
-const apiBase = apiSetting.replace(/\/$/, "") || (location.protocol === "file:" || ["localhost", "127.0.0.1"].includes(location.hostname) ? "http://127.0.0.1:8787" : "");
+const apiConfig = document.querySelector('meta[name="apparel-api-base"]');
+const isLocal = location.protocol === "file:" || ["localhost", "127.0.0.1"].includes(location.hostname);
+const apiSetting = (isLocal && apiConfig.dataset.localApiBase || apiConfig.content).trim();
+const apiBase = apiSetting.replace(/\/$/, "") || (isLocal ? "http://127.0.0.1:8787" : "");
 const storageKey = "wave-apparel-cart-v1";
 const productsElement = document.querySelector("#products");
 const cartItems = document.querySelector("#cart-items");
@@ -15,6 +17,10 @@ function money(cents) { return new Intl.NumberFormat("en-US", { style: "currency
 function productFor(item) { return products.find((product) => product.id === item.id); }
 function hasPrice(product) { return Number.isSafeInteger(product.price) && product.price >= 0; }
 function hasPreviewPrice(product) { return Number.isSafeInteger(product.previewPrice) && product.previewPrice >= 0; }
+function available(product, size) {
+  const quantity = product && product.active && product.inventory && product.inventory[size];
+  return Number.isSafeInteger(quantity) && quantity > 0 ? quantity : 0;
+}
 function validItem(item) {
   const product = item && productFor(item);
   return Boolean(product && product.colors.includes(item.color) && product.sizes.includes(item.size) &&
@@ -50,13 +56,17 @@ function renderCart() {
     const variant = document.createElement("p");
     if (validItem(item)) {
       const product = productFor(item);
+      if (item.quantity > available(product, item.size)) {
+        invalid = true;
+        variant.textContent = "Sorry, this size is no longer available in this quantity. Update or remove it.";
+      }
       name.textContent = product.name;
       if (hasPrice(product)) {
-        variant.textContent = `${item.color} / ${item.size} · ${money(product.price)} each`;
+        if (item.quantity <= available(product, item.size)) variant.textContent = `${item.color} / ${item.size} · ${money(product.price)} each`;
         subtotal += product.price * item.quantity;
       } else {
         variant.textContent = hasPreviewPrice(product)
-          ? `${item.color} / ${item.size} · ${money(product.previewPrice)} each (unverified preview price). Checkout requires a verified price.`
+          ? `${item.color} / ${item.size} · ${money(product.previewPrice)} each`
           : `${item.color} / ${item.size} · Price unavailable. Checkout requires a verified price.`;
         priceUnavailable = true;
       }
@@ -76,8 +86,9 @@ function renderCart() {
       input.setAttribute("aria-label", `Quantity for ${productFor(item).name}, ${item.color}, ${item.size}`);
       input.addEventListener("change", () => {
         const quantity = Number(input.value);
-        if (!input.value || !Number.isInteger(quantity) || quantity < 1 || quantity > 20) {
-          message("Choose a quantity between 1 and 20.");
+        if (!input.value || !Number.isInteger(quantity) || quantity < 1 || quantity > 20 ||
+            quantity > available(productFor(item), item.size)) {
+          message("Choose a quantity between 1 and the available stock, up to 20.");
           input.value = item.quantity;
           return;
         }
@@ -100,10 +111,32 @@ function renderCart() {
   document.querySelector("#cart-subtotal").textContent = priceUnavailable || invalid ? "Unavailable" : money(subtotal);
   checkoutButton.disabled = busy || !cart.length || invalid || priceUnavailable || !products.length;
 }
-function addItem(item) {
+async function addItem(item) {
+  try {
+    const response = await fetch(`${apiBase}/api/apparel-catalog`, { cache: "no-store" });
+    if (!response.ok) throw new Error("Availability could not be checked. Please try again.");
+    const data = await response.json();
+    if (!Array.isArray(data.products)) throw new Error("Availability could not be checked. Please try again.");
+    products = data.products;
+    productsElement.replaceChildren();
+    products.forEach(renderProduct);
+  } catch (error) {
+    message(error.message || "Availability could not be checked. Please try again.");
+    return false;
+  }
+  if (!validItem(item)) {
+    message("This product is no longer available.");
+    renderCart();
+    return false;
+  }
   const existing = cart.find((entry) => entry && entry.id === item.id && entry.size === item.size && entry.color === item.color);
   if (existing && (!validItem(existing) || existing.quantity + item.quantity > 20)) {
     message("Each size and color is limited to 20 items. Adjust the quantity in your cart.");
+    return false;
+  }
+  if ((existing ? existing.quantity : 0) + item.quantity > available(productFor(item), item.size)) {
+    message("Sorry, this size is no longer available in that quantity.");
+    renderCart();
     return false;
   }
   if (existing) existing.quantity += item.quantity; else cart.push(item);
@@ -116,13 +149,22 @@ async function checkout(items, feedback) {
   function checkoutMessage(text) { message(text); if (feedback) feedback.textContent = text; }
   busy = true; renderCart(); checkoutMessage("Opening secure Stripe checkout...");
   try {
+    const attemptKey = "wave-apparel-checkout-attempt";
+    const cartKey = JSON.stringify(items);
+    let attempt;
+    try { attempt = JSON.parse(sessionStorage.getItem(attemptKey)); } catch (error) { attempt = null; }
+    if (!attempt || attempt.cart !== cartKey || typeof attempt.id !== "string") {
+      attempt = { cart: cartKey, id: crypto.randomUUID() };
+      sessionStorage.setItem(attemptKey, JSON.stringify(attempt));
+    }
     const response = await fetch(`${apiBase}/api/apparel-checkout`, {
-      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ items })
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ items, requestId: attempt.id })
     });
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || "Checkout could not be started.");
     const checkoutUrl = new URL(result.url);
     if (checkoutUrl.protocol !== "https:" || checkoutUrl.hostname !== "checkout.stripe.com") throw new Error("Invalid checkout destination.");
+    sessionStorage.removeItem(attemptKey);
     location.assign(checkoutUrl.href);
   } catch (error) {
     checkoutMessage(error.message || "Checkout could not be started. Please try again.");
@@ -136,7 +178,7 @@ function renderProduct(product) {
   card.querySelector(".product-price").textContent = hasPrice(product)
     ? money(product.price)
     : hasPreviewPrice(product)
-      ? `${money(product.previewPrice)} (unverified preview price)`
+      ? money(product.previewPrice)
       : "Price temporarily unavailable";
   card.querySelector(".product-disclaimer").textContent = `${product.pricePlaceholder ? "Placeholder imagery and price." : ""} `;
   const mainImage = card.querySelector(".main-image img");
@@ -158,24 +200,43 @@ function renderProduct(product) {
     dialog.showModal();
   });
   const form = card.querySelector("form");
-  if (!hasPrice(product)) {
-    card.querySelector(".buy-now").disabled = true;
-    card.querySelector(".product-feedback").textContent = "Checkout is unavailable until Stripe verifies the price.";
-  }
+  const addButton = form.querySelector('button[type="submit"]');
+  const buyButton = card.querySelector(".buy-now");
+  const availability = card.querySelector(".product-availability");
   ["color", "size"].forEach((field) => {
     product[`${field}s`].forEach((value) => {
-      const option = document.createElement("option"); option.value = value; option.textContent = value;
+      const option = document.createElement("option"); option.value = value;
+      option.textContent = field === "size" ? `${value} - ${product.availabilityUnavailable
+        ? "Availability unavailable"
+        : available(product, value) ? `${available(product, value)} available` : "Sold out"}` : value;
+      if (field === "size") option.disabled = !available(product, value);
       form.elements[field].append(option);
     });
   });
+  const soldOut = product.active && product.sizes.every((size) => available(product, size) === 0);
+  availability.textContent = product.availabilityUnavailable ? "Availability temporarily unavailable."
+    : !product.active ? "Currently unavailable." : soldOut ? "Sold Out" : "Choose an available size.";
+  function updateButtons() {
+    const stock = available(product, form.elements.size.value);
+    addButton.disabled = !stock;
+    buyButton.disabled = !stock || !hasPrice(product);
+    if (stock) availability.textContent = `${stock} available in ${form.elements.size.value}.`;
+  }
+  form.elements.size.addEventListener("change", updateButtons);
+  updateButtons();
   function selection() {
     if (!form.reportValidity()) return null;
-    return { id: product.id, color: form.elements.color.value, size: form.elements.size.value, quantity: Number(form.elements.quantity.value) };
+    const item = { id: product.id, color: form.elements.color.value, size: form.elements.size.value, quantity: Number(form.elements.quantity.value) };
+    if (!validItem(item) || item.quantity > available(productFor(item), item.size)) {
+      card.querySelector(".product-feedback").textContent = "Sorry, this size is no longer available in that quantity.";
+      return null;
+    }
+    return item;
   }
-  form.addEventListener("submit", (event) => {
+  form.addEventListener("submit", async (event) => {
     event.preventDefault();
     const item = selection();
-    if (item && addItem(item)) document.querySelector("#cart").scrollIntoView({ behavior: "smooth" });
+    if (item && await addItem(item)) document.querySelector("#cart").scrollIntoView({ behavior: "smooth" });
   });
   card.querySelector(".buy-now").addEventListener("click", () => {
     const item = selection(); if (item) checkout([item], card.querySelector(".product-feedback"));
@@ -187,13 +248,20 @@ checkoutButton.addEventListener("click", () => checkout(cart));
 loadCart();
 renderCart();
 fetch(`${apiBase}/api/apparel-catalog`)
-  .then((response) => { if (!response.ok) throw new Error("The collection could not be loaded."); return response.json(); })
-  .then((data) => {
+  .then(async (response) => {
+    const data = await response.json();
+    if (!response.ok && !(response.status === 503 && Array.isArray(data.products) &&
+      data.products.every((product) => product.availabilityUnavailable === true) && typeof data.error === "string")) {
+      throw new Error(data.error || "The collection could not be loaded.");
+    }
+    return { data, error: response.ok ? "" : data.error };
+  })
+  .then(({ data, error }) => {
     if (!Array.isArray(data.products)) throw new Error("The collection response was invalid.");
     document.querySelector("#store-mode").textContent = data.mode === "test" ? "TEST MODE: No real payments or orders." : "";
     products = data.products;
     products.forEach(renderProduct);
-    document.querySelector("#catalog-status").textContent = products.length ? "" : "The collection is currently empty.";
+    document.querySelector("#catalog-status").textContent = error || (products.length ? "" : "The collection is currently empty.");
     renderCart();
   })
   .catch(() => { document.querySelector("#catalog-status").textContent = "The collection is unavailable. Please try again later."; });
