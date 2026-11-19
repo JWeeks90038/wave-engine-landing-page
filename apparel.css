@@ -94,6 +94,8 @@
 .remove-item { padding: .5rem; border: 0; background: none; color: #e4a39c; text-decoration: underline; cursor: pointer; }
 .cart-total { display: flex; justify-content: space-between; margin: 2rem 0 1rem; font-size: 1.25rem; }
 .apparel-footer { display: flex; justify-content: space-between; gap: 1rem; border-top: 1px solid #3c3937; padding: 2rem 0; font-size: .8rem; }
+.apparel-footer .footer-links { flex: 1 1 100%; }
+.apparel-footer .footer-links a { color: #bdb8b4; }
 .image-dialog { width: min(90vw, 800px); max-height: 90vh; padding: 1rem; border: 1px solid #777; background: #1b1b1b; color: white; }
 .image-dialog::backdrop { background: rgba(0,0,0,.85); }
 .image-dialog img { display: block; max-width: 100%; max-height: 75vh; margin: auto; object-fit: contain; }
