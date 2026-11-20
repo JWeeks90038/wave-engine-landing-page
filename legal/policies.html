@@ -73,8 +73,8 @@
       <section id="privacy">
         <h2>1. Privacy Policy</h2>
         <h3>1.1 Who we are and what this policy covers</h3>
-        <p>This Privacy Policy describes how <strong>[PLACEHOLDER: full legal name]</strong>, doing business as Wave Engine <strong>[and/or Wave Engine Studio — confirm]</strong> (“Wave Engine,” “we,” “us,” or “our”), collects, uses, discloses, and retains personal information through <strong>[PLACEHOLDER: canonical website URL and related domains]</strong>, our apparel checkout, customer communications, and any digital services that link to this policy.</p>
-        <p>The public website currently presents music-streaming links and embedded Spotify and YouTube players, an apparel storefront, and an AI album-art/credit tool. The reviewed source code does <strong>not</strong> show a direct music-download storefront, customer newsletter signup, analytics tag, advertising pixel, or shipping-label integration. The album-art tool is not a music-download service. Confirm the production website, added scripts, vendor settings, and all other data flows before publication.</p>
+        <p>This Privacy Policy describes how <strong>Wave Engine Studios</strong>, doing business as Wave Engine Music, collects, uses, discloses, and retains personal information through <strong>https://waveenginemusic.com</strong>, our apparel checkout, customer communications, and any digital services that link to this policy.</p>
+        <p>The public website currently presents music-streaming links and embedded Spotify and YouTube players, an apparel storefront, and an AI album-art/credit tool. The reviewed source code does <strong>not</strong> show a customer newsletter signup, analytics tag, advertising pixel, or shipping-label integration. The album-art tool is not a music-download service. Confirm the production website, added scripts, vendor settings, and all other data flows before publication.</p>
         <p>This policy does not replace a third party’s privacy notice. A third party operating its own service may use information under its own terms.</p>
 
         <h3>1.2 Personal information we collect</h3>
@@ -94,8 +94,8 @@
         <p>We do not intentionally request Social Security numbers, government ID numbers, health details, biometric identifiers, or precise geolocation for ordinary shopping. Do not submit sensitive information in a prompt or email. A third party may independently collect information when you use its embedded content or service.</p>
 
         <h3>1.3 Sources and purposes</h3>
-        <p>We obtain information directly from you (including checkout fields, prompts, and email); automatically from your browser/device and interactions; from Stripe and other vendors supporting a transaction or service; from public Solana blockchain records when you submit a transaction; and, where permitted, from fraud-prevention or security sources. We do not currently identify a data broker, advertising network, or email-marketing provider in the reviewed website code.</p>
-        <p>We use information to display the site and remember an apparel cart during the browser session; check stock, create checkout sessions, take and confirm payment, fulfill apparel orders, manage refunds, and maintain transaction, tax, accounting, security, and dispute records; provide the album-art/credit feature, validate a credit payment, track credits, submit prompts to the image-generation provider, and return generated artwork; respond to questions and custom-order inquiries; protect and troubleshoot the site; and comply with law. We use information for another purpose only where permitted and, when required, after notice or consent. The reviewed code does not use information to make decisions with legal or similarly significant effects about customers.</p>
+        <p>We obtain information directly from you (including checkout fields, prompts, and email); automatically from your browser/device and interactions; from Stripe and other vendors supporting a transaction or service; and, where permitted, from fraud-prevention or security sources. We do not currently identify a data broker, advertising network, or email-marketing provider in the reviewed website code.</p>
+        <p>We use information to display the site and remember an apparel cart during the browser session; check stock, create checkout sessions, take and confirm payment, fulfill apparel orders, manage refunds, and maintain transaction, tax, accounting, security, and dispute records; provide the album-art/credit feature, validate a credit payment, respond to questions and custom-order inquiries; protect and troubleshoot the site; and comply with law. We use information for another purpose only where permitted and, when required, after notice or consent. The reviewed code does not use information to make decisions with legal or similarly significant effects about customers.</p>
 
         <h3>1.4 Vendors, disclosures, sales, and sharing</h3>
         <p>We disclose information only as needed for the purposes above, subject to contracts and applicable law. Visible integrations include:</p>
@@ -120,144 +120,904 @@
         <p>We retain personal information only as long as reasonably needed for the disclosed purpose, legal/accounting obligations, security, and dispute resolution, then delete, de-identify, or securely dispose of it where feasible. Specific periods must be completed and approved before publication:</p>
         <ul>
           <li>Apparel cart and checkout attempt: browser session storage; normally removed when the browser session ends or the user clears site data.</li>
-          <li>Paid apparel orders: Firestore records include customer, shipping, items, payment, and fulfillment details. Code has no timed deletion rule. <strong>[PLACEHOLDER: retention period and archival/deletion process, including legal holds.]</strong></li>
-          <li>Stripe transaction records: maintained by Stripe under its own retention and legal requirements. <strong>[Confirm account settings and applicable retention.]</strong></li>
+          <li>Paid apparel orders: Firestore records include customer, shipping, items, payment, and fulfillment details. Code has no timed deletion rule.</li>
+          <li>Stripe transaction records: maintained by Stripe under its own retention and legal requirements.</li>
           <li>Album-art prompts and credit history: the application limits the recent image-history list to 100 entries and the credit transaction list to 250 entries; code does not set a time-based retention period for user/payment records. On Vercel the default JSON store uses temporary storage unless another path/store is configured. <strong>[Confirm production storage, backups, deletion/retention periods, and OpenAI retention settings.]</strong></li>
-          <li>Support email and technical logs: <strong>[PLACEHOLDER: provider, retention periods, and deletion process.]</strong></li>
-          <li>Privacy-request verification data: used only to verify and process a request, prevent fraud, and document compliance; delete when no longer needed, subject to legal obligations. <strong>[Confirm schedule.]</strong></li>
+          <li>Support email and technical logs</li>
+          <li>Privacy-request verification data: used only to verify and process a request, prevent fraud, and document compliance; delete when no longer needed, subject to legal obligations.</li>
         </ul>
 
         <h3 id="privacy-choices">1.7 Privacy choices and rights</h3>
         <p>Depending on your residence, the law’s scope, and exceptions, you may have rights to know/access categories and specific pieces of information and their sources/purposes/recipients; request deletion or correction; opt out of sale or sharing for cross-context behavioral advertising; limit certain uses/disclosures of sensitive information; obtain data portability or exercise other state rights; and receive equal service and pricing. These rights are not absolute. We may retain information needed to complete a transaction, provide a requested service, maintain security, comply with law, or establish, exercise, or defend legal claims. We will explain a denial and any available appeal process where required.</p>
         <p><a href="mailto:waveenginestudio@gmail.com?subject=Privacy%20request"><strong>Your Privacy Choices — submit a privacy request</strong></a></p>
-        <p><strong>How to submit a request:</strong> Email <a href="mailto:waveenginestudio@gmail.com?subject=Privacy%20request">waveenginestudio@gmail.com</a> with the subject “Privacy Request” and identify the right you wish to exercise. Do not include full payment-card data. <strong>[Add a working on-site request form/link and any required toll-free number before publication. Confirm whether an online-only exception applies.]</strong> An email address alone may not satisfy every covered business’s statutory request-method requirements. The email link is not a substitute for a separate, functioning sale/sharing opt-out control if required.</p>
+        <p><strong>How to submit a request:</strong> Email <a href="mailto:waveenginestudio@gmail.com?subject=Privacy%20request">waveenginestudio@gmail.com</a> with the subject “Privacy Request” and identify the right you wish to exercise. Do not include full payment-card data. <strong>You can also contact (951) 290-8916 by CALLING or TEXT MESSAGE</strong> An email address alone may not satisfy every covered business’s statutory request-method requirements. The email link is not a substitute for a separate, functioning sale/sharing opt-out control if required.</p>
         <p><strong>Identity verification:</strong> We will use information already associated with the request (for example, the email used for an order and limited order details) to reasonably verify identity. We may request additional information only when necessary and use it for verification, security, or fraud prevention, then delete it when practical unless law requires retention. We will not ask for a password, full card number, or unrelated sensitive information to process a request.</p>
         <p><strong>Authorized agents:</strong> An agent may submit a request with proof of written permission or other legally accepted authority. We may still ask the consumer to verify identity directly unless law provides otherwise. Agents acting under power of attorney may submit documentation recognized by law.</p>
-        <p><strong>Opt-out link and preference signals:</strong> If required, a clearly labeled “Your Privacy Choices” or “Do Not Sell or Share My Personal Information” link will be available, and we will honor valid opt-out preference signals such as Global Privacy Control. <strong>[Link to the functioning control, confirm GPC implementation, and connect the control to any vendor/ad systems before publication.]</strong></p>
+        <p><strong>Opt-out link and preference signals:</strong> If you believe your personal information is being sold or shared, you may submit an opt-out request by contacting us at <a href="mailto:waveenginestudio@gmail.com">waveenginestudio@gmail.com</a>. We will honor valid opt-out preference signals, including Global Privacy Control, where legally required.</p>
 
         <h3>1.8 Children</h3>
-        <p>The site and store are not intended for children under 13 <strong>[CONFIRM the actual audience and marketing]</strong>, and we do not knowingly seek personal information from children under 13. If we learn that we collected such information without legally required parental consent, we will take reasonable steps to delete it. A parent or guardian may contact us at <a href="mailto:waveenginestudio@gmail.com">waveenginestudio@gmail.com</a>. If the service is directed to children or we knowingly collect their information, additional COPPA steps and notices are required before collection.</p>
+<p>The site, store, music services, and related content are intended for a general audience and are not directed to children under 13. We do not knowingly collect or solicit personal information from children under 13. If we learn that we have collected personal information from a child under 13 without legally required parental consent, we will take reasonable steps to delete that information. A parent or guardian who believes that a child has provided personal information to us may contact us at <a href="mailto:waveenginestudio@gmail.com">waveenginestudio@gmail.com</a>.</p>
 
-        <h3>1.9 Security</h3>
-        <p>The apparel integration sends payment details to Stripe-hosted Checkout; the reviewed application code does not collect full payment-card numbers. The repository’s Firestore rules deny direct client access and the apparel admin API requires a verified administrator claim; confirm these controls are deployed in production. <strong>[Confirm actual access controls, encryption, key management, vendor contracts, incident-response plan, logging, backups, and PCI responsibilities before describing them as current practices.]</strong> We cannot guarantee that any internet transmission or storage method is completely secure. Notify us promptly if you believe an account or transaction is compromised.</p>
+<h3>1.9 Security</h3>
+<p>We use reasonable administrative, technical, and organizational safeguards designed to protect personal information against unauthorized access, use, alteration, or disclosure. Apparel payment details are processed through Stripe-hosted Checkout, and we do not intentionally collect or store complete payment-card numbers on our website. Administrative inventory functions are restricted through authentication and access controls.</p>
 
-        <h3>1.10 Visitors outside the United States; changes; contact</h3>
-        <p>The apparel checkout currently limits shipping addresses to the United States. The public website and album-art service may nevertheless be reachable elsewhere. We do not represent that the site is designed for or marketed in the EEA, UK, or other non-U.S. regions. Information may be processed in the United States and other countries where providers operate. <strong>[Confirm provider locations and non-U.S. targeting; add required GDPR/UK and transfer notices before targeting those regions.]</strong></p>
-        <p>We may update this Policy when practices or legal obligations change and will post a revised date and provide additional notice or consent when required. For questions or privacy requests, contact <strong>[PLACEHOLDER: legal business name]</strong> at <a href="mailto:waveenginestudio@gmail.com">waveenginestudio@gmail.com</a> or <strong>[PLACEHOLDER: business mailing address and any required phone number]</strong>.</p>
-      </section>
+<p>Although we take reasonable steps to protect personal information, no method of transmitting or storing information electronically is completely secure. We cannot guarantee the absolute security of information transmitted to or stored by us or our service providers. If you believe that your account, personal information, or transaction has been compromised, please notify us promptly at <a href="mailto:waveenginestudio@gmail.com">waveenginestudio@gmail.com</a>.</p>
 
-      <section id="notice">
-        <h2>2. California Notice at Collection</h2>
-        <p>This Notice is intended to appear <strong>at or before</strong> the point where information is collected, including apparel checkout and any future music-download checkout. It supplements the Privacy Policy. Reconcile categories, uses, sale/sharing status, and retention with production vendor settings before use.</p>
-        <div class="table-wrap" role="region" aria-label="California notice at collection details" tabindex="0"><table class="table-wide">
-          <thead><tr><th>Category collected</th><th>Business purpose</th><th>Sold/shared?</th><th>Retention</th></tr></thead>
-          <tbody>
-            <tr><td>Identifiers and contact details (name, email, phone, billing/shipping address, order/session IDs)</td><td>Checkout, payment, shipment, support, security, legal/tax records</td><td>[CONFIRM; current code shows no sale for money or ad pixel]</td><td>Order/claims period: [PLACEHOLDER]; vendor periods may differ</td></tr>
-            <tr><td>Commercial and transaction information (cart, product/size/color, purchase/refund history, payment status)</td><td>Availability, order processing, fulfillment, refunds, accounting, fraud/disputes</td><td>[CONFIRM]</td><td>[PLACEHOLDER: period or criteria]</td></tr>
-            <tr><td>Payment and wallet information (processor data, payment reference, wallet address, public transaction signature)</td><td>Process payment, verify Solana credit purchase, prevent fraud, reconcile records</td><td>[CONFIRM]</td><td>[PLACEHOLDER; blockchain records may be immutable]</td></tr>
-            <tr><td>Internet/device activity (IP, browser/device, request/referrer, interaction data)</td><td>Deliver site, security, troubleshooting, embedded media/fonts</td><td>[CONFIRM vendor disclosures and whether any are “sale” or “sharing”]</td><td>[PLACEHOLDER: host/embed log periods]</td></tr>
-            <tr><td>Account/service identifiers and prompts (pseudonymous user ID/token, prompt, credit and image-generation history)</td><td>Deliver album-art service, account continuity, credit accounting, support, safety</td><td>Prompt sent to OpenAI; other sharing [CONFIRM]</td><td>Application lists capped at 100 image-history entries and 250 credit transactions; no timed deletion for core records in code. [Confirm schedule.]</td></tr>
-            <tr><td>Customer-service communications</td><td>Respond to requests, resolve orders, keep necessary records</td><td>Email provider [PLACEHOLDER]</td><td>[PLACEHOLDER]</td></tr>
-          </tbody>
-        </table></div>
-        <p>We do not request sensitive personal information for ordinary apparel checkout. If you provide it in a message or prompt, we handle it as described in the Privacy Policy and applicable law. We do not use sensitive personal information for purposes that trigger a right to limit, except as disclosed and permitted by law. <strong>[Confirm before publishing.]</strong></p>
-        <p>For rights, requests, verification, agents, opt-outs, and contact details, see the <a href="#privacy">Privacy Policy</a>. At collection, link to the full policy and provide any required “Your Privacy Choices” control. If information is sold/shared, this Notice and control must accurately say so.</p>
-      </section>
+<h3>1.10 Visitors outside the United States; changes; contact</h3>
+<p>The apparel store currently accepts shipping addresses within the United States. Although the public website, music content, and album-art services may be accessible from other countries, they are not intentionally directed or marketed to residents of the European Economic Area, the United Kingdom, or other non-U.S. regions at this time. Personal information may be processed in the United States and in other countries where our service providers operate.</p>
+
+<p>If we begin intentionally marketing to customers outside the United States or offering international sales, we will review and update this Privacy Policy and implement any additional notices, rights, consent requirements, or international data-transfer safeguards required by applicable law.</p>
+
+<p>We may update this Privacy Policy when our business practices, services, or legal obligations change. When we do, we will post the revised policy and update the effective or revised date. Where legally required, we will provide additional notice or obtain consent.</p>
+
+<p>For questions, privacy requests, or concerns about this Privacy Policy, contact <strong>Wave Engine Studio</strong> at <a href="mailto:waveenginestudio@gmail.com">waveenginestudio@gmail.com</a>.</p>
+ 
+<section id="notice">
+  <h2>2. California Notice at Collection</h2>
+
+  <p>
+    This Notice at Collection explains the categories of personal information
+    Wave Engine Studio may collect, the purposes for collecting it, whether it
+    is sold or shared, and the general criteria used to determine how long it
+    is retained. This Notice applies at or before the point of collection,
+    including apparel checkout and any future music-download or album-art
+    checkout. It supplements the <a href="#privacy">Privacy Policy</a>.
+  </p>
+
+  <div class="table-wrap" role="region" aria-label="California notice at collection details" tabindex="0">
+    <table class="table-wide">
+      <thead>
+        <tr>
+          <th>Category collected</th>
+          <th>Business purpose</th>
+          <th>Sold/shared?</th>
+          <th>Retention</th>
+        </tr>
+      </thead>
+
+      <tbody>
+        <tr>
+          <td>
+            Identifiers and contact details, including name, email address,
+            telephone number, billing address, shipping address, order
+            information, and session or order identifiers
+          </td>
+          <td>
+            Process orders, process payments, ship merchandise, provide
+            customer support, prevent fraud, maintain security, communicate
+            about transactions, and comply with legal and tax obligations
+          </td>
+          <td>
+            Not sold or shared by Wave Engine Studio for cross-context
+            behavioral advertising. Disclosed to payment, shipping, hosting,
+            security, and support providers only as needed to provide services.
+          </td>
+          <td>
+            Retained for as long as reasonably necessary to complete the
+            transaction, provide support, resolve disputes, maintain business
+            records, and satisfy legal or tax obligations.
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            Commercial and transaction information, including cart contents,
+            product, size, color, purchase history, refund history, order
+            status, and payment status
+          </td>
+          <td>
+            Display availability, process and fulfill orders, manage inventory,
+            issue refunds, provide support, maintain accounting records, and
+            prevent fraud or transaction abuse
+          </td>
+          <td>
+            Not sold or shared for cross-context behavioral advertising.
+            Disclosed to service providers such as Stripe, shipping providers,
+            hosting providers, and accounting or business-support providers
+            when necessary.
+          </td>
+          <td>
+            Retained for the order-support, dispute, accounting, tax, warranty,
+            and legal-record period reasonably necessary for the applicable
+            transaction.
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            Payment and wallet information, including payment-processor
+            references, payment status, wallet address, and public blockchain
+            transaction information or signatures
+          </td>
+          <td>
+            Process payments, verify applicable digital-credit or Solana
+            transactions, prevent fraud, reconcile transactions, provide
+            support, and maintain business records
+          </td>
+          <td>
+            Not sold or shared for cross-context behavioral advertising.
+            Payment information is processed by applicable payment or
+            blockchain service providers. Public blockchain records may be
+            visible to others and may not be controlled by Wave Engine Studio.
+          </td>
+          <td>
+            Processor records are retained according to the applicable
+            provider’s policies and our business, accounting, tax, dispute, and
+            legal requirements. Public blockchain records may be permanent or
+            technically difficult to delete.
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            Internet or other electronic network activity, including IP address,
+            browser type, device information, request information, referring
+            URL, general interaction data, and security or error logs
+          </td>
+          <td>
+            Deliver and secure the website, identify and troubleshoot errors,
+            prevent abuse, maintain reliability, support embedded media or
+            fonts, and understand basic service performance
+          </td>
+          <td>
+            Not sold or shared for cross-context behavioral advertising.
+            Certain information may be processed by hosting, security,
+            analytics, embedded-content, font, or infrastructure providers
+            acting on our behalf.
+          </td>
+          <td>
+            Retained by Wave Engine Studio and applicable providers for the
+            period reasonably necessary for security, troubleshooting,
+            reliability, fraud prevention, and legal purposes. Provider
+            retention periods may differ.
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            Account and album-art service information, including pseudonymous
+            user identifiers, authentication tokens, prompts, credit balances,
+            image-generation history, and related service activity
+          </td>
+          <td>
+            Provide the album-art service, maintain account continuity, track
+            credits, generate requested artwork, provide support, prevent
+            abuse, and maintain service and transaction records
+          </td>
+          <td>
+            Prompts and related request information may be disclosed to OpenAI
+            or another applicable service provider to provide the requested
+            image-generation service. This information is not sold or shared
+            for cross-context behavioral advertising.
+          </td>
+          <td>
+            Image-history records may be limited to the most recent 100 entries,
+            and credit-transaction records may be limited to the most recent
+            250 entries, where those limits are implemented. Records may
+            otherwise be retained for as long as needed to provide the service,
+            maintain account history, resolve disputes, prevent abuse, and
+            satisfy legal obligations.
+          </td>
+        </tr>
+
+        <tr>
+          <td>
+            Customer-service communications, including emails, submitted
+            questions, order-related messages, and information voluntarily
+            provided in support requests
+          </td>
+          <td>
+            Respond to questions, resolve orders and technical problems,
+            process privacy requests, prevent abuse, and maintain necessary
+            business records
+          </td>
+          <td>
+            Not sold or shared for cross-context behavioral advertising.
+            Communications may be processed through Google Gmail and other
+            service providers used to operate customer support.
+          </td>
+          <td>
+            Retained for as long as reasonably necessary to respond, document
+            and resolve the matter, maintain business records, and comply with
+            legal obligations.
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>
+    We do not request sensitive personal information for ordinary apparel
+    checkout. If you voluntarily provide sensitive personal information in an
+    email, message, or prompt, we will use it only as reasonably necessary to
+    respond to your request, provide the requested service, protect the
+    service, comply with the law, or for another purpose permitted by law.
+  </p>
+
+  <p>
+    Wave Engine Studio does not sell personal information or share personal
+    information for cross-context behavioral advertising. Not sold or shared for cross-context behavioral advertising. If our practices
+    change, this Notice, the Privacy Policy, and any required “Your Privacy
+    Choices” or “Do Not Sell or Share My Personal Information” control will be
+    updated before or at the time the changed information is collected.
+  </p>
+
+  <p>
+    For privacy rights, requests, verification, authorized agents, and contact
+    information, see the <a href="#privacy">Privacy Policy</a>. Requests may be
+    submitted to
+    <a href="mailto:waveenginestudio@gmail.com">waveenginestudio@gmail.com</a>.
+  </p>
+</section>
 
       <section id="refunds">
-        <h2>3. Refund, Return, Exchange, Cancellation, and Order Policy</h2>
-        <p>This Policy applies to orders placed directly with <strong>[PLACEHOLDER: legal seller name]</strong> through <strong>[PLACEHOLDER: URL]</strong>. It separates physical apparel from digital music. Nothing here waives rights that cannot be waived under applicable law.</p>
-        <h3>3.1 Physical apparel</h3>
-        <p><strong>Return window — must be chosen:</strong> Contact us within <strong>[PLACEHOLDER: number of calendar days after delivery]</strong> after delivery to request a return for an eligible change-of-mind or fit issue. Do not publish until the deadline, start date, and statutory exceptions are confirmed. If a shorter or no-refund policy is used for California sales, display it conspicuously before purchase as required by California law.</p>
-        <p><strong>Eligible condition and packaging:</strong> Unless damaged, defective, incorrect, or subject to a non-waivable right, returned apparel must be <strong>[CONFIRM: unworn, unwashed, unaltered, with original tags, and in resalable condition]</strong>. Original packaging is <strong>[PLACEHOLDER: required/not required; specify reasonable protective packaging]</strong>. Include proof of purchase or order number. Do not return an item until we issue return instructions.</p>
-        <p><strong>Damaged, defective, incorrect, or missing item:</strong> Email <a href="mailto:waveenginestudio@gmail.com">waveenginestudio@gmail.com</a> with the order number, description, and clear photographs of the item, packaging, shipping label, and issue where reasonably available. Contact us within <strong>[PLACEHOLDER: reporting period]</strong> after delivery or when discovered. We may ask that the item or packaging be retained or returned for inspection, but a photo or packaging request will not waive a remedy required by law. For a missing item, contact us promptly so we can investigate order and carrier records.</p>
-        <p>If we confirm an error, damage, defect, or failure to deliver for which we are responsible, we will provide the remedy required by law and, where appropriate, a replacement, exchange, or refund. We pay reasonable return shipping for an item we sent incorrectly or that is confirmed defective, subject to applicable law. <strong>[Confirm the operational replacement/refund process and who issues the label.]</strong></p>
-        <p><strong>Wrong size or change of mind:</strong> Returns or exchanges are available only under the return window and condition rules above. The customer pays return shipping for a non-defective change-of-mind/fit return: <strong>[CONFIRM]</strong>. Exchanges depend on inventory and are not guaranteed. If the requested size is unavailable, the remedy is <strong>[PLACEHOLDER: refund/store credit/other option]</strong>.</p>
-        <p><strong>Refunds and store credit:</strong> Approved refunds are issued to the original payment method unless law or the customer’s agreement permits another method. We will initiate an approved refund within <strong>[PLACEHOLDER: number of business days]</strong>; the processor or bank may take additional time to post it. Store credit is offered only <strong>[PLACEHOLDER: when and whether]</strong> and does not replace a cash refund where legally required.</p>
-        <p><strong>Sale, clearance, promotional, and custom items:</strong> Items specifically labeled <strong>[PLACEHOLDER: final-sale items or exclusions]</strong> are not eligible for discretionary change-of-mind returns, except for defects, incorrect fulfillment, non-delivery, or other rights that cannot be excluded. Promotional terms control only to the extent consistent with law. A custom item is not automatically exempt from a remedy for a defect or seller error.</p>
-        <p><strong>Lost, stolen, refused, or undeliverable packages:</strong> Contact us with your order number. We will review the order, tracking, delivery scan, and carrier investigation. <strong>[CONFIRM</strong> policy for a package marked delivered but reported stolen and for carrier loss<strong>]</strong>. If a package is returned as undeliverable or refused, we will contact you about reshipment or refund. Any deduction for shipping or other costs must be disclosed, lawful, and supported by actual circumstances. <strong>[Set the actual policy.]</strong></p>
-        <p><strong>Customer address errors:</strong> Contact us promptly. We will try to correct an address before shipment but cannot guarantee a change after submission or dispatch. If returned or redirected because the supplied address was incorrect, <strong>[PLACEHOLDER: reship/refund and any actual carrier-cost policy]</strong>, subject to law.</p>
-        <p><strong>Cancellation before shipment:</strong> Email us with “Cancel order” and the order number. We will cancel and refund if the order has not entered fulfillment or shipped. Once a label is created or parcel dispatched, cancellation may not be possible; return rules then apply. <strong>[Confirm operational cutoff and manual workflow.]</strong></p>
-        <p><strong>Out of stock or shipment delay:</strong> Inventory is checked at checkout but not reserved until the order is processed. If we cannot ship within the time stated or within the period required by the FTC Mail, Internet, or Telephone Order Merchandise Rule, we will provide legally required delay notice, obtain consent where required, or cancel and promptly refund unshipped merchandise. We will not treat silence as consent except where the Rule expressly permits.</p>
-        <h3>3.2 Digital music downloads</h3>
-        <p><strong>Current scope:</strong> The reviewed site code has streaming links and embedded players, but no direct music-download checkout or delivery system. This section applies only if we later offer a direct music download through <strong>[PLACEHOLDER: actual sales/download platform]</strong>. External streaming services have their own terms.</p>
-        <p><strong>Delivery:</strong> An order is considered delivered when <strong>[PLACEHOLDER: confirmation/download link is sent or platform records access]</strong>. The platform is <strong>[PLACEHOLDER]</strong>; link expiration is <strong>[PLACEHOLDER: duration or no scheduled expiration, only if verified]</strong>. If a link expires or the platform fails, contact us and we will investigate and, where reasonably possible, restore access or provide a replacement.</p>
-        <p><strong>Refunds:</strong> After a download link is accessed or the file downloaded, a change-of-mind refund is generally unavailable, except as required by law. We will review duplicate charges/purchases, non-delivery, corrupted or inaccessible files, materially defective downloads, unauthorized transactions, and other protected claims. Contact us within <strong>[PLACEHOLDER: support period]</strong> with the order number, platform, device/software, and error message. We may provide a replacement or restore access; a refund will be provided where required by law or approved by us. Compatibility is the customer’s responsibility only to the extent supported formats and requirements were disclosed before purchase.</p>
-        <p><strong>License and consumer rights:</strong> The price grants only the limited personal-use license in Section 5, not copyright ownership. If access can be revoked after payment, checkout must clearly disclose the license and material restrictions and obtain affirmative acknowledgment required by California Business and Professions Code section 17500.6 where applicable. This Policy does not waive rights regarding unauthorized charges, non-delivery, or defective digital goods.</p>
-        <h3>3.3 Payment disputes</h3>
-        <p>Please contact <a href="mailto:waveenginestudio@gmail.com">waveenginestudio@gmail.com</a> first with your order number and a description so we can try to resolve a billing, delivery, or product problem. This request is not a condition to exercising your rights. It does not prevent you from contacting your card issuer, wallet provider, regulator, or law enforcement, or disputing an unauthorized transaction.</p>
-      </section>
+  <h2>3. Refund, Return, Exchange, Cancellation, and Order Policy</h2>
+
+  <p>
+    This Policy applies to orders placed directly with
+    <strong>Wave Engine Studio</strong> through
+    <strong>https://waveenginemusic.com</strong>. It separates physical apparel
+    from digital music. Nothing in this Policy waives rights that cannot be
+    waived under applicable law.
+  </p>
+
+  <h3>3.1 Physical apparel</h3>
+
+  <p>
+    <strong>Return window:</strong> Contact us within
+    <strong>30 calendar days after delivery</strong> to request a return for an
+    eligible change-of-mind, fit, or size issue. The return must be approved
+    before the item is shipped back.
+  </p>
+
+  <p>
+    <strong>Eligible condition and packaging:</strong> Unless damaged,
+    defective, incorrect, or subject to a non-waivable legal right, returned
+    apparel must be unworn, unwashed, unaltered, free from odors, with original
+    tags attached, and in resalable condition. Original packaging is preferred
+    but is not required if the item is returned using reasonable protective
+    packaging. Include proof of purchase or the order number. Do not return an
+    item until we issue return instructions.
+  </p>
+
+  <p>
+    <strong>Damaged, defective, incorrect, or missing item:</strong> Email
+    <a href="mailto:waveenginestudio@gmail.com">waveenginestudio@gmail.com</a>
+    with the order number, a description of the issue, and clear photographs of
+    the item, packaging, shipping label, and issue where reasonably available.
+    Contact us promptly and, where reasonably possible, within
+    <strong>30 calendar days after delivery</strong> or after discovering the
+    issue. We may ask that the item or packaging be retained or returned for
+    inspection. For a missing item, contact us promptly so we can investigate
+    the order and carrier records.
+  </p>
+
+  <p>
+    If we confirm an error, damage, defect, or failure to deliver for which we
+    are responsible, we will provide the remedy required by law and, where
+    appropriate, a replacement, exchange, or refund. We will provide return
+    instructions and pay reasonable return shipping for an item we sent
+    incorrectly or that is confirmed defective.
+  </p>
+
+  <p>
+    <strong>Wrong size or change of mind:</strong> Returns or exchanges are
+    available only within the 30-day return window and subject to the condition
+    requirements above. The customer is responsible for return shipping for a
+    non-defective change-of-mind, fit, or size return. Exchanges depend on
+    available inventory and are not guaranteed. If the requested size is
+    unavailable, we will provide a refund to the original payment method or
+    store credit if the customer chooses store credit.
+  </p>
+
+  <p>
+    <strong>Refunds and store credit:</strong> Approved refunds are issued to
+    the original payment method unless applicable law or the customer’s
+    agreement permits another method. We will initiate an approved refund
+    within <strong>10 business days</strong> after receiving and reviewing the
+    returned item. The payment processor or bank may require additional time to
+    post the refund. Store credit is available only if the customer voluntarily
+    chooses it and does not replace a cash refund where a cash refund is
+    legally required.
+  </p>
+
+  <p>
+    <strong>Sale, clearance, promotional, and custom items:</strong> Wave
+    Engine Studio currently does not designate apparel as final sale unless the
+    product page or checkout clearly states that the item is final sale before
+    purchase. Clearly labeled final-sale items are not eligible for
+    discretionary change-of-mind returns, but remain eligible for remedies
+    involving defects, incorrect fulfillment, non-delivery, or other rights
+    that cannot legally be excluded. Custom or personalized items are not
+    automatically exempt from remedies for defects or seller error.
+  </p>
+
+  <p>
+    <strong>Lost, stolen, refused, or undeliverable packages:</strong> Contact
+    us with your order number. We will review the order, tracking information,
+    delivery scan, and carrier investigation. If a carrier confirms that a
+    package was lost or delivered incorrectly, we will work with the customer
+    to provide an appropriate remedy, which may include reshipment or a refund.
+    For packages marked delivered but reported stolen, we may require the
+    customer to contact the carrier or file a carrier claim before determining
+    whether replacement or refund is available. We are not responsible for
+    theft after confirmed delivery to the address provided by the customer,
+    except where applicable law requires otherwise.
+  </p>
+
+  <p>
+    If a package is returned as undeliverable or refused, we will contact the
+    customer about reshipment or refund. Reshipment may require payment of
+    actual additional shipping costs. Any deduction from a refund will be
+    disclosed and limited to actual, lawful costs associated with the
+    circumstances.
+  </p>
+
+  <p>
+    <strong>Customer address errors:</strong> Contact us promptly. We will try
+    to correct an address before shipment but cannot guarantee a change after
+    the order has been submitted or dispatched. If an order is returned or
+    redirected because the customer supplied an incorrect or incomplete
+    address, the customer may request reshipment at the customer’s expense. If
+    the customer instead requests a refund after the item is returned, the
+    product price will be refunded, but actual shipping or carrier costs may be
+    deducted where lawful and applicable.
+  </p>
+
+  <p>
+    <strong>Cancellation before shipment:</strong> Email
+    <a href="mailto:waveenginestudio@gmail.com">waveenginestudio@gmail.com</a>
+    with “Cancel order” and the order number. We will cancel and refund an
+    order if the cancellation request is received before fulfillment begins or
+    before the package is shipped. Once fulfillment has begun, a shipping label
+    has been created, or the parcel has been dispatched, cancellation may not be
+    possible and the applicable return rules will apply.
+  </p>
+
+  <p>
+    <strong>Out of stock or shipment delay:</strong> Inventory is checked at
+    checkout but is not considered reserved until the order is processed. We
+    will provide the shipping timeframe stated at checkout or in the product
+    listing. If we cannot ship within the promised timeframe or within the
+    period required by applicable law, we will provide legally required delay
+    notice, obtain the customer’s consent to a delay where required, or cancel
+    the order and promptly refund all amounts paid for unshipped merchandise.
+    We will not treat silence as consent except where applicable law expressly
+    permits it.
+  </p>
+
+  <h3>3.2 Digital music downloads</h3>
+
+  <p>
+    <strong>Scope:</strong> Wave Engine Studio may offer digital music
+    downloads through
+    <strong>https://waveenginemusic.com</strong>. Payments may be processed
+    through Stripe Checkout, and download access may be delivered through a
+    secure download link sent to the email address provided at checkout.
+    External streaming services are governed by their own terms and policies.
+  </p>
+
+  <p>
+    <strong>Delivery:</strong> A digital music order is considered delivered
+    when the download link or download instructions are sent to the email
+    address provided during checkout or when the customer receives access
+    through the applicable download system. Download links are intended to
+    remain available for <strong>30 days</strong>. If a link expires, does not
+    work, or the platform experiences a technical failure, contact us and we
+    will investigate and, where reasonably possible, restore access or provide
+    a replacement link.
+  </p>
+
+  <p>
+    <strong>Digital-download refunds:</strong> After a download link has been
+    accessed or a file has been downloaded, a change-of-mind refund is
+    generally unavailable to the extent permitted by law. We will review
+    duplicate charges, non-delivery, corrupted or inaccessible files,
+    materially defective downloads, unauthorized transactions, and other
+    legally protected claims. Contact us within
+    <strong>30 calendar days after purchase</strong> with the order number,
+    device or software used, and any applicable error message. We may provide a
+    replacement file, restore access, or issue a refund when required by law or
+    approved by us.
+  </p>
+
+  <p>
+    Compatibility is the customer’s responsibility only to the extent that the
+    supported file format, system requirements, and any material limitations
+    were clearly disclosed before purchase. Available file formats and
+    technical requirements will be displayed before checkout.
+  </p>
+
+  <p>
+    <strong>License and consumer rights:</strong> Payment for a digital music
+    download grants a limited personal-use license described in Section 5. It
+    does not transfer copyright ownership or authorize resale, redistribution,
+    public performance, synchronization, commercial reuse, or other uses not
+    expressly permitted by the applicable license. This Policy does not waive
+    rights involving unauthorized charges, non-delivery, defective digital
+    goods, or other rights that cannot legally be excluded.
+  </p>
+
+  <h3>3.3 Payment disputes</h3>
+
+  <p>
+    Please contact
+    <a href="mailto:waveenginestudio@gmail.com">waveenginestudio@gmail.com</a>
+    first with your order number and a description so we can try to resolve a
+    billing, delivery, digital-access, or product problem. This request is not
+    a condition to exercising your legal rights. It does not prevent you from
+    contacting your card issuer, wallet provider, regulator, or law
+    enforcement, or from disputing an unauthorized transaction.
+  </p>
+</section>
 
       <section id="terms">
-        <h2>4. Terms of Service</h2>
-        <p><strong>Effective/last updated:</strong> November 19, 2026. These Terms are between you and <strong>[PLACEHOLDER: full legal name and entity type]</strong>, doing business as Wave Engine <strong>[confirm DBA]</strong> (“Wave Engine,” “we,” or “us”). Contact: <a href="mailto:waveenginestudio@gmail.com">waveenginestudio@gmail.com</a>, <strong>[PLACEHOLDER: mailing address]</strong>.</p>
-        <h3>4.1 Acceptance, eligibility, and accounts</h3>
-        <p>By accessing the site or placing an order, you agree to these Terms and the applicable policies linked at checkout. If you do not agree, do not use the relevant service. You must be at least 18 or the age of majority where you live, or use the service with a parent or guardian who agrees and is responsible for the transaction. <strong>[Confirm minimum age and counsel review.]</strong></p>
-        <p>The apparel store does not currently require a customer account. The album-art tool creates a pseudonymous service identifier in the browser. If an account or credential is offered, keep it secure and promptly report suspected unauthorized use.</p>
-        <h3>4.2 Products, availability, and order acceptance</h3>
-        <p>We try to describe products, sizes, images, digital formats, and availability accurately. Colors and images may vary by screen; measurements and production variations must be disclosed accurately. Inventory can change before payment and fulfillment. A cart does not reserve stock.</p>
-        <p>Submitting checkout is an offer to purchase. An order is accepted only when <strong>[PLACEHOLDER: define confirmation/acceptance event]</strong>. We may reject or cancel an order for a genuine stock, pricing, payment, fraud, or fulfillment issue, but will promptly refund amounts collected for an order we do not accept, subject to law. If we cannot ship as promised, the Shipping Policy and applicable law control.</p>
-        <h3>4.3 Pricing, taxes, and payments</h3>
-        <p>Prices and currency are shown at checkout. Current apparel code configures a one-time payment through Stripe-hosted Checkout and U.S. shipping of $5.99, or free shipping when merchandise totals at least $75; checkout displays the final charge before payment. <strong>[Confirm current prices, shipping, discounts, currency, and tax behavior.]</strong></p>
-        <p>The project README states that the current apparel integration does not calculate or collect sales tax. The business must determine and meet its tax obligations; this draft does not state that no tax is legally due. Do not launch or continue sales without confirming nexus, registrations, tax collection, and checkout disclosures.</p>
-        <p>Stripe processes apparel payment information under its own terms. For the separate album-art credit feature, the current source uses Solana wallet transactions for one-time credit packs; it does not show subscription billing. Blockchain transactions may be irreversible and public. <strong>[Confirm production configuration, wallet providers, accepted assets, price/volatility disclosures, refund policy, and tax/accounting treatment.]</strong></p>
-        <h3>4.4 Apparel, shipping, returns, and digital goods</h3>
-        <p>Physical apparel orders are subject to the Refund and Order Policy and Shipping Policy. Digital music downloads, if offered, are subject to Section 5 and checkout-specific terms. An album-art PNG download is not a music download. No subscription or automatic renewal appears in the reviewed checkout code.</p>
-        <h3>4.5 Intellectual property</h3>
-        <p>Site text, artwork, photographs, marks, music, sound recordings, design, and software may be owned by Wave Engine or licensed from others. Actual ownership and licensing are not established by this source review. <strong>[Identify owners and licensors for each composition, master recording, image, product design, logo, and third-party asset before publication.]</strong></p>
-        <p>Except for the limited license in Section 5 or a separate written license, no ownership or commercial-use rights are transferred. You may not reproduce, distribute, publicly perform, modify, sell, sublicense, or make derivative works without written permission or a legal exception.</p>
-        <h3>4.6 User content and prompts</h3>
-        <p>If you submit a prompt, message, design, or other material (“User Content”), you represent that you have the rights needed to submit it and that it does not violate law or another person’s rights. You retain whatever rights you have. You grant us a limited, non-exclusive license to host, transmit, process, and use User Content only to provide, secure, support, and improve the requested service and as otherwise disclosed or authorized. We may send image-generation prompts to OpenAI to provide the album-art tool.</p>
-        <p>Do not submit confidential, personal, unlawful, or third-party copyrighted material unless you have permission. The reviewed site has no public user-content gallery or upload-for-publication feature. If that changes, additional moderation, takedown, retention, and license terms are needed. Nothing transfers rights you do not own or waives statutory rights.</p>
-        <h3>4.7 Prohibited conduct</h3>
-        <p>You may not use the site to break law, infringe rights, submit malicious code, interfere with security or operations, make fraudulent payments or claims, scrape or harvest personal information without permission, reverse engineer except where law permits, or circumvent payment or access restrictions. We may suspend access where reasonably necessary to protect users, the site, or legal rights.</p>
-        <h3>4.8 Third-party services and links</h3>
-        <p>The site links to or embeds Stripe, Firebase, Google Fonts, Spotify, YouTube, Apple Music, Amazon Music, OpenAI, Solana RPC services, and wallet software. Their availability and practices are controlled by their operators. Your use is subject to their own terms and privacy notices. We are not responsible for third-party content or services except where applicable law provides otherwise.</p>
-        <h3>4.9 Disclaimers and liability</h3>
-        <p>We provide the site and services with reasonable care, but cannot promise uninterrupted or error-free access. To the extent permitted by law, third-party services and nonessential content are provided without a separate warranty from us. Nothing excludes or limits a warranty, consumer remedy, or other right that cannot legally be excluded, including applicable rights for defective goods or services.</p>
-        <p>To the extent permitted by law, neither party will be liable to the other for indirect, incidental, special, exemplary, or consequential losses arising from a transaction. <strong>[California counsel must tailor this clause to consumer sales, statutory claims, personal injury, gross negligence, willful misconduct, and warranty law.]</strong> Nothing limits liability where prohibited by law.</p>
-        <h3>4.10 Indemnification</h3>
-        <p>You are responsible for claims caused by your unlawful conduct or User Content that infringes another person’s rights, but only to the extent your conduct legally permits such responsibility. You do not indemnify us for our negligence, misconduct, legal violation, or obligations that law does not allow you to transfer. <strong>[Have California counsel review any consumer indemnity clause before use.]</strong></p>
-        <h3>4.11 Governing law and disputes</h3>
-        <p>California law governs these Terms, without displacing mandatory consumer-protection laws where you live. Court actions must be brought in state or federal courts located in <strong>[PLACEHOLDER: California county]</strong>, unless law gives a consumer another mandatory venue or forum.</p>
-        <p>These Terms do <strong>not</strong> impose mandatory arbitration, waive a jury trial, or waive class or representative rights. Any future arbitration or class-action waiver requires separate, informed business and California counsel review.</p>
-        <h3>4.12 Electronic communications; changes; general terms</h3>
-        <p>You agree that order notices and service communications may be provided electronically where legally permitted. This does not enroll you in marketing email. Promotional email, if introduced, must have compliant consent and opt-out practices.</p>
-        <p>We may revise these Terms by posting a new version and date. Material changes apply prospectively, with notice or consent where required. If a provision is unenforceable, it will be limited or severed to the minimum extent necessary; the rest remains effective. Delay in enforcement is not a waiver. You may not assign your rights without written consent; we may assign these Terms as part of a lawful business transfer, subject to law. These Terms, linked policies, and any written order-specific agreement are the entire agreement about the covered service, except that no term overrides mandatory law.</p>
-        <p>Contact <strong>[PLACEHOLDER: legal seller name]</strong> at <a href="mailto:waveenginestudio@gmail.com">waveenginestudio@gmail.com</a> or <strong>[PLACEHOLDER: mailing address]</strong>.</p>
-      </section>
+  <h2>4. Terms of Service</h2>
+
+  <p>
+    <strong>Effective/last updated:</strong> November 19, 2026. These Terms are
+    between you and <strong>Jonas Weeks, operating under the Wave Engine Studio
+    brand</strong> (“Wave Engine,” “we,” “us,” or “our”). Contact:
+    <a href="mailto:waveenginestudio@gmail.com">waveenginestudio@gmail.com</a>.
+  </p>
+
+  <h3>4.1 Acceptance, eligibility, and accounts</h3>
+
+  <p>
+    By accessing the site, using a service, or placing an order, you agree to
+    these Terms and the applicable policies linked at checkout. If you do not
+    agree, do not use the relevant service. You must be at least 18 years old,
+    or the age of majority where you live, to place an order or use a paid
+    service. A parent or legal guardian may approve a minor’s use of the site
+    or service and is responsible for the resulting transaction.
+  </p>
+
+  <p>
+    The apparel store does not currently require a customer account. The
+    album-art tool may create a pseudonymous service identifier in the browser.
+    If an account, login, or credential is offered, you are responsible for
+    keeping it secure and promptly reporting suspected unauthorized use.
+  </p>
+
+  <h3>4.2 Products, availability, and order acceptance</h3>
+
+  <p>
+    We try to describe products, sizes, images, digital formats, prices, and
+    availability accurately. Colors and images may vary by screen. Product
+    measurements, production variations, and material information may vary and
+    will be disclosed where applicable. Inventory can change before payment and
+    fulfillment. Adding an item to a cart does not reserve inventory.
+  </p>
+
+  <p>
+    Submitting checkout is an offer to purchase. An order is accepted when we
+    send an order confirmation or otherwise begin processing the order. A
+    payment receipt alone does not guarantee acceptance if a genuine stock,
+    pricing, payment, fraud, or fulfillment issue is later identified.
+  </p>
+
+  <p>
+    We may reject or cancel an order for a genuine stock, pricing, payment,
+    fraud, technical, or fulfillment issue. If we cancel an order after
+    collecting payment, we will promptly refund the amount collected for the
+    canceled order, subject to applicable law. If we cannot ship as promised,
+    the Refund, Return, Exchange, Cancellation, and Order Policy and applicable
+    law control.
+  </p>
+
+  <h3>4.3 Pricing, taxes, and payments</h3>
+
+  <p>
+    Prices are displayed in U.S. dollars unless otherwise stated. Apparel
+    orders currently use Stripe-hosted Checkout for one-time payments. Standard
+    U.S. shipping is currently <strong>$5.99</strong>, with free U.S. shipping
+    when merchandise totals at least <strong>$75</strong>, unless a product
+    page or promotion states otherwise. Checkout displays the order total,
+    applicable shipping charges, taxes, discounts, and other charges before
+    payment.
+  </p>
+
+  <p>
+    Sales tax may be added where required by applicable law. Wave Engine Studio
+    is responsible for determining whether it has tax collection, registration,
+    reporting, or remittance obligations in any jurisdiction. Customers are
+    responsible for any personal tax obligations associated with their
+    purchases or use of digital assets.
+  </p>
+
+  <p>
+    Stripe processes apparel payment information under its own terms and
+    privacy practices. For any separate album-art credit feature, we may use
+    Solana wallet transactions for one-time credit purchases. We do not
+    currently offer subscription billing or automatic recurring charges through
+    that feature. Blockchain transactions may be irreversible and publicly
+    visible. Prices, accepted digital assets, wallet requirements, and any
+    applicable transaction fees will be disclosed before purchase.
+  </p>
+
+  <p>
+    Customers are responsible for using a compatible wallet, confirming the
+    correct transaction details, and reviewing the transaction before
+    submission. We are not responsible for transactions sent to an incorrect
+    wallet address or made through an unsupported wallet or asset, except where
+    applicable law requires otherwise.
+  </p>
+
+  <h3>4.4 Apparel, shipping, returns, and digital goods</h3>
+
+  <p>
+    Physical apparel orders are subject to the
+    <a href="#refunds">Refund, Return, Exchange, Cancellation, and Order
+    Policy</a> and any applicable Shipping Policy. Digital music downloads are
+    subject to the digital-download terms in that Policy and the license terms
+    in Section 5. An album-art PNG download is not a music download.
+  </p>
+
+  <p>
+    We do not currently offer subscriptions or automatic renewals. If a
+    subscription or recurring payment is introduced, the checkout page will
+    clearly disclose the recurring charge, billing frequency, cancellation
+    process, and applicable terms before payment.
+  </p>
+
+  <h3>4.5 Intellectual property</h3>
+
+  <p>
+    Site text, artwork, photographs, trademarks, music, sound recordings,
+    product designs, logos, graphics, page layouts, and software may be owned
+    by Wave Engine Studio or licensed from third parties. All rights not
+    expressly granted are reserved by the applicable owner.
+  </p>
+
+  <p>
+    Except for the limited license in Section 5 or a separate written license,
+    no ownership or commercial-use rights are transferred. You may not
+    reproduce, distribute, publicly perform, modify, sell, sublicense,
+    synchronize, or create derivative works from our content without written
+    permission or a legal exception.
+  </p>
+
+  <h3>4.6 User content and prompts</h3>
+
+  <p>
+    If you submit a prompt, message, design, image, audio file, or other
+    material (“User Content”), you represent that you have the rights needed
+    to submit it and that it does not violate law or another person’s rights.
+    You retain whatever rights you have in your User Content.
+  </p>
+
+  <p>
+    You grant us a limited, non-exclusive license to host, transmit, process,
+    and use User Content only to provide, secure, support, troubleshoot, and
+    improve the requested service and as otherwise disclosed or authorized.
+    We may send image-generation prompts and related information to OpenAI or
+    another applicable service provider to provide the album-art tool.
+  </p>
+
+  <p>
+    Do not submit confidential, highly sensitive, unlawful, malicious, or
+    third-party copyrighted material unless you have permission. The site does
+    not currently provide a public user-content gallery or upload-for-
+    publication feature. If that changes, we may add moderation, takedown,
+    retention, and additional license terms.
+  </p>
+
+  <h3>4.7 Prohibited conduct</h3>
+
+  <p>
+    You may not use the site or services to violate law or another person’s
+    rights; submit malicious code; interfere with security or operations; make
+    fraudulent payments or claims; scrape or harvest personal information
+    without permission; reverse engineer the services except where law permits;
+    bypass payment or access restrictions; impersonate another person or
+    business; or use the services to create unlawful, abusive, fraudulent,
+    threatening, or infringing content.
+  </p>
+
+  <p>
+    We may suspend or terminate access where reasonably necessary to protect
+    users, the site, our services, our legal rights, or third-party rights.
+  </p>
+
+  <h3>4.8 Third-party services and links</h3>
+
+  <p>
+    The site may link to, embed, or rely on third-party services, including
+    Stripe, Firebase, Google Fonts, Spotify, YouTube, Apple Music, Amazon
+    Music, OpenAI, Solana RPC services, wallet software, hosting providers,
+    shipping providers, and payment processors.
+  </p>
+
+  <p>
+    Third-party services are controlled by their respective operators and may
+    have separate terms, privacy notices, fees, and availability. Your use of
+    a third-party service is subject to that provider’s terms. We are not
+    responsible for third-party content, availability, security, or practices
+    except where applicable law provides otherwise.
+  </p>
+
+  <h3>4.9 Disclaimers and liability</h3>
+
+  <p>
+    We provide the site and services with reasonable care, but cannot promise
+    uninterrupted, error-free, or continuously available access. Product
+    images, descriptions, estimated delivery times, digital download
+    availability, and album-art outputs may contain errors or interruptions.
+  </p>
+
+  <p>
+    To the extent permitted by law, third-party services and nonessential
+    content are provided without a separate warranty from us. Nothing in these
+    Terms excludes or limits a warranty, consumer remedy, or other right that
+    cannot legally be excluded, including rights involving defective goods,
+    defective digital content, unauthorized charges, or non-delivery.
+  </p>
+
+  <p>
+    To the extent permitted by law, neither party will be liable to the other
+    for indirect, incidental, special, exemplary, or consequential losses
+    arising from a transaction. Nothing in these Terms limits liability for
+    fraud, intentional misconduct, gross negligence, personal injury, unlawful
+    conduct, or any liability that cannot legally be limited.
+  </p>
+
+  <h3>4.10 Indemnification</h3>
+
+  <p>
+    You are responsible for claims caused by your unlawful conduct, fraud, or
+    User Content that infringes another person’s rights, but only to the
+    extent the law permits that responsibility to be transferred to you. You do
+    not indemnify us for our negligence, misconduct, legal violations, or
+    obligations that applicable law does not allow us to transfer.
+  </p>
+
+  <h3>4.11 Governing law and disputes</h3>
+
+  <p>
+    California law governs these Terms, without displacing mandatory
+    consumer-protection laws that apply where you live. Any court action
+    permitted under these Terms must be brought in a state or federal court
+    located in the California county where Wave Engine Studio maintains its
+    principal business location, unless applicable law gives a consumer
+    another mandatory venue or forum.
+  </p>
+
+  <p>
+    These Terms do not impose mandatory arbitration, waive a jury trial, or
+    waive class or representative rights. Any future arbitration agreement or
+    class-action waiver will require separate review and clear disclosure
+    before it is used.
+  </p>
+
+  <h3>4.12 Electronic communications; changes; general terms</h3>
+
+  <p>
+    You agree that order confirmations, receipts, delivery notices, download
+    instructions, support communications, and other service notices may be
+    provided electronically where legally permitted. This does not enroll you
+    in marketing email. Promotional email, if introduced, will include
+    appropriate consent and unsubscribe options.
+  </p>
+
+  <p>
+    We may revise these Terms by posting a new version and revised date.
+    Material changes will apply prospectively, with additional notice or
+    consent where required. If a provision is unenforceable, it will be
+    limited or severed to the minimum extent necessary, and the remaining
+    provisions will remain effective. Delay in enforcing a provision is not a
+    waiver.
+  </p>
+
+  <p>
+    You may not assign your rights under these Terms without written consent.
+    We may assign these Terms as part of a lawful business transfer, subject to
+    applicable law. These Terms, linked policies, and any written
+    order-specific agreement constitute the entire agreement regarding the
+    covered service, except that no term overrides mandatory law.
+  </p>
+
+  <p>
+    Contact <strong>Wave Engine Studio</strong> at
+    <a href="mailto:waveenginestudio@gmail.com">waveenginestudio@gmail.com</a>.
+  </p>
+</section>
 
       <section id="music-license">
-        <h2>5. Digital Music Download License and Usage Terms</h2>
-        <p><strong>Applies only to a direct music-download purchase offered by Wave Engine.</strong> The reviewed website does not currently show a music-download sales or delivery system. Streaming through third-party services is governed by their terms. Do not display a music “buy” or “purchase” offer until ownership, rights, checkout acknowledgment, download delivery, and this license have been verified.</p>
-        <h3>5.1 What you receive</h3>
-        <p>When you complete a digital music order, <strong>[PLACEHOLDER: legal seller]</strong> grants you a limited, personal, non-exclusive, non-transferable license to download and listen to the purchased file for private, non-commercial enjoyment on devices you control, subject to these terms. You receive a license, not ownership of the music, composition, sound recording, artwork, or copyright.</p>
-        <p><strong>Rights owner(s):</strong> [PLACEHOLDER: identify copyright owners and authorized licensors for each composition and sound recording; verify songwriter, performer, producer, sample, and artwork permissions.] We grant only rights we own or are authorized to grant.</p>
-        <h3>5.2 Restrictions</h3>
-        <p>Unless separately authorized in a signed writing or permitted by law, you may not share, upload, publish, distribute, transmit, or make the file available to others; resell, rent, sublicense, transfer, or commercially exploit it; use it in advertising, film, games, podcasts, social/video content, public performance, business, broadcast, synchronization, remix, sampling, or another commercial/public use; remove copyright notices, circumvent access controls, or claim authorship or ownership. Contact <strong>[PLACEHOLDER: licensing email or confirmed business email]</strong> for commercial, synchronization, public-performance, remix, or other licenses.</p>
-        <h3>5.3 Delivery and technical support</h3>
-        <p>Delivery provider/process: <strong>[PLACEHOLDER]</strong>. The order is delivered when <strong>[PLACEHOLDER: delivery event]</strong>. Link expiration: <strong>[PLACEHOLDER: duration or no scheduled expiration, only if verified]</strong>. Supported formats and requirements: <strong>[PLACEHOLDER]</strong>. For a failed link, corrupt file, or inaccessible download, email <a href="mailto:waveenginestudio@gmail.com">waveenginestudio@gmail.com</a> with order number, platform, device/software, and error details. We will investigate and, where reasonably possible, restore access or provide a working replacement. If a platform fails, we will use a reasonable alternate method where available or refund where required by law.</p>
-        <h3>5.4 Refunds and duplicate purchases</h3>
-        <p>After a link is accessed or file downloaded, a change-of-mind refund is generally unavailable, except as required by law. We will review duplicate purchases/charges, unauthorized transactions, non-delivery, corrupted or materially defective files, and inaccessible downloads under the Refund and Order Policy. A replacement does not eliminate a refund right where law requires one.</p>
-        <h3>5.5 Revocation and California disclosure</h3>
-        <p>If we can revoke access after payment, checkout must conspicuously disclose that fact and obtain the affirmative acknowledgment required by California Business and Professions Code section 17500.6 where applicable. The acknowledgment must state that the purchaser receives a license, show its restrictions and conditions, and disclose possible unilateral revocation if applicable. The exact disclosure and implementation require legal review. We will not claim to sell ownership unless the transaction actually transfers the applicable rights.</p>
-      </section>
+  <h2>5. Digital Music Download License and Usage Terms</h2>
 
-      <section id="shipping">
-        <h2>6. Shipping and Delivery Policy</h2>
-        <p>This Policy applies to physical apparel shipped to U.S. addresses. Current apparel checkout allows U.S. addresses, charges <strong>$5.99</strong> below a <strong>$75</strong> merchandise subtotal, and shows free shipping at or above $75. <strong>[Confirm these amounts, thresholds, tax calculation, and promotions before publication.]</strong></p>
-        <h3>6.1 Processing, carrier, and estimates</h3>
-        <p>Orders are processed within <strong>[PLACEHOLDER: business days]</strong>. Estimated transit after carrier acceptance is <strong>[PLACEHOLDER: range]</strong>. Carrier/service: <strong>[PLACEHOLDER]</strong>; the reviewed code does not identify a carrier or generate tracking labels. We will provide tracking only if fulfillment produces it.</p>
-        <p>Estimates are not guarantees unless we expressly guarantee a date in writing. When no shipping time is stated, federal law generally requires shipment within 30 days; if we cannot meet the applicable time, we will provide notice, obtain consent to delay where required, or cancel and promptly refund unshipped merchandise as required by the FTC Mail, Internet, or Telephone Order Merchandise Rule.</p>
-        <h3>6.2 U.S. destinations and address accuracy</h3>
-        <p>We currently accept only U.S. addresses through checkout. Territories, APO/FPO, P.O. boxes, Alaska, Hawaii, and carrier restrictions: <strong>[PLACEHOLDER: confirm accepted destinations]</strong>. You are responsible for a complete deliverable address. Contact us promptly for a correction; a change cannot be guaranteed once fulfillment begins.</p>
-        <h3>6.3 Delays, loss, damage, and delivery scans</h3>
-        <p>Contact <a href="mailto:waveenginestudio@gmail.com">waveenginestudio@gmail.com</a> if tracking is stalled, a parcel arrives damaged, or an order appears lost. Include order number and photographs when available. We will review carrier information and work with you on a lawful resolution.</p>
-        <p>For a parcel marked delivered but not received, notify us promptly. We will investigate with the carrier. <strong>[PLACEHOLDER: state whether and when the business will replace/refund a package reported stolen after a delivery scan.]</strong> We do not waive rights by assigning every delivery issue to a carrier.</p>
-        <h3>6.4 Charges, taxes, and international orders</h3>
-        <p>Shipping charges are displayed before payment. The README states the current apparel integration does not calculate or collect sales tax. The business must confirm its tax obligations and configure checkout accordingly; a customer may owe tax if it is not collected at checkout. <strong>[Confirm final tax display and process before publication.]</strong></p>
-        <p>We do not currently promise international apparel shipping. Digital services may be accessible abroad; see the Privacy Policy. Contact us before placing an order outside the stated region.</p>
-      </section>
+  <p>
+    <strong>Applies only to direct music-download purchases offered by Wave
+    Engine Studio.</strong> Streaming through third-party services is governed
+    by those services’ own terms. When a direct music download is offered,
+    checkout will identify the applicable track, price, file format, and
+    download terms before payment.
+  </p>
+
+  <h3>5.1 What you receive</h3>
+
+  <p>
+    When you complete a digital music order, <strong>Wave Engine Studio,
+    operated by Jonas Weeks</strong>, grants you a limited, personal,
+    non-exclusive, non-transferable license to download and listen to the
+    purchased file for private, non-commercial enjoyment on devices you
+    control, subject to these Terms.
+  </p>
+
+  <p>
+    You receive a license, not ownership of the music, composition, sound
+    recording, artwork, or copyright. Wave Engine Studio will offer only music
+    that it owns or is authorized to license. The applicable songwriter,
+    composer, performer, producer, publisher, sound-recording owner, sample
+    owner, and artwork rights information will be identified in the applicable
+    product listing, metadata, or order information where required.
+  </p>
+
+  <h3>5.2 Restrictions</h3>
+
+  <p>
+    Unless separately authorized in writing or permitted by law, you may not
+    share, upload, publish, distribute, transmit, or make the file available to
+    others; resell, rent, sublicense, transfer, or commercially exploit it; or
+    use it in advertising, film, television, games, podcasts, social-media or
+    video content, public performance, business operations, broadcast,
+    synchronization, remixing, sampling, or another commercial or public use.
+  </p>
+
+  <p>
+    You may not remove copyright notices, circumvent access controls, claim
+    authorship or ownership, or register the music as your own. For commercial,
+    synchronization, public-performance, remix, sampling, or other licensing
+    requests, contact
+    <a href="mailto:waveenginestudio@gmail.com">waveenginestudio@gmail.com</a>.
+  </p>
+
+  <h3>5.3 Delivery and technical support</h3>
+
+  <p>
+    Digital music downloads will be delivered through a secure download link
+    sent to the email address provided during checkout. An order is considered
+    delivered when the download link or download instructions are sent.
+  </p>
+
+  <p>
+    Download links are intended to remain available for
+    <strong>30 days</strong>. Supported formats, including MP3, WAV, or another
+    format, will be identified on the product page before purchase. Customers
+    are responsible for having compatible devices and software.
+  </p>
+
+  <p>
+    For a failed link, corrupt file, or inaccessible download, email
+    <a href="mailto:waveenginestudio@gmail.com">waveenginestudio@gmail.com</a>
+    with the order number, device or software used, and error details. We will
+    investigate and, where reasonably possible, restore access or provide a
+    working replacement. If the delivery system fails, we will use a reasonable
+    alternate delivery method where available or provide a refund where
+    required by law.
+  </p>
+
+  <h3>5.4 Refunds and duplicate purchases</h3>
+
+  <p>
+    After a download link has been accessed or a file has been downloaded, a
+    change-of-mind refund is generally unavailable to the extent permitted by
+    law. We will review duplicate purchases or charges, unauthorized
+    transactions, non-delivery, corrupted or materially defective files, and
+    inaccessible downloads under the Refund, Return, Exchange, Cancellation,
+    and Order Policy.
+  </p>
+
+  <p>
+    Contact us within <strong>30 calendar days after purchase</strong> with the
+    order number and a description of the issue. A replacement or restored
+    download does not eliminate a refund right where a refund is required by
+    law.
+  </p>
+
+  <h3>5.5 Revocation and California disclosure</h3>
+
+  <p>
+    We will not claim to sell ownership of a music track unless the transaction
+    actually transfers the applicable rights. If access to a purchased download
+    may be revoked after payment, checkout will clearly disclose that
+    possibility, the license restrictions, and any applicable conditions before
+    purchase, together with any acknowledgment required by applicable law.
+  </p>
+
+  <p>
+    Nothing in this License waives rights involving unauthorized charges,
+    non-delivery, defective digital goods, or other rights that cannot legally
+    be excluded.
+  </p>
+</section>
+
+<section id="shipping">
+  <h2>6. Shipping and Delivery Policy</h2>
+
+  <p>
+    This Policy applies to physical apparel shipped to U.S. addresses. Current
+    apparel checkout charges <strong>$5.99</strong> for shipping when the
+    merchandise subtotal is below <strong>$75</strong> and provides free
+    shipping at or above $75, unless a product page or promotion states
+    otherwise. Checkout displays applicable shipping charges, taxes,
+    discounts, and the final order total before payment.
+  </p>
+
+  <h3>6.1 Processing, carrier, and estimates</h3>
+
+  <p>
+    Apparel orders are generally processed within
+    <strong>3 business days</strong> after payment is successfully completed.
+    Estimated transit after carrier acceptance is generally
+    <strong>3–7 business days</strong>. The carrier and service level may vary
+    based on the order, destination, inventory location, and fulfillment
+    method. Tracking information will be provided when available.
+  </p>
+
+  <p>
+    Shipping estimates are not guarantees unless we expressly guarantee a date
+    in writing. When no shipping time is stated, federal law generally requires
+    shipment within 30 days. If we cannot meet the promised or legally
+    applicable shipping timeframe, we will provide legally required delay
+    notice, obtain consent to the delay where required, or cancel the order
+    and promptly refund unshipped merchandise.
+  </p>
+
+  <h3>6.2 U.S. destinations and address accuracy</h3>
+
+  <p>
+    We currently accept U.S. shipping addresses supported by checkout,
+    including addresses in the 50 states and the District of Columbia.
+    Availability for Alaska, Hawaii, U.S. territories, APO/FPO addresses, and
+    P.O. boxes may depend on the carrier and will be determined at checkout.
+  </p>
+
+  <p>
+    You are responsible for providing a complete and deliverable address.
+    Contact us promptly if an address needs to be corrected. An address change
+    cannot be guaranteed once fulfillment has begun or the order has shipped.
+  </p>
+
+  <h3>6.3 Delays, loss, damage, and delivery scans</h3>
+
+  <p>
+    Contact
+    <a href="mailto:waveenginestudio@gmail.com">waveenginestudio@gmail.com</a>
+    if tracking is stalled, a parcel arrives damaged, or an order appears lost.
+    Include the order number and photographs of the package, shipping label,
+    and damage when available. We will review the carrier information and work
+    with you on a lawful resolution.
+  </p>
+
+  <p>
+    For a parcel marked delivered but not received, notify us promptly. We will
+    investigate with the carrier and may request that you check with household
+    members, neighbors, building management, or the delivery location. If the
+    carrier confirms loss or incorrect delivery, we may provide a replacement
+    or refund, subject to applicable law and inventory availability.
+  </p>
+
+  <p>
+    A package reported stolen after a confirmed delivery scan is not
+    automatically eligible for replacement or refund. We will review the
+    circumstances individually and provide any remedy required by law.
+  </p>
+
+  <h3>6.4 Charges, taxes, and international orders</h3>
+
+  <p>
+    Shipping charges are displayed before payment. Applicable sales tax may be
+    added where required by law. Customers are responsible for reviewing the
+    final checkout total before submitting payment.
+  </p>
+
+  <p>
+    We do not currently promise international apparel shipping. Orders may be
+    limited to the U.S. addresses accepted by checkout. Digital music and
+    album-art services may be accessible from other countries, but customers
+    are responsible for complying with applicable laws in their location.
+  </p>
+</section>
 
       <section id="custom">
         <h2>7. Custom and Large-Order Policy</h2>
@@ -277,83 +1037,93 @@
       </section>
 
       <section id="checklist">
-        <h2>8. Publication Checklist and Legal Review Items</h2>
-        <h3>8.1 Facts to confirm before publication</h3>
-        <ul>
-          <li>Full legal seller name/entity, DBA(s), California business and return addresses, support email, and required phone number.</li>
-          <li>Canonical URL, live host/CDN, Vercel API, GitHub Pages usage, storage regions, backups, logs, and production environments.</li>
-          <li>Payment methods/settings, Stripe fields and receipts, tax, refunds, test/live mode, wallet/Solana sales, and any processors added.</li>
-          <li>Sales-tax nexus/registrations, product taxability, checkout tax, and total-price/shipping disclosures.</li>
-          <li>Apparel return window, condition, packaging, return shipping, exchange/store credit, refund timing, sale/custom exclusions, cancellation cutoff, damage/missing process, and return address.</li>
-          <li>Carrier, fulfillment, processing/transit estimates, tracking, destinations, address correction, lost/stolen/refused/undeliverable policy, and actual shipping prices.</li>
-          <li>Whether direct music downloads are sold; if so, platform, delivery event, link expiration, formats, refund/support rules, receipts, and affirmative license acknowledgment.</li>
-          <li>Composition, master-recording, performer, producer, sample, artwork, and trademark ownership and licenses for all music and merchandise.</li>
-          <li>Custom-order channel, minimums, deposits, timelines, proofing, cancellation, quote terms, and authorized approver.</li>
-          <li>All live vendors/data flows: Stripe, Firebase, Vercel, GitHub Pages, Google Fonts, Spotify, YouTube, OpenAI, Solana RPC, wallets, email, analytics/ad tools, shipping and fulfillment. Review contracts and subprocessors.</li>
-          <li>Live cookies, pixels, storage, embedded-media tracking, Do Not Track, GPC, consent behavior, and whether embeds should be delayed until consent.</li>
-          <li>Sale/sharing status and opt-out mechanism under CCPA and other laws; test the control.</li>
-          <li>Retention/deletion schedule for orders, support, logs, prompts, credits, payment records, backups, and request-verification data.</li>
-          <li>CCPA applicability: for-profit status; current $26.625 million revenue threshold (Jan. 1, 2025); 100,000 California residents/households whose PI is bought/sold/shared; 50% revenue from sale/sharing; affiliates/common branding; service-provider roles.</li>
-          <li>Other-state privacy exposure based on customer location, data volume, revenue, sensitive data, sales/targeted advertising, and effective dates.</li>
-          <li>If CCPA-covered: request channels, identity verification, agents, response/appeal workflow, required metrics, functioning “Your Privacy Choices” link, GPC/other valid signals, and whether a toll-free number is required or an online-only exception applies.</li>
-          <li>Child-directed status/under-13 collection; international targeting and any GDPR/UK notices and transfer safeguards.</li>
-          <li>Marketing email practices, if any, including consent, sender identity/postal address, unsubscribe and suppression processes. The reviewed site has no newsletter signup or marketing-email integration.</li>
-          <li>Accessibility of pages, controls, checkout, embeds, documents, and request methods; test keyboard and assistive technology.</li>
-          <li>Policy links and consistency across page, checkout, notice at collection, and confirmation emails.</li>
-        </ul>
-        <h3>8.2 Clauses requiring licensed California attorney review</h3>
-        <ul>
-          <li>Legal identity, privacy-law applicability, CCPA/CPRA roles/thresholds, notice at collection, vendor contracts, sale/sharing, GPC, verification, and other-state privacy addenda.</li>
-          <li>Third-party embeds, cookies, cross-site tracking, retention, international access, breach notification, and security/privacy representations.</li>
-          <li>Return exclusions, final-sale/custom items, California Civil Code section 1723 disclosures, implied warranties, defective-product remedies, digital refunds, chargebacks, and parcel-loss wording.</li>
-          <li>Delivery promises under the FTC merchandise rule, shipping/total-price disclosures, taxes and sales-tax obligations by state.</li>
-          <li>Music license, copyright ownership, California Business and Professions Code section 17500.6 disclosure/affirmative acknowledgment, revocation, refund rules, and platform agreements.</li>
-          <li>Terms disclaimers, liability limits, warranties, indemnity, governing law, venue, minors, user-content rights, and any future arbitration/class waiver.</li>
-          <li>Custom deposits, cancellation, nonrefundability after production begins, artwork rights, proof approval, and product labeling/safety.</li>
-          <li>ADA Title III, California Unruh Act, and other accessibility obligations; choose and test an accessibility target.</li>
-          <li>Future promotional email under CAN-SPAM/state laws and any subscriptions under ROSCA and state automatic-renewal statutes.</li>
-        </ul>
-        <h3>8.3 Preliminary legal applicability assessment</h3>
-        <p>This is a screening based on the source code, not a finding that any threshold is met:</p>
-        <ul>
-          <li><strong>California privacy:</strong> The CCPA, as amended by the CPRA, applies to qualifying for-profit businesses doing business in California that meet a statutory test. The CPPA currently lists annual gross revenue of at least $26.625 million, buying/selling/sharing information of 100,000 or more California consumers or households, or deriving at least 50% of revenue from selling/sharing personal information. Ownership/affiliate rules can also matter. Revenue, volume, and corporate relationships are unknown, so applicability cannot be decided from the site alone. Separately, CalOPPA may require a conspicuously posted privacy policy even below CCPA thresholds; it calls for disclosures about third-party collection and the site’s response to Do Not Track. Embedded media makes that review relevant.</li>
-          <li><strong>Other state privacy laws:</strong> Laws can apply based on the customer’s state, consumer/data volume, revenue, sensitive-data processing, sale, or targeted advertising. Potentially relevant comprehensive-law jurisdictions include Colorado, Connecticut, Delaware, Indiana, Iowa, Kentucky, Maryland, Minnesota, Montana, Nebraska, New Hampshire, New Jersey, Oregon, Rhode Island, Tennessee, Texas, Utah, and Virginia, among others and subject to current effective dates and scope. Some statutes have no revenue floor or lower thresholds for sensitive-data processing or sale. Because apparel checkout accepts U.S. addresses, analyze actual customer reach and each law; this list is not exhaustive.</li>
-          <li><strong>Online apparel orders and shipping:</strong> The FTC Mail, Internet, or Telephone Order Merchandise Rule applies to online merchandise orders. A seller must have a reasonable basis for its stated shipment time or, absent a stated time, generally ship within 30 days; delay notices, consent, cancellation, and prompt refunds may be required. California Civil Code section 1723 requires conspicuous disclosure of certain refund/exchange restrictions. State unfair/deceptive-practices, warranty, sales-tax, price-display, product-labeling, and delivery laws may also apply. Actual return terms, shipping promises, tax setup, and destinations are not all established.</li>
-          <li><strong>Subscriptions/automatic renewal:</strong> No subscription, recurring charge, or automatic renewal appears in the reviewed checkout code; apparel and credit-pack payments are one-time flows. If subscriptions, memberships, trials, or recurring billing are introduced, federal ROSCA and California’s Automatic Renewal Law, plus state-specific renewal, consent, reminder, and cancellation laws, may apply. Re-check current legal status and effective dates at launch.</li>
-          <li><strong>Promotional email:</strong> No newsletter form or email-marketing provider appears in the source. If promotional email is sent, CAN-SPAM applies to commercial email, not only bulk campaigns, and requires accurate sender/subject information, a valid postal address, an effective opt-out, and timely suppression; state privacy and marketing laws may add requirements.</li>
-          <li><strong>Digital music:</strong> No direct music-download checkout was identified. If songs are offered, California AB 2426 / Business and Professions Code section 17500.6 may require clear license disclosures and affirmative acknowledgment in covered revocable-license sales; rights in the composition and sound recording must both be verified. Digital refund and consumer-protection laws vary by location and facts.</li>
-          <li><strong>Accessibility:</strong> A public retail website may implicate ADA Title III and California Unruh Act requirements. DOJ guidance says public-facing businesses must provide access to online goods/services but has not prescribed a detailed private-business technical standard; WCAG is useful implementation guidance, not a substitute for legal review and user testing.</li>
-          <li><strong>Copyright and platform use:</strong> A song may involve separate rights in the musical composition and sound recording. Streaming links do not establish ownership or permission to grant a download license. Verify songwriter, publisher, performer, producer, sample, artwork, and platform/distribution agreements before selling downloads or authorizing custom use.</li>
-          <li><strong>Children, breach, and international visitors:</strong> COPPA can apply to child-directed services or a service with actual knowledge it collects information from a child under 13. California and other states have separate breach-notification rules. GDPR/UK rules may apply if the business intentionally targets or monitors people there; global reach alone does not establish that it does so, but provider locations and audience should be checked.</li>
-        </ul>
-        <h3>8.4 Where the policies should appear</h3>
-        <ul>
-          <li><strong>Site footer:</strong> Persistent Privacy, Terms, and Your Privacy Choices links; link Privacy from the first significant page. Do not link this unfinished draft as final.</li>
-          <li><strong>Apparel page:</strong> Returns &amp; Shipping and Terms links near products/checkout. Keep the custom-order message prominent; it is now included on the apparel page.</li>
-          <li><strong>Checkout:</strong> Link Privacy, Terms, Refund/Order, and Shipping policies immediately before final payment. Show total price, taxes, shipping, delivery estimates, and return terms. For downloads, show license restrictions and any separate affirmative acknowledgment before payment.</li>
-          <li><strong>Music-download page:</strong> No direct-download sales page was found. If added, show license/refund terms beside each offer and before purchase.</li>
-          <li><strong>Contact page:</strong> Link Privacy and Terms and identify request channels. The site currently publishes waveenginestudio@gmail.com.</li>
-          <li><strong>Order emails:</strong> Link policies in apparel/download confirmations; include order ID, estimate, support route, and digital license/access details. Confirm the actual email system.</li>
-          <li><strong>Notice at Collection:</strong> Present at or before checkout, privacy-request form, and prompt/payment collection; link the full Policy.</li>
-          <li><strong>Accessibility:</strong> Use semantic headings, visible focus, sufficient contrast, descriptive links, accessible tables, and a print stylesheet; test the published page and checkout.</li>
-        </ul>
-        <h3>8.5 Primary legal sources for counsel</h3>
-        <ul>
-          <li><a href="https://cppa.ca.gov/faq.html">California Privacy Protection Agency: CCPA FAQ and rights</a></li>
-          <li><a href="https://privacy.ca.gov/laws-and-regulations/monetary-thresholds-in-the-ccpa/">California Privacy Protection Agency: monetary thresholds</a></li>
-          <li><a href="https://oag.ca.gov/news/press-releases/attorney-general-kamala-d-harris-issues-guide-privacy-policies-and-do-not-track">California Attorney General: privacy policy and Do Not Track guidance</a></li>
-          <li><a href="https://leginfo.legislature.ca.gov/faces/codes_displaySection.xhtml?sectionNum=17500.6.&amp;lawCode=BPC">California Business and Professions Code section 17500.6: digital goods</a></li>
-          <li><a href="https://leginfo.legislature.ca.gov/faces/codes_displaySection.xhtml?sectionNum=1723&amp;lawCode=CIV">California Civil Code section 1723: refund-policy disclosure</a></li>
-          <li><a href="https://www.ftc.gov/legal-library/browse/rules/mail-internet-or-telephone-order-merchandise-rule">FTC merchandise rule</a> · <a href="https://www.ftc.gov/business-guidance/resources/business-guide-ftcs-mail-internet-or-telephone-order-merchandise-rule">FTC business guide</a></li>
-          <li><a href="https://www.ftc.gov/business-guidance/resources/can-spam-act-compliance-guide-business">FTC CAN-SPAM guide</a> · <a href="https://www.ftc.gov/business-guidance/resources/childrens-online-privacy-protection-rule-six-step-compliance-plan-your-business">FTC COPPA guide</a></li>
-          <li><a href="https://www.ada.gov/resources/web-guidance/">U.S. Department of Justice: ADA web accessibility guidance</a></li>
-          <li><a href="https://www.copyright.gov/engage/musicians/">U.S. Copyright Office: What Musicians Should Know about Copyright</a></li>
-        </ul>
-        <p><strong>This list is not exhaustive.</strong> Counsel should check current federal, California, and customer-state statutes, regulations, agency guidance, and court decisions for the actual business model and vendor configuration.</p>
-      </section>
+  <h2>8. Publication Checklist and Legal Review Items</h2>
+
+  <p>
+    This checklist is for internal review only and should not appear on the
+    public Privacy Policy, Terms of Service, or checkout pages.
+  </p>
+
+  <h3>8.1 Confirmed business practices</h3>
+  <ul>
+    <li>Primary website: <strong>https://waveenginemusic.com</strong>.</li>
+    <li>Support email: <strong>waveenginestudio@gmail.com</strong>.</li>
+    <li>The website does not currently use advertising pixels or analytics tools for targeted advertising.</li>
+    <li>Personal information is not intentionally sold or shared for cross-context behavioral advertising.</li>
+    <li>Apparel checkout uses Stripe-hosted Checkout for one-time payments.</li>
+    <li>The apparel store currently accepts U.S. shipping addresses supported by checkout.</li>
+    <li>Current apparel shipping is $5.99 below a $75 merchandise subtotal and free at or above $75, unless a promotion states otherwise.</li>
+    <li>Apparel returns are currently planned for up to 30 calendar days after delivery.</li>
+    <li>Change-of-mind, fit, or size returns require items to be unworn, unwashed, unaltered, and in resalable condition.</li>
+    <li>Customers pay return shipping for non-defective change-of-mind or size returns.</li>
+    <li>Wave Engine Studio pays reasonable return shipping for confirmed defective, damaged, or incorrectly fulfilled items.</li>
+    <li>The site does not currently offer subscriptions or automatic recurring billing.</li>
+    <li>Direct music downloads are planned but must not be sold until ownership, licensing, checkout, delivery, refund, and license terms are verified.</li>
+    <li>Album-art prompts may be sent to OpenAI to provide the requested image-generation service.</li>
+  </ul>
+
+  <h3>8.2 Information still requiring confirmation</h3>
+  <ul>
+    <li>Actual legal seller name, business structure, registered DBA, mailing address, and business or return address.</li>
+    <li>Actual shipping carrier, fulfillment provider, processing time, tracking process, and delivery estimates.</li>
+    <li>Whether Alaska, Hawaii, territories, APO/FPO addresses, and P.O. boxes are supported.</li>
+    <li>Final sales-tax registrations, tax nexus, tax collection, and checkout tax configuration.</li>
+    <li>Actual Stripe payment fields, receipts, refund workflow, test/live mode, and account ownership.</li>
+    <li>Actual Firebase, Vercel, hosting, storage, backup, logging, and production security settings.</li>
+    <li>Whether Solana wallet or digital-credit purchases will remain available and which assets and wallets will be supported.</li>
+    <li>Music-download platform, secure delivery method, file formats, link expiration, download limits, refund process, and customer support procedure.</li>
+    <li>Copyright ownership and written licenses for every composition, sound recording, performer contribution, producer contribution, sample, artwork, logo, and merchandise design.</li>
+    <li>Custom-order terms, including deposits, quotes, proof approvals, production timelines, cancellations, and final-payment requirements.</li>
+    <li>Retention and deletion periods for orders, prompts, credits, support emails, payment records, logs, backups, and privacy requests.</li>
+    <li>Whether any embedded services collect cookies, IP addresses, device information, or interaction data.</li>
+    <li>Whether Global Privacy Control is technically detected and honored in production.</li>
+    <li>Whether the site is intentionally marketed to children, international customers, or customers in the EEA or United Kingdom.</li>
+    <li>Whether promotional email, newsletters, text messages, or marketing automation will be introduced.</li>
+  </ul>
+
+  <h3>8.3 Required launch testing</h3>
+  <ul>
+    <li>Complete a live apparel checkout using a test payment method.</li>
+    <li>Confirm that the displayed product price, shipping charge, taxes, discounts, and final total are accurate.</li>
+    <li>Confirm that successful orders generate accurate receipts and order confirmations.</li>
+    <li>Test cancellation, refund, return, exchange, damaged-item, and missing-package workflows.</li>
+    <li>Test inventory deduction and sold-out behavior for every apparel size.</li>
+    <li>Test the privacy-request email address and response workflow.</li>
+    <li>Test all Privacy Policy, Terms, Refund, Shipping, and Your Privacy Choices links.</li>
+    <li>Test keyboard navigation, visible focus, color contrast, image descriptions, tables, forms, and checkout accessibility.</li>
+    <li>Test the website on desktop and mobile devices.</li>
+    <li>Confirm that no advertising pixels, unauthorized analytics, or unexpected third-party tracking tools are active.</li>
+    <li>Before launching music downloads, test payment, delivery, download access, link expiration, file quality, license acknowledgment, and refund support.</li>
+  </ul>
+
+  <h3>8.4 Legal review recommended before launch</h3>
+  <ul>
+    <li>Confirm the legal seller identity, business structure, DBA, mailing address, and return address.</li>
+    <li>Review California privacy requirements, Notice at Collection, Global Privacy Control, and other-state privacy obligations.</li>
+    <li>Review apparel returns, final-sale items, defective-product remedies, shipping delays, taxes, and refund procedures.</li>
+    <li>Review digital-music licensing, copyright ownership, download rights, refund terms, and any revocable-license disclosure.</li>
+    <li>Review Terms disclaimers, liability limitations, indemnification, governing law, venue, minors, and user-content provisions.</li>
+    <li>Review accessibility obligations and test the published website and checkout.</li>
+    <li>Review future marketing email, text messaging, subscriptions, automatic renewals, and promotional campaigns before activation.</li>
+  </ul>
+
+  <h3>8.5 Publication locations</h3>
+  <ul>
+    <li><strong>Site footer:</strong> Privacy Policy, Terms of Service, Refund and Order Policy, Shipping Policy, and Your Privacy Choices, if applicable.</li>
+    <li><strong>Apparel page:</strong> Return and Shipping links near the products and checkout controls.</li>
+    <li><strong>Checkout:</strong> Links to the Privacy Policy, Terms, Refund Policy, and Shipping Policy before final payment.</li>
+    <li><strong>Music-download page:</strong> License, refund, file-format, delivery, and usage terms before purchase.</li>
+    <li><strong>Order emails:</strong> Order number, purchased items, total amount, delivery estimate, support email, and applicable policy links.</li>
+  </ul>
+
+  <p>
+    This checklist is not legal advice and does not replace review by a
+    licensed attorney familiar with California consumer, privacy, e-commerce,
+    copyright, and digital-content law.
+  </p>
+</section>
     </main>
     <footer>
-      <p>Draft only. Complete all placeholders and verify the live site and vendor practices before publication. This draft is not legal advice and does not guarantee protection from claims or legal challenges.</p>
       <p><a href="mailto:waveenginestudio@gmail.com?subject=Privacy%20request">Contact for a privacy request</a></p>
     </footer>
   </body>
