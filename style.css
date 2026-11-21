@@ -604,6 +604,18 @@ main {
   margin-top: 1.25rem;
 }
 
+.featured .embed-grid {
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 760px;
+  margin-inline: auto;
+}
+
+.featured .youtube-card iframe {
+  aspect-ratio: 16 / 9;
+  height: auto;
+  min-height: 0;
+}
+
 .embed-card,
 .drop-card {
   padding: 1rem;
