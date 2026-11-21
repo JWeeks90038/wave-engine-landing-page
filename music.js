@@ -5,9 +5,9 @@ const tracks = document.querySelector("#music-tracks");
 const players = new Set();
 
 function fileUrl(id, format, download = false) {
-  const query = new URLSearchParams({ id, format });
+  const query = new URLSearchParams({ action: "file", id, format });
   if (download) query.set("download", "1");
-  return `${apiBase}/api/music-file?${query}`;
+  return `${apiBase}/api/music?${query}`;
 }
 
 function text(tag, value, className) {
@@ -78,7 +78,7 @@ function renderTrack(track) {
 }
 
 try {
-  const response = await fetch(`${apiBase}/api/music-library`);
+  const response = await fetch(`${apiBase}/api/music?action=library`);
   const data = await response.json();
   if (!response.ok) throw new Error(data.error || "The music library could not be loaded.");
   tracks.replaceChildren(...data.tracks.map(renderTrack));

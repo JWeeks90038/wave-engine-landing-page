@@ -1,4 +1,4 @@
-const { sendJson, setCorsHeaders } = require("../server/api-utils");
+const { sendJson, setCorsHeaders } = require("./api-utils");
 
 module.exports = (request, response) => {
   if (request.method === "OPTIONS") {

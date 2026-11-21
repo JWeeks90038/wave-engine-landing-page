@@ -2,8 +2,9 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const { Readable, Writable } = require("node:stream");
 const music = require("../server/music-library");
-const { createHandler: fileHandler } = require("../api/music-file");
-const { createHandler: libraryHandler } = require("../api/music-library");
+const { createHandler: fileHandler } = require("../server/music-file-handler");
+const { createHandler: libraryHandler } = require("../server/music-library-handler");
+const musicHandler = require("../api/music");
 
 class Response extends Writable {
   constructor() {
@@ -114,4 +115,20 @@ test("range and path validation reject malformed input", () => {
   assert.deepEqual(music.byteRange("bytes=7-", 10), { start: 7, end: 9 });
   assert.equal(music.byteRange("bytes=0-1,4-5", 10), false);
   assert.equal(music.filePath("track1", { mp3StoragePath: "musicTracks/other/file/mp3.mp3" }, "mp3"), null);
+});
+
+test("the consolidated music function routes configuration and rejects invalid requests", async () => {
+  const previous = process.env.FIREBASE_STORAGE_BUCKET;
+  process.env.FIREBASE_STORAGE_BUCKET = "test-bucket";
+  try {
+    const config = await request(musicHandler, "/api/music?action=config");
+    assert.deepEqual(JSON.parse(config.body()), { storageBucket: "test-bucket" });
+    const missingFile = await request(musicHandler, "/api/music?action=file");
+    assert.equal(missingFile.statusCode, 400);
+    const unknown = await request(musicHandler, "/api/music?action=unknown");
+    assert.equal(unknown.statusCode, 404);
+  } finally {
+    if (previous === undefined) delete process.env.FIREBASE_STORAGE_BUCKET;
+    else process.env.FIREBASE_STORAGE_BUCKET = previous;
+  }
 });

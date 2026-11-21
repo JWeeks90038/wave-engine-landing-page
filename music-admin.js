@@ -189,7 +189,7 @@ form.addEventListener("submit", async (event) => {
 });
 
 try {
-  const [app, configResponse] = await Promise.all([firebaseClient(apiBase), fetch(`${apiBase}/api/music-config`)]);
+  const [app, configResponse] = await Promise.all([firebaseClient(apiBase), fetch(`${apiBase}/api/music?action=config`)]);
   const config = await configResponse.json();
   if (!configResponse.ok) throw new Error(config.error || "Music storage is not configured.");
   auth = getAuth(app);

@@ -1,5 +1,5 @@
-const { sendJson, setCorsHeaders } = require("../server/api-utils");
-const music = require("../server/music-library");
+const { sendJson, setCorsHeaders } = require("./api-utils");
+const music = require("./music-library");
 
 function createHandler({ database, publicTrack } = music) {
   return async (request, response) => {

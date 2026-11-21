@@ -1,5 +1,5 @@
 // Merge this match block into the existing Cloud Storage rules before deploying.
-// Public file access goes through the publication-checked music-file API, not Storage URLs.
+// Public file access goes through the publication-checked music API, not Storage URLs.
 match /musicTracks/{trackId}/{uploadId}/{fileName} {
   function isAdmin() {
     return request.auth != null && request.auth.token.admin == true;
