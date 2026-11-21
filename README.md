@@ -35,6 +35,70 @@ High-conversion, mobile-first landing page for Wave Engine built with plain HTML
 - `Images/apparel/` - replaceable product image placeholders
 - `Images/` - local artwork used by the page
 
+## Digital music library setup
+
+`music.html` displays published tracks from Firestore. `music-admin.html` uses the
+same Firebase administrator account and `admin: true` claim as apparel inventory.
+Administrators can upload MP3 (up to 100 MiB), WAV (up to 100 MiB), and PNG,
+JPEG, or WebP artwork (up to 10 MiB). Uploads go directly from the browser to
+Firebase Storage; the API serves published files with byte-range support, so
+playback and downloads do not expose permanent Firebase Storage download URLs.
+The API rechecks publication on every new request. An in-progress response or
+a file already downloaded cannot be recalled after unpublishing.
+
+1. Complete the Firebase inventory setup below using the existing project and
+   administrator claim. Enable Cloud Storage for Firebase and set the
+   **server-side** `FIREBASE_STORAGE_BUCKET` environment variable in Vercel
+   and the local API to the exact bucket name shown in Firebase (without
+   `gs://`). Give the existing service account permission to read that bucket.
+   The Firebase web configuration and bucket name are public identifiers, not
+   service-account credentials. Do not make the bucket or its objects public.
+2. Deploy `firestore.rules` using the command in the inventory setup. The new
+   `musicTracks` rules allow visitors to read only published metadata and allow
+   only users with the administrator claim to modify it. Apparel inventory and
+   all other documents remain denied to direct clients.
+3. **Before deploying Storage rules**, inspect your currently deployed Storage
+   rules and merge the match block in `music-storage.rules` into the existing
+   `match /b/{bucket}/o` block. This repository does not contain the deployed
+   Storage rules, so replacing them wholesale could break unrelated features.
+   Ensure no overlapping rule grants public access to `musicTracks/**`; Storage
+   rules are additive. Deploy the merged rules through Firebase Console or
+   your normal Firebase CLI configuration.
+4. Configure the bucket's CORS policy to allow the administrator page's HTTPS
+   origin and the local development origin for `GET`, `POST`, `PUT`, and
+   `DELETE`. For example, save the following as a private local JSON file,
+   replace the origins as needed, and run
+   `gcloud storage buckets update gs://YOUR_BUCKET --cors-file=YOUR_CORS_FILE`.
+   Review and preserve any existing bucket CORS policy before replacing it.
+
+   ```json
+   [{
+     "origin": ["https://waveenginemusic.com", "http://127.0.0.1:4173"],
+     "method": ["GET", "POST", "PUT", "DELETE"],
+     "responseHeader": ["Content-Type", "Authorization", "X-Goog-Resumable",
+       "X-Goog-Upload-Protocol", "X-Goog-Upload-Command", "X-Goog-Upload-Offset",
+       "X-Goog-Upload-Header-Content-Type", "X-Goog-Upload-Header-Content-Length"],
+     "maxAgeSeconds": 3600
+   }]
+   ```
+
+   Browser-side draft preview uses authenticated Storage downloads. Add the
+   relevant hostnames to Firebase Authentication's authorized domains. Serve the
+   admin page over HTTPS (or localhost), and sign in at `music-admin.html`.
+5. Upload files and save a draft first; preview it from the track list, then
+   edit it and select Published. Do not publish until you have tested upload,
+   preview, playback, download, unpublish and unauthorized access with a
+   separate test project. Deleting a track removes its metadata first and then
+   its files. Any failed file cleanup is reported with the affected paths.
+
+The public library and admin page use the existing Vercel API origin; localhost
+uses the Node API on port 8787. Firebase Storage download tokens must not be
+shared: anyone holding a tokenized URL can bypass Storage rules. Public clients
+receive only API links, not Storage paths or tokens. Restrict Firebase Console,
+service-account IAM, and administrator accounts accordingly. Music delivery
+uses Vercel function execution time and Storage bandwidth; verify capacity,
+large-file playback and download behavior on the deployed plan before launch.
+
 ## Local Preview
 
 Open `index.html` directly in a browser, or run a local server.
@@ -166,8 +230,9 @@ have been tested end to end. Deploy the API with your existing Vercel Git integr
    firebase deploy --only firestore:rules --project YOUR_FIREBASE_PROJECT_ID
    ```
 
-   [firestore.rules](firestore.rules) denies all direct client reads and writes. The public
-   catalog API returns only availability; the admin API verifies Firebase ID tokens and the
+   [firestore.rules](firestore.rules) denies direct client access to apparel data; the music
+   collection has its own published-read and administrator-write rules described above. The public
+   apparel catalog API returns only availability; the admin API verifies Firebase ID tokens and the
    `admin: true` custom claim before any inventory access. Restrict service-account IAM and
    access to the project and secrets; Admin SDK access bypasses Firestore rules.
 4. Create an email/password user in Firebase Authentication. In a private terminal with the

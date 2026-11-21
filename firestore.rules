@@ -1,6 +1,36 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    match /musicTracks/{trackId} {
+      function isAdmin() {
+        return request.auth != null && request.auth.token.admin == true;
+      }
+      function validTrack() {
+        let data = request.resource.data;
+        return data.keys().hasOnly(['title', 'artist', 'album', 'description', 'genre', 'releaseDate',
+          'duration', 'sortOrder', 'published', 'mp3StoragePath', 'wavStoragePath', 'coverStoragePath',
+          'createdAt', 'updatedAt', 'createdBy'])
+          && data.title is string && data.title.size() > 0 && data.title.size() <= 160
+          && data.artist is string && data.artist.size() > 0 && data.artist.size() <= 160
+          && data.album is string && data.album.size() <= 160
+          && data.description is string && data.description.size() <= 5000
+          && data.genre is string && data.genre.size() <= 120
+          && data.releaseDate is string && data.releaseDate.size() <= 10
+          && data.duration is string && data.duration.matches('^[0-9]+:[0-5][0-9]$')
+          && data.sortOrder is int && data.published is bool
+          && data.mp3StoragePath is string && data.wavStoragePath is string && data.coverStoragePath is string
+          && (!data.published || data.mp3StoragePath != '' || data.wavStoragePath != '')
+          && data.updatedAt == request.time
+          && data.createdAt is timestamp && data.createdBy is string;
+      }
+      allow read: if isAdmin() || resource.data.published == true;
+      allow create: if isAdmin() && validTrack() && request.resource.data.createdAt == request.time
+        && request.resource.data.createdBy == request.auth.uid;
+      allow update: if isAdmin() && validTrack()
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.createdBy == resource.data.createdBy;
+      allow delete: if isAdmin();
+    }
     // The server exposes availability and checks admin claims; clients never write directly.
     match /{document=**} {
       allow read, write: if false;

@@ -6,17 +6,17 @@
     <title>Wave Engine Music | Cinematic Motivational and Inspirational Soundtracks</title>
     <meta
       name="description"
-      content="Explore Wave Engine music across Spotify, Apple Music, YouTube Music, and Amazon Music, from workout motivation to cinematic inspiration."
+      content="Listen to Wave Engine music online and download available MP3 and WAV tracks."
     />
     <meta
       name="keywords"
-      content="Wave Engine music, cinematic motivational music, inspirational soundtracks, workout music, epic music for videos, streaming music"
+      content="Wave Engine music, cinematic motivational music, inspirational soundtracks, workout music, music downloads"
     />
     <link rel="canonical" href="https://waveenginemusic.com/music.html" />
     <meta property="og:title" content="Wave Engine Studio | Cinematic Motivational and Inspirational Soundtracks" />
     <meta
       property="og:description"
-      content="Stream Wave Engine across Spotify, Apple Music, YouTube Music, and Amazon Music for workouts, storytelling, inspiration, and life's biggest moments."
+      content="Listen to Wave Engine music online and download available MP3 and WAV tracks."
     />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://waveenginemusic.com/music.html" />
@@ -30,7 +30,7 @@
     <meta name="twitter:title" content="Wave Engine Music | Cinematic Motivational and Inspirational Soundtracks" />
     <meta
       name="twitter:description"
-      content="Discover Wave Engine music and stream it across all major platforms."
+      content="Discover Wave Engine music and download available tracks."
     />
     <meta name="twitter:image" content="https://waveenginemusic.com/Images/wave-engine-social-card-4k-v1.png" />
     <meta name="twitter:image:alt" content="Wave Engine cinematic motivational music artwork with logo, waveform, and mountain landscape." />
@@ -45,6 +45,8 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="music.css" />
+    <script type="module" src="music.js"></script>
   </head>
   <body>
     <div class="page-shell">
@@ -62,19 +64,23 @@
         </nav>
         <section class="page-hero">
           <p class="eyebrow">Music</p>
-          <h1>Stream Wave Engine everywhere</h1>
+          <h1>Listen to the Music</h1>
           <p class="page-intro">
-            Find cinematic motivational music, inspirational releases, workout energy, and story-driven soundtracks across the top streaming platforms.
+            Find cinematic motivational music, inspirational releases, workout energy, and story-driven soundtracks.
           </p>
         </section>
       </header>
 
       <main class="page-main">
-        <section class="content-section link-grid">
-          <a class="cta-button cta-primary" href="https://open.spotify.com/artist/0iIZ1Eb8hzcsDcjBCyVtmz?si=yvpLIwWCQ6OL9dFJ0PTTcQ&nd=1&dlsi=008e51b0b0db427d" target="_blank" rel="noopener noreferrer">Listen on Spotify</a>
-          <a class="cta-button cta-apple" href="https://music.apple.com/us/artist/wave-engine/6782497667" target="_blank" rel="noopener noreferrer">Listen on Apple Music</a>
-          <a class="cta-button cta-youtube-music" href="https://music.youtube.com/channel/UCOseyu2LocqhcslSYBd1Z-g" target="_blank" rel="noopener noreferrer">Listen on YouTube Music</a>
-          <a class="cta-button cta-amazon" href="https://music.amazon.com/artists/B0GQNZ9QHP/wave-engine" target="_blank" rel="noopener noreferrer">Listen on Amazon Music</a>
+        <section class="content-section music-library" aria-labelledby="library-title">
+          <div class="music-library-intro">
+            <p class="eyebrow">Play, download, and own the music</p>
+            <h2 id="library-title">Digital Music Library</h2>
+            <p>Listen online and download available MP3 or WAV files.</p>
+          </div>
+          <p id="music-status" role="status" aria-live="polite">Loading the music library...</p>
+          <div id="music-tracks" class="music-tracks"></div>
+          <noscript>JavaScript is required to load the music library.</noscript>
         </section>
 
         <section class="content-section embed-grid">

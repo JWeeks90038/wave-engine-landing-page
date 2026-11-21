@@ -1,0 +1,17 @@
+// Merge this match block into the existing Cloud Storage rules before deploying.
+// Public file access goes through the publication-checked music-file API, not Storage URLs.
+match /musicTracks/{trackId}/{uploadId}/{fileName} {
+  function isAdmin() {
+    return request.auth != null && request.auth.token.admin == true;
+  }
+  allow read, delete: if isAdmin();
+  allow create: if isAdmin() && request.resource.size > 0 && (
+    (fileName == 'mp3.mp3' && request.resource.size <= 100 * 1024 * 1024
+      && request.resource.contentType == 'audio/mpeg') ||
+    (fileName == 'wav.wav' && request.resource.size <= 100 * 1024 * 1024
+      && request.resource.contentType in ['audio/wav', 'audio/x-wav']) ||
+    (fileName == 'cover' && request.resource.size <= 10 * 1024 * 1024
+      && request.resource.contentType in ['image/png', 'image/jpeg', 'image/webp'])
+  );
+  allow update: if false;
+}

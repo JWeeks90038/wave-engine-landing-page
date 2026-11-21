@@ -1,4 +1,4 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js";
+import { firebaseClient } from "./firebase-client.js";
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js";
 
 const apiConfig = document.querySelector('meta[name="apparel-api-base"]');
@@ -82,9 +82,7 @@ async function loadInventory() {
 }
 
 try {
-  const response = await fetch(`${apiBase}/api/apparel-firebase-config`);
-  if (!response.ok) throw new Error("Firebase authentication is not configured.");
-  auth = getAuth(initializeApp(await response.json()));
+  auth = getAuth(await firebaseClient(apiBase));
   login.addEventListener("submit", async (event) => {
     event.preventDefault();
     try {
