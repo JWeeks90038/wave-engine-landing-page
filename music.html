@@ -38,7 +38,6 @@
     <link rel="icon" type="image/jpeg" href="Images/we_favicon.jpg" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="preconnect" href="https://open.spotify.com" />
     <link rel="preconnect" href="https://www.youtube.com" />
     <link
       href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;900&family=Space+Grotesk:wght@400;500;700&display=swap"
@@ -86,26 +85,28 @@
           <noscript>JavaScript is required to load the music library.</noscript>
         </section>
 
-        <section class="content-section embed-grid">
-          <article class="embed-card spotify-card">
-            <div class="card-header">
-              <span class="stream-pill">Spotify</span>
-              <h2>Featured Spotify player</h2>
-            </div>
-            <iframe
-              src="https://open.spotify.com/embed/artist/0iIZ1Eb8hzcsDcjBCyVtmz?utm_source=generator&theme=0&si=d23fd099eeb24ff6"
-              title="Wave Engine Spotify player"
-              loading="lazy"
-              allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-            ></iframe>
-          </article>
-          <article class="embed-card youtube-card">
-            <div class="card-header">
-              <span class="stream-pill alt">YouTube</span>
-              <h2>Featured video</h2>
-            </div>
-            <iframe width="315" height="560" src="https://www.youtube.com/embed/zJQVdONp7O8" title="Happy 250th | Wave Engine" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
-          </article>
+        <section class="content-section" aria-labelledby="featured-videos-title">
+          <div class="section-copy">
+            <h2 id="featured-videos-title">Featured Videos</h2>
+          </div>
+          <div class="embed-grid">
+            <article class="embed-card youtube-card">
+              <div class="card-header">
+                <span class="stream-pill alt">YouTube</span>
+                <h3>Happy 250th</h3>
+              </div>
+              <iframe width="315" height="560" src="https://www.youtube.com/embed/zJQVdONp7O8" title="Happy 250th | Wave Engine" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+              <p>This viral video received over 1 million views on Facebook within its first two weeks, with over 83,000 likes and reactions and more than 20,000 shares.</p>
+            </article>
+            <article class="embed-card youtube-card">
+              <div class="card-header">
+                <span class="stream-pill alt">YouTube</span>
+                <h3>America, Turn It Up!</h3>
+              </div>
+              <iframe width="315" height="560" src="https://www.youtube.com/embed/1G3BsuVWAIg" title="America, Turn It Up! | Wave Engine" frameborder="0" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+              <p>This video received over 300,000 views on Facebook within its first two weeks, with over 17,000 likes and reactions and more than 4,200 shares.</p>
+            </article>
+          </div>
         </section>
       </main>
 
