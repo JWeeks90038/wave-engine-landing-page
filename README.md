@@ -84,7 +84,7 @@ a file already downloaded cannot be recalled after unpublishing.
 
    Browser-side draft preview uses authenticated Storage downloads. Add the
    relevant hostnames to Firebase Authentication's authorized domains. Serve the
-   admin page over HTTPS (or localhost), and sign in at `music-admin.html`.
+   admin page over HTTPS (or localhost), and sign in at `/music-admin`.
 5. Upload files and save a draft first; preview it from the track list, then
    edit it and select Published. Do not publish until you have tested upload,
    preview, playback, download, unpublish and unauthorized access with a
@@ -101,19 +101,16 @@ large-file playback and download behavior on the deployed plan before launch.
 
 ## Local Preview
 
-Open `index.html` directly in a browser, or run a local server.
-
-Example with Python:
+Vercel serves pages without the `.html` extension and redirects old `.html`
+URLs to their clean equivalents. To preview the same routing locally, use the
+Vercel CLI in a linked project:
 
 ```bash
-python -m http.server 4173
+vercel dev --listen 127.0.0.1:4173
 ```
 
-Then visit:
-
-```text
-http://127.0.0.1:4173/index.html
-```
+Then visit `http://127.0.0.1:4173/`. A basic static server or opening files
+directly does not provide these clean URL routes.
 
 ## AI Album Cover Generator Setup
 
@@ -247,7 +244,7 @@ have been tested end to end. Deploy the API with your existing Vercel Git integr
    The user must sign out and back in to receive the new claim. To revoke access, remove
    the claim and revoke the user's refresh tokens using Firebase Admin; disabling a user
    also blocks revoked-token verification.
-5. Open `apparel-admin.html`, sign in, and enter non-negative quantities for all five sizes
+5. Open `/apparel-admin`, sign in, and enter non-negative quantities for all five sizes
    of each product. Save each row. A missing product or size is unavailable until initialized;
    inactive products are also unavailable. Use Refresh after a conflicting update and re-enter
    your changes. Restock returns or cancellations manually only after physical inspection.
@@ -296,8 +293,9 @@ $env:STRIPE_WEBHOOK_SECRET="whsec_replace_me"
 node .\server\album-generator-server.js
 ```
 
-Serve the site with Live Server on port 5500 and open `http://127.0.0.1:5500/apparel.html`.
-Match `APPAREL_SITE_URL` to your actual Live Server origin. The local API is at port 8787.
+Serve the site with `vercel dev --listen 127.0.0.1:5500` and open
+`http://127.0.0.1:5500/apparel`. Match `APPAREL_SITE_URL` to your actual preview
+origin. The local API is at port 8787.
 For webhook testing, run the Stripe CLI in a separate terminal:
 
 ```powershell
