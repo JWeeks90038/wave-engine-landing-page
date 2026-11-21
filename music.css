@@ -61,7 +61,6 @@
 .music-actions { display: flex; flex-wrap: wrap; gap: 0.6rem; }
 .music-actions .cta-button { min-height: 44px; padding: 0.65rem 1rem; font-size: 0.9rem; }
 .music-details audio { width: 100%; margin-top: 1rem; }
-.youtube-card iframe { aspect-ratio: 16 / 9; height: auto; min-height: 0; }
 .music-admin-form { display: grid; gap: 1rem; }
 .music-admin-form[hidden] { display: none; }
 .music-admin-form label { display: grid; gap: 0.4rem; }

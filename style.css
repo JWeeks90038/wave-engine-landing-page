@@ -610,14 +610,8 @@ main {
 
 .featured .embed-grid {
   grid-template-columns: minmax(0, 1fr);
-  max-width: 760px;
+  max-width: 390px;
   margin-inline: auto;
-}
-
-.featured .youtube-card iframe {
-  aspect-ratio: 16 / 9;
-  height: auto;
-  min-height: 0;
 }
 
 .embed-card,
@@ -656,7 +650,12 @@ main {
 }
 
 .youtube-card iframe {
-  min-height: 220px;
+  display: block;
+  width: min(100%, 315px);
+  aspect-ratio: 9 / 16;
+  height: auto;
+  min-height: 0;
+  margin-inline: auto;
   border-radius: 18px;
 }
 
