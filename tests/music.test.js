@@ -4,6 +4,9 @@ const { Readable, Writable } = require("node:stream");
 const music = require("../server/music-library");
 const { createHandler: fileHandler } = require("../server/music-file-handler");
 const { createHandler: libraryHandler } = require("../server/music-library-handler");
+const { createHandler: checkoutHandler } = require("../server/music-checkout-handler");
+const { createHandler: purchaseHandler } = require("../server/music-purchase-handler");
+const payments = require("../server/music-payments");
 const musicHandler = require("../api/music");
 
 class Response extends Writable {
@@ -28,6 +31,10 @@ function fakeMusic(track, content = "0123456789") {
   let storageAccesses = 0;
   const dependencies = {
     ...music,
+    verify: async (sessionId) => {
+      if (sessionId !== "paid") throw payments.denied();
+      return { trackId: "track1", title: "Test" };
+    },
     database: () => ({
       collection: () => ({
         doc: (id) => ({ get: async () => ({ exists: Boolean(track), data: () => track, id }) }),
@@ -88,7 +95,7 @@ test("published audio supports seeking, named downloads, and invalid ranges", as
   assert.equal(partial.headers["content-range"], "bytes 3-5/10");
   assert.equal(partial.body(), "345");
   assert.equal(partial.headers["cache-control"], "private, no-store");
-  const download = await request(handler, "/api/music-file?id=track1&format=mp3&download=1");
+  const download = await request(handler, "/api/music-file?id=track1&format=mp3&download=1&session_id=paid");
   assert.equal(download.body(), "0123456789");
   assert.equal(download.headers["content-disposition"], 'attachment; filename="Wave Engine - Test.mp3"');
   const invalid = await request(handler, "/api/music-file?id=track1&format=mp3", { range: "bytes=20-" });
@@ -100,7 +107,7 @@ test("WAV downloads work and unpublishing blocks later requests", async () => {
   const changing = { ...track, wavStoragePath: "musicTracks/track1/file/wav.wav" };
   const fake = fakeMusic(changing);
   const handler = fileHandler(fake.dependencies);
-  const download = await request(handler, "/api/music-file?id=track1&format=wav&download=1");
+  const download = await request(handler, "/api/music-file?id=track1&format=wav&download=1&session_id=paid");
   assert.equal(download.statusCode, 200);
   assert.equal(download.headers["content-type"], "audio/wav");
   assert.equal(download.headers["content-disposition"], 'attachment; filename="Wave Engine - Test.wav"');
@@ -108,6 +115,83 @@ test("WAV downloads work and unpublishing blocks later requests", async () => {
   const hidden = await request(handler, "/api/music-file?id=track1&format=wav");
   assert.equal(hidden.statusCode, 404);
   assert.equal(fake.accesses(), 1);
+  const purchased = await request(handler, "/api/music-file?id=track1&format=wav&download=1&session_id=paid");
+  assert.equal(purchased.statusCode, 200);
+});
+
+test("downloads require payment for the selected track while streaming remains free", async () => {
+  const fake = fakeMusic(track);
+  const handler = fileHandler(fake.dependencies);
+  const unpaid = await request(handler, "/api/music-file?id=track1&format=mp3&download=1");
+  assert.equal(unpaid.statusCode, 403);
+  assert.equal(fake.accesses(), 0);
+  const wrongTrack = await request(handler, "/api/music-file?id=track2&format=mp3&download=1&session_id=paid");
+  assert.equal(wrongTrack.statusCode, 403);
+  assert.equal(fake.accesses(), 0);
+  const stream = await request(handler, "/api/music-file?id=track1&format=mp3");
+  assert.equal(stream.statusCode, 200);
+});
+
+test("purchase verification rejects unpaid, refunded, disputed and mismatched sessions", async () => {
+  const session = {
+    mode: "payment", status: "complete", payment_status: "paid", livemode: false,
+    currency: "usd", amount_subtotal: 149, amount_total: 149,
+    metadata: { type: "music-download-v1", trackId: "track1", priceId: "price_123", title: "Test" },
+    line_items: { data: [{ quantity: 1, price: { id: "price_123" } }] },
+    payment_intent: { status: "succeeded", latest_charge: { status: "succeeded", refunded: false, amount_refunded: 0, disputed: false } }
+  };
+  const stripe = { checkout: { sessions: { retrieve: async () => session } } };
+  assert.deepEqual(await payments.verifyPurchase("cs_test_123", stripe, "test"), { trackId: "track1", title: "Test" });
+  session.payment_status = "unpaid";
+  await assert.rejects(() => payments.verifyPurchase("cs_test_123", stripe, "test"), { statusCode: 403 });
+  session.payment_status = "paid";
+  session.amount_total = 0;
+  await assert.rejects(() => payments.verifyPurchase("cs_test_123", stripe, "test"), { statusCode: 403 });
+  session.amount_total = 149;
+  session.payment_intent.latest_charge.amount_refunded = 1;
+  await assert.rejects(() => payments.verifyPurchase("cs_test_123", stripe, "test"), { statusCode: 403 });
+  session.payment_intent.latest_charge.amount_refunded = 0;
+  session.payment_intent.latest_charge.disputed = true;
+  await assert.rejects(() => payments.verifyPurchase("cs_test_123", stripe, "test"), { statusCode: 403 });
+  session.payment_intent.latest_charge.disputed = false;
+  session.line_items.data[0].price.id = "price_other";
+  await assert.rejects(() => payments.verifyPurchase("cs_test_123", stripe, "test"), { statusCode: 403 });
+  await assert.rejects(() => payments.verifyPurchase("cs_live_123", stripe, "test"), { statusCode: 403 });
+});
+
+test("checkout uses one verified $1.49 price and purchase exposes both available formats", async () => {
+  const fake = fakeMusic({ ...track, wavStoragePath: "musicTracks/track1/file/wav.wav" });
+  let created;
+  const price = { id: "price_123", livemode: false, active: true, type: "one_time", currency: "usd",
+    unit_amount: 149, billing_scheme: "per_unit" };
+  const payment = {
+    mode: () => "test",
+    stripeClient: () => ({
+      prices: { retrieve: async () => price },
+      checkout: { sessions: { create: async (params) => {
+        created = params;
+        return { url: "https://checkout.stripe.com/example", livemode: false };
+      } } }
+    }),
+    priceId: () => "price_123",
+    siteUrl: () => new URL("https://example.com/"),
+    validatePrice: payments.validatePrice
+  };
+  const handler = checkoutHandler({ ...fake.dependencies, payment });
+  const response = new Response();
+  const input = Readable.from([Buffer.from(JSON.stringify({ id: "track1" }))]);
+  input.method = "POST";
+  await handler(input, response);
+  assert.equal(response.statusCode, 200);
+  assert.equal(created.line_items[0].price, "price_123");
+  assert.deepEqual(created.payment_method_types, ["card"]);
+  assert.equal(created.metadata.trackId, "track1");
+  assert.match(created.success_url, /session_id=\{CHECKOUT_SESSION_ID\}$/);
+  const purchase = await request(purchaseHandler(fake.dependencies), "/api/music?action=purchase&session_id=paid");
+  assert.deepEqual(JSON.parse(purchase.body()).formats, ["mp3", "wav"]);
+  const denied = await request(purchaseHandler(fake.dependencies), "/api/music?action=purchase");
+  assert.equal(denied.statusCode, 403);
+  assert.throws(() => payments.validatePrice({ ...price, unit_amount: 150 }, "price_123", false));
 });
 
 test("range and path validation reject malformed input", () => {

@@ -43,8 +43,44 @@ Administrators can upload MP3 (up to 100 MiB), WAV (up to 100 MiB), and PNG,
 JPEG, or WebP artwork (up to 10 MiB). Uploads go directly from the browser to
 Firebase Storage; the API serves published files with byte-range support, so
 playback and downloads do not expose permanent Firebase Storage download URLs.
-The API rechecks publication on every new request. An in-progress response or
-a file already downloaded cannot be recalled after unpublishing.
+The API rechecks publication on every public streaming request. An in-progress
+response or a file already downloaded cannot be recalled after unpublishing.
+
+### Paid music downloads
+
+Listening is free. A $1.49 USD Stripe Checkout purchase covers one track in
+its currently available MP3 and WAV formats. Streaming serves the audio to
+the listener and is not DRM-protected, so a technical user can save the
+stream without purchasing it.
+
+1. In Stripe, create one active one-time $1.49 USD Price for a generic music
+   download. A separate Price is needed for test mode and live mode.
+2. Set `MUSIC_STRIPE_MODE` to `test` or `live`, `MUSIC_STRIPE_PRICE_ID` to the
+   matching Price ID, `MUSIC_SITE_URL` to the website's HTTPS root (or a
+   localhost URL for testing), and `STRIPE_SECRET_KEY` to a matching Stripe
+   secret or restricted key. The key must be able to retrieve Prices,
+   Checkout Sessions and PaymentIntents and create Checkout Sessions.
+   The same secret key is used by apparel checkout; test mode must use a
+   separate local or preview environment so live apparel payments are unaffected.
+3. Keep `MUSIC_LIVE_CHECKOUT_ENABLED` unset until test-mode checkout,
+   payment verification, both available file downloads, declined payments,
+   refunds and support recovery have been tested. Set it to `true` only when
+   ready to accept live payments. Without a configured Price, checkout reports
+   that it is unavailable; the paid download action fails closed.
+4. In Stripe Dashboard, enable **Customer emails > Successful payments** to
+   send receipts. Stripe receipts do not deliver files. After successful card
+   payment the customer is returned to a download page, which verifies the
+   payment with Stripe before offering available formats.
+
+The download-page URL is a bearer link: anyone holding it can access the
+purchase, so buyers must keep it private. There is no account or automated
+email delivery or link recovery; help customers manually if they lose the
+page. Links have no fixed expiry, but cannot provide files after an
+administrator deletes them. Buyers should save their files immediately.
+Downloaded files do not expire. Review the draft digital music license and
+refund policy with counsel before enabling sales.
+
+### Firebase music setup
 
 1. Complete the Firebase inventory setup below using the existing project and
    administrator claim. Enable Cloud Storage for Firebase and set the

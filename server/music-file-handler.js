@@ -1,7 +1,8 @@
 const { sendJson, setCorsHeaders } = require("./api-utils");
 const music = require("./music-library");
+const { verifyPurchase } = require("./music-payments");
 
-function createHandler({ bucket, database, filePath, byteRange, downloadName } = music) {
+function createHandler({ bucket, database, filePath, byteRange, downloadName, verify = verifyPurchase } = music) {
   return async (request, response) => {
   if (request.method === "OPTIONS") {
     setCorsHeaders(response);
@@ -17,9 +18,14 @@ function createHandler({ bucket, database, filePath, byteRange, downloadName } =
     return sendJson(response, 400, { error: "Invalid music file request." });
   }
   try {
+    const isDownload = params.get("download") === "1" && format !== "cover";
+    if (isDownload) {
+      const purchase = await verify(params.get("session_id"));
+      if (purchase.trackId !== id) return sendJson(response, 403, { error: "Payment could not be verified." });
+    }
     const doc = await database().collection("musicTracks").doc(id).get();
     const track = doc.exists && doc.data();
-    const path = track && track.published === true && filePath(id, track, format);
+    const path = track && (track.published === true || isDownload) && filePath(id, track, format);
     if (!path) return sendJson(response, 404, { error: "Music file not found." });
     const file = bucket().file(path);
     const [metadata] = await file.getMetadata();
@@ -40,7 +46,7 @@ function createHandler({ bucket, database, filePath, byteRange, downloadName } =
     response.setHeader("Content-Type", format === "mp3" ? "audio/mpeg" : format === "wav" ? "audio/wav" : metadata.contentType);
     response.setHeader("Content-Length", String(end - start + 1));
     if (range) response.setHeader("Content-Range", `bytes ${start}-${end}/${size}`);
-    if (params.get("download") === "1" && format !== "cover") {
+    if (isDownload) {
       response.setHeader("Content-Disposition", `attachment; filename="${downloadName(track, format)}"`);
     }
     response.writeHead(range ? 206 : 200);
@@ -54,7 +60,9 @@ function createHandler({ bucket, database, filePath, byteRange, downloadName } =
   } catch (error) {
     console.error("Music file error:", error.message);
     if (response.headersSent) return response.destroy(error);
-    return sendJson(response, error.code === 404 ? 404 : 503, { error: "The music file could not be loaded." });
+    return sendJson(response, error.statusCode === 403 ? 403 : error.code === 404 ? 404 : 503, {
+      error: error.statusCode === 403 ? "Payment could not be verified." : "The music file could not be loaded."
+    });
   }
   };
 }

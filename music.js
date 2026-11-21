@@ -4,10 +4,27 @@ const status = document.querySelector("#music-status");
 const tracks = document.querySelector("#music-tracks");
 const players = new Set();
 
-function fileUrl(id, format, download = false) {
+function fileUrl(id, format) {
   const query = new URLSearchParams({ action: "file", id, format });
-  if (download) query.set("download", "1");
   return `${apiBase}/api/music?${query}`;
+}
+
+async function purchaseTrack(id, button) {
+  button.disabled = true;
+  status.textContent = "Opening secure checkout...";
+  try {
+    const response = await fetch(`${apiBase}/api/music?action=checkout`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id })
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Music checkout is unavailable.");
+    location.assign(data.url);
+  } catch (error) {
+    status.textContent = error.message || "Music checkout is unavailable. Please try again later.";
+    button.disabled = false;
+  }
 }
 
 function text(tag, value, className) {
@@ -65,12 +82,14 @@ function renderTrack(track) {
         catch { status.textContent = `Unable to play ${track.title}. Please try again later.`; }
       });
       actions.append(listen);
-      const link = document.createElement("a");
-      link.className = "cta-button";
-      link.href = fileUrl(track.id, option, true);
-      link.textContent = `Download ${option.toUpperCase()}`;
-      actions.append(link);
     }
+    const buy = document.createElement("button");
+    buy.type = "button";
+    buy.className = "cta-button";
+    const formats = [track.hasMp3 && "MP3", track.hasWav && "WAV"].filter(Boolean).join(" & ");
+    buy.textContent = `Download ${formats} - $1.49`;
+    buy.addEventListener("click", () => purchaseTrack(track.id, buy));
+    actions.append(buy);
     details.append(actions, player);
   }
   card.append(details);
