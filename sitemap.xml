@@ -7,37 +7,32 @@
   </url>
   <url>
     <loc>https://waveenginemusic.com/</loc>
-    <lastmod>2026-06-23</lastmod>
+    <lastmod>2026-11-21</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
     <loc>https://waveenginemusic.com/music</loc>
-    <lastmod>2026-06-23</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
     <loc>https://waveenginemusic.com/stream</loc>
-    <lastmod>2026-06-23</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
     <loc>https://waveenginemusic.com/about</loc>
-    <lastmod>2026-06-23</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://waveenginemusic.com/contact</loc>
-    <lastmod>2026-06-23</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>https://waveenginemusic.com/blog</loc>
-    <lastmod>2026-06-23</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>

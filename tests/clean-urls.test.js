@@ -35,10 +35,14 @@ test("internal page links use clean URLs that resolve to existing pages", () => 
 
 test("sitemap URLs match the pages' clean canonical URLs", () => {
   const sitemap = fs.readFileSync(path.join(root, "sitemap.xml"), "utf8");
+  const seen = new Set();
   for (const match of sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)) {
     const url = new URL(match[1]);
+    assert.equal(seen.has(url.href), false, `duplicate sitemap URL: ${url.href}`);
+    seen.add(url.href);
     assert.equal(url.pathname.endsWith(".html"), false, url.href);
     const html = fs.readFileSync(pageFile(url.pathname), "utf8");
     assert.ok(html.includes(`rel="canonical" href="${url.href}"`), url.href);
+    assert.doesNotMatch(html, /<meta\s+name=["']robots["']\s+content=["'][^"']*\bnoindex\b/i, url.href);
   }
 });

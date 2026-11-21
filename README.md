@@ -35,6 +35,13 @@ High-conversion, mobile-first landing page for Wave Engine built with plain HTML
 - `Images/apparel/` - replaceable product image placeholders
 - `Images/` - local artwork used by the page
 
+## Sitemap maintenance
+
+List public, indexable canonical pages in `sitemap.xml`. Add new pages when
+they are published, and omit administrative, checkout, and `noindex` pages.
+Use `lastmod` only when the date of the page's last significant change is
+known; otherwise omit it. `robots.txt` advertises the sitemap to crawlers.
+
 ## Digital music library setup
 
 `music.html` displays published tracks from Firestore. `music-admin.html` uses the
