@@ -286,6 +286,10 @@ iframe {
   font-size: 1rem;
 }
 
+.hero-actions .cta-button {
+  margin-top: 1.4rem;
+}
+
 .cta-group {
   display: grid;
   gap: 0.85rem;
