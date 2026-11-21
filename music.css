@@ -1,3 +1,36 @@
+.music-hero {
+  display: grid;
+  gap: 1.5rem;
+  justify-items: start;
+  text-align: left;
+  margin-bottom: 1.2rem;
+  padding: clamp(1.4rem, 4vw, 2.5rem);
+  background: linear-gradient(135deg, rgba(85, 35, 38, 0.92), rgba(8, 13, 26, 0.96));
+}
+.music-hero-art {
+  width: min(100%, 240px);
+  height: auto;
+  border-radius: 14px;
+  box-shadow: 0 18px 36px rgba(0, 0, 0, 0.4);
+}
+.music-hero-copy { display: grid; justify-items: start; gap: 0.8rem; min-width: 0; }
+.music-hero-label {
+  margin: 0;
+  color: #f3c5bf;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.music-hero h1 {
+  max-width: none;
+  text-align: left;
+  font-family: "Archivo", sans-serif;
+  font-size: clamp(2.4rem, 6vw, 4.7rem);
+  letter-spacing: -0.04em;
+  line-height: 1;
+}
+.music-hero .page-intro { max-width: 38rem; color: #e2dce0; }
 .music-library {
   background:
     radial-gradient(circle at top right, rgba(30, 215, 96, 0.13), transparent 45%),
@@ -43,6 +76,7 @@
 .music-admin-list h3 { margin: 0 0 0.5rem; }
 .music-admin-list audio { width: 100%; margin-top: 0.75rem; }
 @media (min-width: 650px) {
+  .music-hero { grid-template-columns: minmax(0, 240px) minmax(0, 1fr); align-items: end; gap: 2rem; }
   .music-card { grid-template-columns: auto minmax(0, 1fr); }
   .music-cover { width: 180px; }
 }

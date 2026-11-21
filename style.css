@@ -31,9 +31,9 @@ body {
   font-family: "Space Grotesk", sans-serif;
   color: var(--text);
   background:
-    radial-gradient(circle at top left, rgba(255, 77, 109, 0.18), transparent 30%),
-    radial-gradient(circle at top right, rgba(30, 215, 96, 0.18), transparent 28%),
-    linear-gradient(180deg, #040611 0%, #070c1d 40%, #02040a 100%);
+    linear-gradient(rgba(16, 16, 16, 0.82), rgba(16, 16, 16, 0.88)),
+    url("Images/apparel/apparel-background.jpg.png") center top / cover no-repeat fixed;
+  background-color: #101010;
 }
 
 body::before {

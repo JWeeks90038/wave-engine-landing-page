@@ -1,6 +1,5 @@
 .apparel-page {
   --accent: #aa4949;
-  background: #101010;
   color: #f5f2ee;
 }
 .apparel-page::before { display: none; }
@@ -10,11 +9,6 @@
 .apparel-page :focus-visible { outline: 2px solid #e4a39c; outline-offset: 3px; }
 .apparel-stage {
   min-width: 0;
-  background-color: #181615;
-  background-image: linear-gradient(rgba(16, 16, 16, .82), rgba(16, 16, 16, .88)), url("Images/apparel/apparel-background.jpg.png");
-  background-position: center top;
-  background-size: cover;
-  background-repeat: no-repeat;
 }
 .apparel-stage > header, .apparel-stage > .collection { padding-left: 1rem; padding-right: 1rem; }
 .apparel-kicker { color: #d28b83; font-size: .73rem; font-weight: 700; letter-spacing: .19em; text-transform: uppercase; }
