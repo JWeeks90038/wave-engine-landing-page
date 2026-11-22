@@ -37,6 +37,11 @@
     var(--surface);
 }
 .music-library-intro { padding-bottom: 1.25rem; border-bottom: 1px solid var(--line); }
+.music-library-intro .eyebrow {
+  padding-inline: 0.5rem;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
 .music-library-intro h2 {
   margin: 0.6rem 0;
   font-family: "Archivo", sans-serif;
@@ -226,6 +231,10 @@
   font: inherit;
   font-size: 0.85rem;
   cursor: pointer;
+}
+.music-player-mute {
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 .music-player-volume { width: min(120px, 100%); }
 .music-player-speed { margin-left: auto; }
