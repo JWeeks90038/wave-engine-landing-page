@@ -55,6 +55,8 @@ response or a file already downloaded cannot be recalled after unpublishing.
 After a song finishes, playback advances to the next playable song in library
 order and stops after the last song. It uses MP3 when available unless the
 listener has already selected another format for that song.
+The player provides play and pause, seeking, volume, mute, and playback-speed
+controls.
 
 ### Paid music downloads
 
