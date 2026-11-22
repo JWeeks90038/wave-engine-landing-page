@@ -2,7 +2,7 @@ const isLocal = location.protocol === "file:" || ["localhost", "127.0.0.1"].incl
 const apiBase = isLocal ? "http://127.0.0.1:8787" : "https://wave-engine-landing-page.vercel.app";
 const status = document.querySelector("#music-status");
 const tracks = document.querySelector("#music-tracks");
-const players = new Set();
+const players = [];
 
 function fileUrl(id, format) {
   const query = new URLSearchParams({ action: "file", id, format });
@@ -38,6 +38,7 @@ function renderTrack(track) {
   const card = document.createElement("article");
   card.className = "music-card";
   if (track.hasCover) {
+    card.className += " has-cover";
     const cover = document.createElement("img");
     cover.src = fileUrl(track.id, "cover");
     cover.alt = `Cover artwork for ${track.title}`;
@@ -53,34 +54,46 @@ function renderTrack(track) {
   const actions = document.createElement("div");
   actions.className = "music-actions";
   if (track.hasMp3 || track.hasWav) {
+    const playerPanel = document.createElement("div");
+    playerPanel.className = "music-player";
+    playerPanel.hidden = true;
     const player = document.createElement("audio");
     player.controls = true;
     player.preload = "none";
     player.hidden = true;
     player.setAttribute("aria-label", `Audio player for ${track.title}`);
     player.addEventListener("play", () => {
-      for (const other of players) if (other !== player) other.pause();
+      for (const other of players) if (other.player !== player) other.player.pause();
     });
     player.addEventListener("error", () => {
       status.textContent = `Unable to play ${track.title}. Please try again later.`;
     });
-    players.add(player);
+    async function playTrack(format) {
+      const url = format
+        ? fileUrl(track.id, format)
+        : player.getAttribute("src") || fileUrl(track.id, track.hasMp3 ? "mp3" : "wav");
+      if (player.getAttribute("src") !== url) {
+        player.pause();
+        player.src = url;
+      }
+      playerPanel.hidden = false;
+      player.hidden = false;
+      try { await player.play(); }
+      catch { status.textContent = `Unable to play ${track.title}. Please select Listen to try again.`; }
+    }
+    const playerIndex = players.length;
+    players.push({ player, playTrack });
+    player.addEventListener("ended", () => {
+      const next = players[playerIndex + 1];
+      if (next) next.playTrack();
+    });
     for (const option of ["mp3", "wav"]) {
       if (!track[option === "mp3" ? "hasMp3" : "hasWav"]) continue;
       const listen = document.createElement("button");
       listen.type = "button";
       listen.className = "cta-button cta-primary";
       listen.textContent = `Listen ${option.toUpperCase()}`;
-      listen.addEventListener("click", async () => {
-        const url = fileUrl(track.id, option);
-        if (player.getAttribute("src") !== url) {
-          player.pause();
-          player.src = url;
-        }
-        player.hidden = false;
-        try { await player.play(); }
-        catch { status.textContent = `Unable to play ${track.title}. Please try again later.`; }
-      });
+      listen.addEventListener("click", () => playTrack(option));
       actions.append(listen);
     }
     const buy = document.createElement("button");
@@ -90,7 +103,8 @@ function renderTrack(track) {
     buy.textContent = `Download ${formats} - $1.49`;
     buy.addEventListener("click", () => purchaseTrack(track.id, buy));
     actions.append(buy);
-    details.append(actions, player);
+    playerPanel.append(text("p", "Wave Engine Studio / Audio Player", "music-player-label"), player);
+    details.append(actions, playerPanel);
   }
   card.append(details);
   return card;

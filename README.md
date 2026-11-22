@@ -52,6 +52,9 @@ Firebase Storage; the API serves published files with byte-range support, so
 playback and downloads do not expose permanent Firebase Storage download URLs.
 The API rechecks publication on every public streaming request. An in-progress
 response or a file already downloaded cannot be recalled after unpublishing.
+After a song finishes, playback advances to the next playable song in library
+order and stops after the last song. It uses MP3 when available unless the
+listener has already selected another format for that song.
 
 ### Paid music downloads
 
