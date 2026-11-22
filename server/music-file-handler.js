@@ -1,6 +1,6 @@
 const { sendJson, setCorsHeaders } = require("./api-utils");
 const music = require("./music-library");
-const { verifyPurchase } = require("./music-payments");
+const { verifyPurchase, EXPIRED_DOWNLOAD_MESSAGE } = require("./music-payments");
 
 function createHandler({ bucket, database, filePath, byteRange, downloadName, verify = verifyPurchase } = music) {
   return async (request, response) => {
@@ -17,6 +17,7 @@ function createHandler({ bucket, database, filePath, byteRange, downloadName, ve
   if (!id || !/^[a-zA-Z0-9_-]{1,128}$/.test(id) || !["mp3", "wav", "cover"].includes(format)) {
     return sendJson(response, 400, { error: "Invalid music file request." });
   }
+  response.setHeader("Cache-Control", "private, no-store");
   try {
     const isDownload = params.get("download") === "1" && format !== "cover";
     if (isDownload) {
@@ -33,7 +34,6 @@ function createHandler({ bucket, database, filePath, byteRange, downloadName, ve
     if (!Number.isSafeInteger(size) || size <= 0) throw new Error("Invalid music file size.");
     const range = byteRange(request.headers.range, size);
     setCorsHeaders(response);
-    response.setHeader("Cache-Control", "private, no-store");
     response.setHeader("Accept-Ranges", "bytes");
     response.setHeader("X-Content-Type-Options", "nosniff");
     if (range === false) {
@@ -60,8 +60,9 @@ function createHandler({ bucket, database, filePath, byteRange, downloadName, ve
   } catch (error) {
     console.error("Music file error:", error.message);
     if (response.headersSent) return response.destroy(error);
-    return sendJson(response, error.statusCode === 403 ? 403 : error.code === 404 ? 404 : 503, {
-      error: error.statusCode === 403 ? "Payment could not be verified." : "The music file could not be loaded."
+    return sendJson(response, error.statusCode === 410 ? 410 : error.statusCode === 403 ? 403 : error.code === 404 ? 404 : 503, {
+      error: error.statusCode === 410 ? EXPIRED_DOWNLOAD_MESSAGE :
+        error.statusCode === 403 ? "Payment could not be verified." : "The music file could not be loaded."
     });
   }
   };

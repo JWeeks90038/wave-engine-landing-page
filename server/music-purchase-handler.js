@@ -1,6 +1,6 @@
 const { sendJson, setCorsHeaders } = require("./api-utils");
 const music = require("./music-library");
-const { verifyPurchase } = require("./music-payments");
+const { verifyPurchase, EXPIRED_DOWNLOAD_MESSAGE } = require("./music-payments");
 
 function createHandler({ database = music.database, filePath = music.filePath, verify = verifyPurchase } = {}) {
   return async (request, response) => {
@@ -23,7 +23,8 @@ function createHandler({ database = music.database, filePath = music.filePath, v
     } catch (error) {
       console.error("Music purchase error:", error.message);
       return sendJson(response, error.statusCode || 503, {
-        error: error.statusCode === 403 ? "Payment could not be verified." : "Your purchase could not be loaded. Please try again later."
+        error: error.statusCode === 410 ? EXPIRED_DOWNLOAD_MESSAGE :
+          error.statusCode === 403 ? "Payment could not be verified." : "Your purchase could not be loaded. Please try again later."
       });
     }
   };

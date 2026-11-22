@@ -40,7 +40,7 @@ function createHandler({ database = music.database, filePath = music.filePath, p
         payment_method_types: ["card"],
         line_items: [{ price: configuredPrice, quantity: 1 }],
         metadata: { type: "music-download-v1", trackId: id, title: track.title, priceId: configuredPrice },
-        custom_text: { submit: { message: `Track: ${track.title}. Personal listening only; commercial use requires a separate license.` } },
+        custom_text: { submit: { message: `Track: ${track.title}. Download links expire 24 hours after payment. Personal listening only; commercial use requires a separate license.` } },
         success_url: successUrl,
         cancel_url: new URL("music", site).href
       });

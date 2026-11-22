@@ -1,4 +1,6 @@
 const Stripe = require("stripe");
+const DOWNLOAD_LINK_LIFETIME_SECONDS = 24 * 60 * 60;
+const EXPIRED_DOWNLOAD_MESSAGE = "This download link has expired. Please contact Wave Engine Studio for help.";
 
 function mode() {
   const value = process.env.MUSIC_STRIPE_MODE || "live";
@@ -68,7 +70,16 @@ async function verifyPurchase(sessionId, stripe = stripeClient(), expectedMode =
       charge.refunded || charge.amount_refunded !== 0 || charge.disputed) {
     throw denied();
   }
+  const now = Math.floor(Date.now() / 1000);
+  if (!Number.isSafeInteger(charge.created) || charge.created <= 0 || charge.created > now) {
+    throw new Error("The verified charge has an invalid creation time.");
+  }
+  if (now >= charge.created + DOWNLOAD_LINK_LIFETIME_SECONDS) {
+    const error = new Error(EXPIRED_DOWNLOAD_MESSAGE);
+    error.statusCode = 410;
+    throw error;
+  }
   return { trackId: session.metadata.trackId, title: session.metadata.title || "Music track" };
 }
 
-module.exports = { mode, stripeClient, priceId, siteUrl, validatePrice, verifyPurchase, denied };
+module.exports = { mode, stripeClient, priceId, siteUrl, validatePrice, verifyPurchase, denied, EXPIRED_DOWNLOAD_MESSAGE };

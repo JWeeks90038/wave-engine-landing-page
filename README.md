@@ -85,12 +85,14 @@ stream without purchasing it.
    payment with Stripe before offering available formats.
 
 The download-page URL is a bearer link: anyone holding it can access the
-purchase, so buyers must keep it private. There is no account or automated
-email delivery or link recovery; help customers manually if they lose the
-page. Links have no fixed expiry, but cannot provide files after an
-administrator deletes them. Buyers should save their files immediately.
-Downloaded files do not expire. Review the draft digital music license and
-refund policy with counsel before enabling sales.
+purchase until it expires, so buyers must keep it private. The purchase page
+and file requests expire 24 hours after Stripe creates the successful charge.
+This applies to existing purchases too. Downloads started before expiry can
+finish, but new or resumed requests after expiry are denied. There is no
+account or automated email delivery or link recovery; help customers manually
+with alternate delivery if necessary. Buyers should save their files
+immediately. Downloaded files do not expire. Review the digital music license
+and refund policy with counsel before enabling sales.
 
 ### Firebase music setup
 

@@ -138,7 +138,10 @@ test("purchase verification rejects unpaid, refunded, disputed and mismatched se
     currency: "usd", amount_subtotal: 149, amount_total: 149,
     metadata: { type: "music-download-v1", trackId: "track1", priceId: "price_123", title: "Test" },
     line_items: { data: [{ quantity: 1, price: { id: "price_123" } }] },
-    payment_intent: { status: "succeeded", latest_charge: { status: "succeeded", refunded: false, amount_refunded: 0, disputed: false } }
+    payment_intent: { status: "succeeded", latest_charge: {
+      status: "succeeded", refunded: false, amount_refunded: 0, disputed: false,
+      created: Math.floor(Date.now() / 1000)
+    } }
   };
   const stripe = { checkout: { sessions: { retrieve: async () => session } } };
   assert.deepEqual(await payments.verifyPurchase("cs_test_123", stripe, "test"), { trackId: "track1", title: "Test" });
@@ -157,6 +160,55 @@ test("purchase verification rejects unpaid, refunded, disputed and mismatched se
   session.line_items.data[0].price.id = "price_other";
   await assert.rejects(() => payments.verifyPurchase("cs_test_123", stripe, "test"), { statusCode: 403 });
   await assert.rejects(() => payments.verifyPurchase("cs_live_123", stripe, "test"), { statusCode: 403 });
+});
+
+test("purchase and file links expire exactly 24 hours after the verified charge", async (t) => {
+  const now = 1800000000;
+  t.mock.method(Date, "now", () => now * 1000);
+  const charge = { status: "succeeded", refunded: false, amount_refunded: 0, disputed: false, created: now - 86399 };
+  const session = {
+    mode: "payment", status: "complete", payment_status: "paid", livemode: false,
+    currency: "usd", amount_subtotal: 149, amount_total: 149,
+    metadata: { type: "music-download-v1", trackId: "track1", priceId: "price_123", title: "Test" },
+    line_items: { data: [{ quantity: 1, price: { id: "price_123" } }] },
+    payment_intent: { status: "succeeded", latest_charge: charge }
+  };
+  const stripe = { checkout: { sessions: { retrieve: async () => session } } };
+  const fake = fakeMusic({ ...track, wavStoragePath: "musicTracks/track1/file/wav.wav" });
+  const verify = (sessionId) => payments.verifyPurchase(sessionId, stripe, "test");
+  const purchase = purchaseHandler({ ...fake.dependencies, verify });
+  const file = fileHandler({ ...fake.dependencies, verify });
+  const sessionId = "cs_test_123";
+  const purchaseUrl = `/api/music?action=purchase&session_id=${sessionId}`;
+  const fileUrl = (format) => `/api/music?action=file&id=track1&format=${format}&download=1&session_id=${sessionId}`;
+
+  assert.equal((await request(purchase, purchaseUrl)).statusCode, 200);
+  assert.equal((await request(file, fileUrl("mp3"))).statusCode, 200);
+  assert.equal((await request(file, fileUrl("wav"), { range: "bytes=0-2" })).statusCode, 206);
+
+  charge.created = now - 86400;
+  const accesses = fake.accesses();
+  for (const response of [
+    await request(purchase, purchaseUrl),
+    await request(file, fileUrl("mp3")),
+    await request(file, fileUrl("wav"), { range: "bytes=0-2" })
+  ]) {
+    assert.equal(response.statusCode, 410);
+    assert.equal(JSON.parse(response.body()).error, payments.EXPIRED_DOWNLOAD_MESSAGE);
+    assert.equal(response.headers["cache-control"], "private, no-store");
+  }
+  assert.equal(fake.accesses(), accesses);
+  assert.equal((await request(file, "/api/music?action=file&id=track1&format=mp3")).statusCode, 200);
+
+  charge.created = undefined;
+  await assert.rejects(() => verify(sessionId), /invalid creation time/);
+  assert.equal((await request(purchase, purchaseUrl)).statusCode, 503);
+  assert.equal((await request(file, fileUrl("mp3"))).statusCode, 503);
+  charge.created = now + 1;
+  await assert.rejects(() => verify(sessionId), /invalid creation time/);
+  charge.created = now - 86401;
+  session.payment_status = "unpaid";
+  await assert.rejects(() => verify(sessionId), { statusCode: 403 });
 });
 
 test("checkout uses one verified $1.49 price and purchase exposes both available formats", async () => {
@@ -186,6 +238,7 @@ test("checkout uses one verified $1.49 price and purchase exposes both available
   assert.equal(created.line_items[0].price, "price_123");
   assert.deepEqual(created.payment_method_types, ["card"]);
   assert.equal(created.metadata.trackId, "track1");
+  assert.match(created.custom_text.submit.message, /expire 24 hours after payment/);
   assert.match(created.success_url, /session_id=\{CHECKOUT_SESSION_ID\}$/);
   const purchase = await request(purchaseHandler(fake.dependencies), "/api/music?action=purchase&session_id=paid");
   assert.deepEqual(JSON.parse(purchase.body()).formats, ["mp3", "wav"]);
