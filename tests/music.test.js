@@ -162,10 +162,10 @@ test("purchase verification rejects unpaid, refunded, disputed and mismatched se
   await assert.rejects(() => payments.verifyPurchase("cs_live_123", stripe, "test"), { statusCode: 403 });
 });
 
-test("purchase and file links expire exactly 24 hours after the verified charge", async (t) => {
+test("purchase and file links expire exactly 10 minutes after the verified charge", async (t) => {
   const now = 1800000000;
   t.mock.method(Date, "now", () => now * 1000);
-  const charge = { status: "succeeded", refunded: false, amount_refunded: 0, disputed: false, created: now - 86399 };
+  const charge = { status: "succeeded", refunded: false, amount_refunded: 0, disputed: false, created: now - 599 };
   const session = {
     mode: "payment", status: "complete", payment_status: "paid", livemode: false,
     currency: "usd", amount_subtotal: 149, amount_total: 149,
@@ -186,7 +186,7 @@ test("purchase and file links expire exactly 24 hours after the verified charge"
   assert.equal((await request(file, fileUrl("mp3"))).statusCode, 200);
   assert.equal((await request(file, fileUrl("wav"), { range: "bytes=0-2" })).statusCode, 206);
 
-  charge.created = now - 86400;
+  charge.created = now - 600;
   const accesses = fake.accesses();
   for (const response of [
     await request(purchase, purchaseUrl),
@@ -206,7 +206,7 @@ test("purchase and file links expire exactly 24 hours after the verified charge"
   assert.equal((await request(file, fileUrl("mp3"))).statusCode, 503);
   charge.created = now + 1;
   await assert.rejects(() => verify(sessionId), /invalid creation time/);
-  charge.created = now - 86401;
+  charge.created = now - 601;
   session.payment_status = "unpaid";
   await assert.rejects(() => verify(sessionId), { statusCode: 403 });
 });
@@ -238,7 +238,7 @@ test("checkout uses one verified $1.49 price and purchase exposes both available
   assert.equal(created.line_items[0].price, "price_123");
   assert.deepEqual(created.payment_method_types, ["card"]);
   assert.equal(created.metadata.trackId, "track1");
-  assert.match(created.custom_text.submit.message, /expire 24 hours after payment/);
+  assert.match(created.custom_text.submit.message, /expire 10 minutes after payment/);
   assert.match(created.success_url, /session_id=\{CHECKOUT_SESSION_ID\}$/);
   const purchase = await request(purchaseHandler(fake.dependencies), "/api/music?action=purchase&session_id=paid");
   assert.deepEqual(JSON.parse(purchase.body()).formats, ["mp3", "wav"]);

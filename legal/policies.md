@@ -193,7 +193,7 @@ If we confirm an error, damage, defect, or a failure to deliver for which we are
 
 **Current scope:** The reviewed site code has streaming links and embedded players, but no direct music-download checkout or download-delivery system. This section applies only if we later offer a direct music download through `[PLACEHOLDER: actual sales/download platform]`. External streaming services are governed by their own terms.
 
-**Delivery:** A digital music order is considered delivered when `[PLACEHOLDER: the purchase confirmation/download link is sent or the platform records access]`. The platform is `[PLACEHOLDER]`; link expiration is `[PLACEHOLDER: state duration or “no scheduled expiration,” only if verified]`. If the link expires or the platform fails, contact us and we will investigate and, when reasonably possible, restore access or provide a replacement file.
+**Delivery:** A digital music order is considered delivered when `[PLACEHOLDER: the purchase confirmation/download link is sent or the platform records access]`. The platform is `[PLACEHOLDER]`; download links expire 10 minutes after payment. If the link expires or the platform fails, contact us and we will investigate and, when reasonably possible, restore access or provide a replacement file.
 
 **Refunds:** After a download link has been accessed or the file downloaded, a change-of-mind refund is generally not available, except as required by law. We will review duplicate charges or duplicate purchases, non-delivery, corrupted or inaccessible files, materially defective downloads, unauthorized transactions, and other legally protected claims. Contact us within `[PLACEHOLDER: support period]` and provide the order number, platform, device/software details, and error message. We may offer a replacement file or restore access; a refund will be provided where required by law or when we approve one. Device/software compatibility is the customer’s responsibility only to the extent the supported format and system requirements were disclosed before purchase.
 
@@ -305,7 +305,7 @@ Contact `[PLACEHOLDER: licensing email or known business email]` for commercial,
 
 ### 5.3 Delivery and technical support
 
-The download is delivered through `[PLACEHOLDER: provider and process]` when `[PLACEHOLDER: delivery event]`. A link expires after `[PLACEHOLDER: duration or “does not expire,” only if verified]`. Supported file formats and minimum system requirements: `[PLACEHOLDER]`.
+The download is delivered through `[PLACEHOLDER: provider and process]` when `[PLACEHOLDER: delivery event]`. Download links expire 10 minutes after payment. Supported file formats and minimum system requirements: `[PLACEHOLDER]`.
 
 If a link fails, a file is corrupt, or the download is inaccessible, contact [waveenginestudio@gmail.com](mailto:waveenginestudio@gmail.com) with the order number, file/platform, device/software, and error details. We will investigate and, where reasonably possible, restore access or provide a working replacement. If a platform fails, we will use a reasonable alternate delivery method where available or provide a refund where required by law.
 

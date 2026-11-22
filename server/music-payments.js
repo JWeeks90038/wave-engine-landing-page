@@ -1,5 +1,5 @@
 const Stripe = require("stripe");
-const DOWNLOAD_LINK_LIFETIME_SECONDS = 24 * 60 * 60;
+const DOWNLOAD_LINK_LIFETIME_SECONDS = 10 * 60;
 const EXPIRED_DOWNLOAD_MESSAGE = "This download link has expired. Please contact Wave Engine Studio for help.";
 
 function mode() {

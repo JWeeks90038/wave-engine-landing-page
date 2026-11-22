@@ -86,7 +86,7 @@ stream without purchasing it.
 
 The download-page URL is a bearer link: anyone holding it can access the
 purchase until it expires, so buyers must keep it private. The purchase page
-and file requests expire 24 hours after Stripe creates the successful charge.
+and file requests expire 10 minutes after Stripe creates the successful charge.
 This applies to existing purchases too. Downloads started before expiry can
 finish, but new or resumed requests after expiry are denied. There is no
 account or automated email delivery or link recovery; help customers manually
