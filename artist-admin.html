@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>Artist Review | Wave Engine Music</title>
+    <link rel="icon" type="image/jpeg" href="Images/we_favicon.jpg" />
+    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="music.css" />
+    <script type="module" src="artist-admin.js"></script>
+  </head>
+  <body>
+    <div class="page-shell">
+      <nav class="topbar site-nav" aria-label="Primary">
+        <a class="brand-link" href="./">Wave Engine Music</a>
+        <a href="music-admin">Music administration</a>
+      </nav>
+      <main class="content-section">
+        <p class="eyebrow">Administrator</p>
+        <h1>Artist applications</h1>
+        <p id="artist-admin-status" role="status" aria-live="polite">Loading authentication...</p>
+        <form id="artist-admin-login" class="music-admin-form" hidden>
+          <label>Email <input type="email" name="email" autocomplete="username" required /></label>
+          <label>Password <input type="password" name="password" autocomplete="current-password" required /></label>
+          <button class="cta-button cta-primary" type="submit">Sign in</button>
+        </form>
+        <section id="artist-admin-content" hidden>
+          <div class="music-actions">
+            <button id="artist-admin-refresh" class="cta-button" type="button">Refresh</button>
+            <button id="artist-admin-logout" class="cta-button" type="button">Sign out</button>
+          </div>
+          <div id="artist-applications" class="music-admin-list"></div>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>

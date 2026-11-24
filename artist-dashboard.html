@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>Artist Studio | Wave Engine Music</title>
+    <meta name="theme-color" content="#050816" />
+    <link rel="icon" type="image/jpeg" href="Images/we_favicon.jpg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;900&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="music.css" />
+    <script type="module" src="artist-dashboard.js"></script>
+  </head>
+  <body>
+    <div class="page-shell">
+      <nav class="topbar site-nav" aria-label="Primary">
+        <a class="brand-link" href="./">Wave Engine Music</a>
+        <div class="nav-links">
+          <a href="music">Music</a>
+          <a href="artist-dashboard">Artist Studio</a>
+        </div>
+      </nav>
+      <main class="content-section artist-dashboard">
+        <p class="eyebrow">Creator tools</p>
+        <h1>Artist Studio</h1>
+        <p id="artist-status" role="status" aria-live="polite">Loading artist tools...</p>
+
+        <section id="artist-auth" class="artist-panel" hidden>
+          <div class="artist-auth-toggle">
+            <button id="show-signin" class="cta-button cta-primary" type="button">Sign in</button>
+            <button id="show-signup" class="cta-button" type="button">Create artist account</button>
+          </div>
+          <form id="artist-signin" class="music-admin-form">
+            <h2>Welcome back</h2>
+            <label>Email <input name="email" type="email" autocomplete="username" required /></label>
+            <label>Password <input name="password" type="password" autocomplete="current-password" required /></label>
+            <button class="cta-button cta-primary" type="submit">Sign in</button>
+          </form>
+          <form id="artist-signup" class="music-admin-form" hidden>
+            <h2>Start your artist account</h2>
+            <p>Verify your email before creating an artist profile. Your profile remains private until reviewed.</p>
+            <label>Email <input name="email" type="email" autocomplete="email" required /></label>
+            <label>Password <input name="password" type="password" autocomplete="new-password" minlength="8" required /></label>
+            <button class="cta-button cta-primary" type="submit">Create account</button>
+          </form>
+        </section>
+
+        <section id="artist-account" class="artist-panel" hidden>
+          <div class="artist-account-bar">
+            <p id="artist-email"></p>
+            <div class="music-actions">
+              <button id="artist-verify" class="cta-button" type="button" hidden>I've verified my email</button>
+              <button id="artist-signout" class="cta-button" type="button">Sign out</button>
+            </div>
+          </div>
+
+          <section id="artist-profile-section" hidden>
+            <h2 id="artist-profile-title">Artist profile</h2>
+            <p id="artist-profile-notice" class="artist-notice"></p>
+            <form id="artist-profile-form" class="music-admin-form">
+              <label>Artist or project name <input name="artistName" maxlength="100" required /></label>
+              <label>Artist URL <input name="slug" minlength="3" maxlength="30" pattern="[a-zA-Z0-9-]+" autocomplete="off" required /></label>
+              <label>Biography <textarea name="biography" maxlength="2000" rows="5"></textarea></label>
+              <label>Website <input name="website" type="url" placeholder="https://" /></label>
+              <label>Instagram <input name="instagram" type="url" placeholder="https://" /></label>
+              <label>YouTube <input name="youtube" type="url" placeholder="https://" /></label>
+              <label>TikTok <input name="tiktok" type="url" placeholder="https://" /></label>
+              <label>Profile image (PNG, JPEG or WebP; up to 10 MiB)
+                <input name="avatar" type="file" accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp" />
+              </label>
+              <label>Banner image (PNG, JPEG or WebP; up to 10 MiB)
+                <input name="banner" type="file" accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp" />
+              </label>
+              <button class="cta-button cta-primary" type="submit">Save artist profile</button>
+            </form>
+            <p id="artist-profile-link" class="artist-profile-link"></p>
+          </section>
+
+          <section id="artist-releases-section" hidden>
+            <h2>Your music drafts</h2>
+            <p>Drafts and uploads are private. Publishing, streaming, and sales remain disabled until rights and release review are completed.</p>
+            <form id="artist-release-form" class="music-admin-form">
+              <h3 id="artist-release-title">New single draft</h3>
+              <label>Track title <input name="title" maxlength="160" required /></label>
+              <label>Description <textarea name="description" maxlength="2000" rows="3"></textarea></label>
+              <label>Genre <input name="genre" maxlength="80" /></label>
+              <label>Moods (up to five)
+                <select name="moods" multiple size="6">
+                  <option value="adventurous">Adventurous</option>
+                  <option value="cinematic">Cinematic</option>
+                  <option value="emotional">Emotional</option>
+                  <option value="energized">Energized</option>
+                  <option value="focused">Focused</option>
+                  <option value="inspired">Inspired</option>
+                  <option value="motivated">Motivated</option>
+                  <option value="nostalgic">Nostalgic</option>
+                  <option value="peaceful">Peaceful</option>
+                  <option value="relaxed">Relaxed</option>
+                  <option value="romantic">Romantic</option>
+                </select>
+              </label>
+              <label>Audio (MP3 or WAV; up to 100 MiB)
+                <input name="audio" type="file" accept=".mp3,.wav,audio/mpeg,audio/wav,audio/x-wav" />
+              </label>
+              <label>Cover artwork (PNG, JPEG or WebP; up to 10 MiB)
+                <input name="cover" type="file" accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp" />
+              </label>
+              <div class="music-actions">
+                <button class="cta-button cta-primary" type="submit">Save private draft</button>
+                <button id="artist-release-cancel" class="cta-button" type="button" hidden>Cancel edit</button>
+              </div>
+            </form>
+            <div id="artist-releases" class="music-admin-list"></div>
+          </section>
+        </section>
+      </main>
+      <footer class="footer">
+        <p class="footer-tagline">Independent creativity. Innovative production. Music without boundaries.</p>
+        <p class="footer-copy">&copy; 2026 Wave Engine Music. All rights reserved.</p>
+      </footer>
+    </div>
+  </body>
+</html>

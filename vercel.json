@@ -1,6 +1,12 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "cleanUrls": true,
+  "rewrites": [
+    {
+      "source": "/artist/:slug",
+      "destination": "/artist.html?slug=:slug"
+    }
+  ],
   "redirects": [
     {
       "source": "/index.html",

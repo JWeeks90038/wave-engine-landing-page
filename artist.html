@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Independent Artist | Wave Engine Music</title>
+    <meta name="description" content="Discover independent artists on Wave Engine Music." />
+    <meta property="og:type" content="profile" />
+    <meta property="og:title" content="Independent Artist | Wave Engine Music" />
+    <meta property="og:description" content="Discover independent artists on Wave Engine Music." />
+    <meta property="og:image" content="https://waveenginemusic.com/Images/wave-engine-social-card-4k-v1.png" />
+    <meta name="theme-color" content="#050816" />
+    <link rel="icon" type="image/jpeg" href="../Images/we_favicon.jpg" />
+    <link rel="stylesheet" href="../style.css" />
+    <link rel="stylesheet" href="../music.css" />
+    <script type="module" src="../artist.js"></script>
+  </head>
+  <body>
+    <div class="page-shell">
+      <nav class="topbar site-nav" aria-label="Primary">
+        <a class="brand-link" href="/">Wave Engine Music</a>
+        <div class="nav-links">
+          <a href="/music">Music</a>
+          <a href="/artist-dashboard">Become an Artist</a>
+        </div>
+      </nav>
+      <main class="content-section artist-storefront">
+        <p id="storefront-status" role="status" aria-live="polite">Loading artist profile...</p>
+        <section id="storefront-profile" hidden>
+          <div id="storefront-banner" class="artist-banner"></div>
+          <div class="artist-storefront-header">
+            <img id="storefront-avatar" class="artist-avatar" alt="" hidden />
+            <div>
+              <p class="eyebrow">Independent artist</p>
+              <h1 id="storefront-name"></h1>
+              <p id="storefront-bio"></p>
+              <div id="storefront-socials" class="artist-socials"></div>
+            </div>
+          </div>
+          <section class="artist-releases-public">
+            <h2>Music</h2>
+            <p>Approved releases will appear here. This artist profile is not a music rights or streaming license.</p>
+          </section>
+        </section>
+      </main>
+      <footer class="footer">
+        <p class="footer-tagline">The future of independent music.</p>
+        <p class="footer-copy">&copy; 2026 Wave Engine Music. All rights reserved.</p>
+      </footer>
+    </div>
+  </body>
+</html>
