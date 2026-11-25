@@ -99,11 +99,60 @@ and refund policy with counsel before enabling sales.
 The initial artist workflow adds email-verified account registration, one artist
 profile per Firebase user, unique artist slugs, private profile/release uploads,
 single-track drafts, and an administrator approval screen. Approved profiles are
-available at `/artist/{slug}`. Draft audio and artwork are not public, and this
-phase does not publish music, enable third-party streaming, or accept artist
-sales. Existing `musicTracks` records and Stripe checkout are unchanged.
+available at `/artist/{slug}` and appear on the music page. Artists with approved
+profiles can confirm their rights and submit a saved track for review. Only
+tracks approved by an administrator can be streamed publicly; draft and
+submitted tracks remain private. Artist sales are disabled until configured. Existing
+`musicTracks` records and Stripe checkout are unchanged.
+On the music page, selecting or hovering over an artist's circle displays their
+approved tracks and a profile link; selecting another artist stops the previous
+artist's playback.
 Artists can search and select one optional genre for each draft; existing custom
 genre and mood data is retained when an older draft is edited.
+
+#### Artist downloads and Stripe Connect
+
+Artists may set an optional USD download price from $0.50 to $100.00 on a
+draft and confirm the rights to sell downloads when submitting it for review.
+The artist must complete Stripe Standard account onboarding; checkout verifies
+that charges and payouts are enabled and Stripe's fee payer is the connected
+account. Stripe processes direct card charges on that account. The application
+fee is 10% of the listed price, rounded to the nearest cent; Stripe deducts
+processing fees from the artist. Payout timing and requirements are managed by
+Stripe. Downloads deliver the one MP3 or WAV uploaded for the approved track.
+Price changes require withdrawing the track and submitting it for review again.
+
+Artist checkout uses `MUSIC_STRIPE_MODE`, `ARTIST_STRIPE_SECRET_KEY`, and
+`MUSIC_SITE_URL` described above. Register and configure Connect with Stripe,
+ensure the key can create and retrieve connected accounts, account links,
+Checkout Sessions and PaymentIntents on connected accounts, and enable the
+requested mode in a separate environment. `ARTIST_SALES_ENABLED=true` enables
+onboarding and checkout; leave it unset until the entire flow has been tested
+and reviewed. Production requires `MUSIC_STRIPE_MODE=live` and the matching live
+artist key. Store the artist key only as a server-side secret, never in the
+repository or browser. The existing `STRIPE_SECRET_KEY` for apparel and Wave
+Engine downloads is unchanged. Never use live credentials in a staging
+environment.
+
+Before enabling live sales, use a separate Stripe test-mode and Firebase staging
+environment to test onboarding, incomplete verification, successful and declined
+payments, actual fees and payouts, downloads, expiration, refunds, disputes,
+unpublishing and support recovery. Confirm Stripe account eligibility, sales
+tax, seller terms, licensing, refund responsibilities and dispute procedures
+with appropriate advisers. Stripe Standard's account settings must charge
+processing fees to the connected artist; checkout fails closed otherwise.
+Support must handle refunds in the artist's connected Stripe account and
+application-fee refunds separately where appropriate. There is no automated
+receipt-based file delivery or refund workflow.
+
+Purchases use a private, server-side Firestore record and a bearer return link;
+payment is verified with the artist's connected Stripe account. Links expire
+10 minutes after the charge. If the track is unpublished or its approved audio
+is removed or replaced, downloads stop and support must resolve the purchase.
+An already-open checkout can still complete after a track is withdrawn, so
+support may need to refund or manually resolve it. The audio stream is not DRM.
+Anonymous checkout creates Stripe sessions and Firestore records; implement
+appropriate abuse monitoring and retention policies before launch.
 
 The artist APIs use the existing Firebase Admin credentials and Firestore
 project. The browser uploads directly to Firebase Storage; the
@@ -117,6 +166,20 @@ Public profile images are streamed by `/api/artist-media` only after profile app
 `artistUploads` match block in `music-storage.rules` into your currently
 deployed Storage rules; do not replace the deployed rules wholesale. Test the
 merged rules against a separate Firebase staging project before deployment.
+
+Administrators can listen to submitted audio on `/artist-admin`, approve it for
+streaming, or return it to draft. Both the artist and an administrator can
+remove a published track from streaming. A submitted track is locked against
+editing until it is withdrawn or returned to draft. Review and streaming use
+the exact Storage object generation captured on submission, so replacing an
+object does not silently substitute different audio. Deleting that generation
+will make the track unavailable. Unpublishing blocks new requests, but cannot
+recall an in-progress stream or audio already saved by a listener.
+
+Streaming serves the audio to listeners and does not provide DRM. A rights
+confirmation is not legal review or proof of ownership. Establish a takedown
+process, review the applicable licenses and policies with counsel, and test
+Firebase/Vercel costs and large-file delivery before promoting public uploads.
 
 The artist dashboard requires Firebase email/password authentication and a
 verified email. Enable the email/password provider and add the staging host to

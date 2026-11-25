@@ -16,6 +16,7 @@
     <link rel="stylesheet" href="../style.css" />
     <link rel="stylesheet" href="../music.css" />
     <script type="module" src="../artist.js"></script>
+    <script type="module" src="../artist-listen.js"></script>
   </head>
   <body>
     <div class="page-shell">
@@ -41,7 +42,8 @@
           </div>
           <section class="artist-releases-public">
             <h2>Music</h2>
-            <p>Approved releases will appear here. This artist profile is not a music rights or streaming license.</p>
+            <p id="artist-discovery-status" role="status" aria-live="polite">Loading tracks...</p>
+            <div id="artist-discovery-list" class="artist-profile-tracks"></div>
           </section>
         </section>
       </main>

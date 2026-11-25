@@ -81,11 +81,18 @@
 
           <section id="artist-releases-section" hidden>
             <h2>Your music drafts</h2>
-            <p>Drafts and uploads are private. Publishing, streaming, and sales remain disabled until rights and release review are completed.</p>
+            <p>Drafts remain private until approved. Streaming is free; optional downloads use your price. Wave Engine receives 10%, and Stripe charges you processing fees.</p>
+            <div class="music-actions">
+              <button id="artist-connect" class="cta-button" type="button">Set up Stripe payouts</button>
+              <button id="artist-connect-status" class="cta-button" type="button">Check payout status</button>
+            </div>
             <form id="artist-release-form" class="music-admin-form">
               <h3 id="artist-release-title">New single draft</h3>
               <label>Track title <input name="title" maxlength="160" required /></label>
               <label>Description <textarea name="description" maxlength="2000" rows="3"></textarea></label>
+              <label>Download price in USD (optional; $0.50–$100.00)
+                <input name="downloadPrice" type="number" min="0.50" max="100.00" step="0.01" placeholder="Leave blank for streaming only" />
+              </label>
               <label>Search genres
                 <input id="artist-genre-search" type="search" autocomplete="off" placeholder="Search by genre" aria-controls="artist-genre" aria-describedby="artist-genre-search-status" />
               </label>

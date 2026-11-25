@@ -128,6 +128,10 @@ function validateReleaseInput(uid, releaseId, body) {
       body.moods.some((mood) => typeof mood !== "string" || !MOODS.has(mood))) {
     throw statusError("Choose up to five supported moods.", 400);
   }
+  if (body.downloadPriceCents !== undefined && body.downloadPriceCents !== null &&
+      (!Number.isSafeInteger(body.downloadPriceCents) || body.downloadPriceCents < 50 || body.downloadPriceCents > 10000)) {
+    throw statusError("Download prices must be between $0.50 and $100.00.", 400);
+  }
   const uploadPrefix = `^artistUploads/${escapeRegExp(uid)}/${escapeRegExp(releaseId)}-${UUID_PATTERN}/`;
   const audioPath = body.audioPath || "";
   const coverPath = body.coverPath || "";
@@ -145,6 +149,7 @@ function validateReleaseInput(uid, releaseId, body) {
     genre: body.genre.trim(),
     releaseType: body.releaseType,
     moods: [...new Set(body.moods)],
+    downloadPriceCents: body.downloadPriceCents === undefined ? null : body.downloadPriceCents,
     audioPath,
     coverPath
   };

@@ -139,7 +139,7 @@ function renderProfile(profile) {
   document.querySelector("#artist-profile-notice").textContent = blocked
     ? "This profile is not active. Contact Wave Engine support for assistance."
     : profile.status === "approved"
-      ? "Your profile is approved. Draft releases remain private and cannot be streamed or sold yet."
+      ? "Your profile is approved. Submit saved tracks for review before they can be streamed."
       : "Your profile is private while it awaits administrator review.";
   profileForm.elements.artistName.value = profile.artistName;
   profileForm.elements.slug.value = profile.slug;
@@ -176,18 +176,74 @@ async function loadReleases() {
     const heading = document.createElement("h3");
     heading.textContent = release.title;
     const details = document.createElement("p");
-    details.textContent = `${release.genre || "Genre not set"} · Private draft`;
+    const labels = { draft: "Private draft", submitted: "Awaiting review", published: "Public streaming" };
+    details.textContent = `${release.genre || "Genre not set"} · ${labels[release.status] || "Unknown status"}`;
     const files = document.createElement("p");
     files.textContent = [
       release.audioPath ? "Audio uploaded" : "Audio not uploaded",
       release.coverPath ? "Artwork uploaded" : "Artwork not uploaded"
     ].join(" · ");
-    const edit = document.createElement("button");
-    edit.type = "button";
-    edit.className = "cta-button";
-    edit.textContent = "Edit draft";
-    edit.addEventListener("click", () => editDraft(release));
-    card.append(heading, details, files, edit);
+    card.append(heading, details, files);
+    if (release.downloadPriceCents != null) {
+      const price = document.createElement("p");
+      price.textContent = `Download price: $${(release.downloadPriceCents / 100).toFixed(2)}`;
+      card.append(price);
+    }
+    if (release.status === "draft") {
+      const edit = document.createElement("button");
+      edit.type = "button";
+      edit.className = "cta-button";
+      edit.textContent = "Edit draft";
+      edit.addEventListener("click", () => editDraft(release));
+      card.append(edit);
+      if (currentProfile.status === "approved" && release.audioPath) {
+        const label = document.createElement("label");
+        label.className = "artist-rights-confirmation";
+        const confirmation = document.createElement("input");
+        confirmation.type = "checkbox";
+        const text = document.createElement("span");
+        text.textContent = release.downloadPriceCents == null
+          ? "I confirm I have the rights to upload and publicly stream this track and authorize Wave Engine to host and stream it."
+          : "I confirm I have the rights to upload, stream, and sell downloads of this track and authorize Wave Engine to host and deliver it.";
+        label.append(confirmation, text);
+        const submit = document.createElement("button");
+        submit.type = "button";
+        submit.className = "cta-button cta-primary";
+        submit.textContent = "Submit saved track for review";
+        submit.addEventListener("click", async () => {
+          if (busy) return;
+          if (!confirmation.checked) return show("Confirm your rights before submitting this track.");
+          setBusy(true);
+          try {
+            await apiRequest("/api/artist-releases", {
+              method: "POST", body: { action: "submit", id: release.id, rightsConfirmed: true,
+                salesRightsConfirmed: release.downloadPriceCents != null }
+            });
+            if (editingRelease && editingRelease.id === release.id) resetReleaseForm();
+            await loadReleases();
+            show("Track submitted for review. It remains private until approved.");
+          } catch (error) { show(error.message); }
+          finally { setBusy(false); }
+        });
+        card.append(label, submit);
+      }
+    } else if (["submitted", "published"].includes(release.status)) {
+      const withdraw = document.createElement("button");
+      withdraw.type = "button";
+      withdraw.className = "cta-button";
+      withdraw.textContent = release.status === "published" ? "Remove from public streaming" : "Withdraw submission";
+      withdraw.addEventListener("click", async () => {
+        if (busy) return;
+        setBusy(true);
+        try {
+          await apiRequest("/api/artist-releases", { method: "POST", body: { action: "withdraw", id: release.id } });
+          await loadReleases();
+          show("Track returned to a private draft.");
+        } catch (error) { show(error.message); }
+        finally { setBusy(false); }
+      });
+      card.append(withdraw);
+    }
     releasesList.append(card);
   }
   if (!data.releases.length) releasesList.textContent = "No drafts yet.";
@@ -219,6 +275,7 @@ function editDraft(release) {
   editingRelease = release;
   releaseForm.elements.title.value = release.title || "";
   releaseForm.elements.description.value = release.description || "";
+  releaseForm.elements.downloadPrice.value = release.downloadPriceCents == null ? "" : (release.downloadPriceCents / 100).toFixed(2);
   const genreSelect = releaseForm.elements.genre;
   const oldGenre = genreSelect.querySelector("option[data-legacy-genre]");
   if (oldGenre) oldGenre.remove();
@@ -266,7 +323,7 @@ async function initializeAccount(user) {
   }
   try {
     await loadProfile();
-    show("Artist Studio is ready. Draft music is private and not available for streaming or sale.");
+    show("Artist Studio is ready. Drafts are private until approved for streaming.");
   } catch (error) {
     if (/No artist profile is registered/.test(error.message)) {
       currentProfile = null;
@@ -387,6 +444,12 @@ releaseForm.addEventListener("submit", async (event) => {
     const title = releaseForm.elements.title.value.trim();
     const description = releaseForm.elements.description.value.trim();
     const genre = releaseForm.elements.genre.value.trim();
+    const rawPrice = releaseForm.elements.downloadPrice.value.trim();
+    if (rawPrice && !/^\d+(?:\.\d{1,2})?$/.test(rawPrice)) throw new Error("Enter a valid download price.");
+    const downloadPriceCents = rawPrice ? Math.round(Number(rawPrice) * 100) : null;
+    if (downloadPriceCents !== null && (downloadPriceCents < 50 || downloadPriceCents > 10000)) {
+      throw new Error("Download prices must be between $0.50 and $100.00.");
+    }
     const moods = editingRelease ? editingRelease.moods || [] : [];
     const audio = releaseForm.elements.audio.files[0];
     const cover = releaseForm.elements.cover.files[0];
@@ -397,7 +460,7 @@ releaseForm.addEventListener("submit", async (event) => {
     if (!release) {
       const created = await apiRequest("/api/artist-releases", {
         method: "POST",
-        body: { action: "create", title, description, genre, moods, releaseType: "single", audioPath: "", coverPath: "" }
+        body: { action: "create", title, description, genre, downloadPriceCents, moods, releaseType: "single", audioPath: "", coverPath: "" }
       });
       release = created.release;
     }
@@ -414,7 +477,7 @@ releaseForm.addEventListener("submit", async (event) => {
     }
     const saved = await apiRequest("/api/artist-releases", {
       method: "POST",
-      body: { action: "update", id: release.id, title, description, genre, moods, releaseType: "single", audioPath, coverPath }
+      body: { action: "update", id: release.id, title, description, genre, downloadPriceCents, moods, releaseType: "single", audioPath, coverPath }
     });
     isSaved = true;
     const oldPaths = [
@@ -436,6 +499,28 @@ releaseForm.addEventListener("submit", async (event) => {
   }
 });
 document.querySelector("#artist-release-cancel").addEventListener("click", resetReleaseForm);
+document.querySelector("#artist-connect").addEventListener("click", async () => {
+  if (busy) return;
+  setBusy(true);
+  try {
+    const data = await apiRequest("/api/artist-releases?action=connect", { method: "POST" });
+    location.assign(data.url);
+  } catch (error) {
+    show(error.message);
+    setBusy(false);
+  }
+});
+document.querySelector("#artist-connect-status").addEventListener("click", async () => {
+  if (busy) return;
+  setBusy(true);
+  try {
+    const data = await apiRequest("/api/artist-releases?action=connect");
+    show(data.ready ? "Stripe is ready to accept payments and make payouts." :
+      data.connected ? "Stripe onboarding or verification is incomplete. Continue setup to see requirements." :
+        "Set up Stripe payouts before selling downloads.");
+  } catch (error) { show(error.message); }
+  finally { setBusy(false); }
+});
 
 try {
   const [app, configResponse] = await Promise.all([

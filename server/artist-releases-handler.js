@@ -1,5 +1,6 @@
 const { readJsonBody, sendJson, setCorsHeaders } = require("./api-utils");
 const marketplace = require("./artist-marketplace");
+const { publicArtists, streamRelease, validId } = require("./artist-streaming");
 
 function createHandler({
   database = marketplace.database,
@@ -9,6 +10,7 @@ function createHandler({
   return async (request, response) => {
     if (request.method === "OPTIONS") {
       setCorsHeaders(response);
+      response.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, Range");
       response.writeHead(204);
       return response.end();
     }
@@ -18,6 +20,15 @@ function createHandler({
     response.setHeader("Cache-Control", "private, no-store");
 
     try {
+      const action = new URL(request.url, "http://localhost").searchParams.get("action");
+      if (request.method === "GET" && action === "public") {
+        return sendJson(response, 200, { artists: await publicArtists(database()) });
+      }
+      if (request.method === "GET" && (action === "stream" || action === "review")) {
+        return await streamRelease(request, response, {
+          db: database(), bucket, authenticate, review: action === "review"
+        });
+      }
       const user = await authenticate(request);
       const db = database();
       const artistRef = db.collection("artists").doc(user.uid);
@@ -38,6 +49,59 @@ function createHandler({
       }
 
       const body = await readJsonBody(request);
+      if (body.action === "submit" || body.action === "withdraw") {
+        if (!validId(body.id)) return sendJson(response, 400, { error: "Invalid draft identifier." });
+        const releaseRef = db.collection("artistReleases").doc(body.id);
+        if (body.action === "submit") {
+          if (body.rightsConfirmed !== true) {
+            return sendJson(response, 400, { error: "Confirm your rights to upload and publicly stream this track." });
+          }
+          const draft = await releaseRef.get();
+          const release = draft.exists && draft.data();
+          if (!release || release.artistUid !== user.uid) return sendJson(response, 404, { error: "Draft not found." });
+          if (release.status !== "draft" || artistSnapshot.data().status !== "approved") {
+            return sendJson(response, 409, { error: "Only drafts from approved artists can be submitted." });
+          }
+          marketplace.validateReleaseInput(user.uid, body.id, release);
+          if (release.downloadPriceCents != null && body.salesRightsConfirmed !== true) {
+            return sendJson(response, 400, { error: "Confirm your rights to sell downloads of this track." });
+          }
+          if (!release.audioPath) return sendJson(response, 400, { error: "Upload audio before submitting this track." });
+          const generation = await verifyAudio(bucket, release.audioPath);
+          await db.runTransaction(async (transaction) => {
+            const current = await transaction.get(releaseRef);
+            const artist = await transaction.get(artistRef);
+            if (!current.exists || current.data().artistUid !== user.uid ||
+                current.data().status !== "draft" || current.data().audioPath !== release.audioPath ||
+                current.data().downloadPriceCents !== release.downloadPriceCents ||
+                !artist.exists || artist.data().status !== "approved") {
+              throw marketplace.statusError("The draft or artist status changed. Refresh and try again.", 409);
+            }
+            transaction.update(releaseRef, {
+              status: "submitted", rightsConfirmed: true,
+              salesRightsConfirmed: release.downloadPriceCents != null && body.salesRightsConfirmed === true,
+              audioGeneration: generation,
+              submittedAt: marketplace.FieldValue.serverTimestamp(),
+              updatedAt: marketplace.FieldValue.serverTimestamp()
+            });
+          });
+          return sendJson(response, 200, { status: "submitted" });
+        }
+        await db.runTransaction(async (transaction) => {
+          const current = await transaction.get(releaseRef);
+          if (!current.exists || current.data().artistUid !== user.uid) {
+            throw marketplace.statusError("Track not found.", 404);
+          }
+          if (!["submitted", "published"].includes(current.data().status)) {
+            throw marketplace.statusError("This track is not submitted or published.", 409);
+          }
+          transaction.update(releaseRef, {
+            status: "draft", rightsConfirmed: false, salesRightsConfirmed: false,
+            updatedAt: marketplace.FieldValue.serverTimestamp()
+          });
+        });
+        return sendJson(response, 200, { status: "draft" });
+      }
       if (body.action !== "create" && body.action !== "update") {
         return sendJson(response, 400, { error: "Choose a valid draft action." });
       }
@@ -75,8 +139,13 @@ function createHandler({
       });
       return sendJson(response, 200, { release: { id: releaseRef.id, ...fields, status: "draft" } });
     } catch (error) {
+      if (response.headersSent) return response.destroy(error);
       if (error instanceof SyntaxError) return sendJson(response, 400, { error: "The request payload was invalid JSON." });
       console.error("Artist draft error:", error.message);
+      const requestAction = new URL(request.url, "http://localhost").searchParams.get("action");
+      if ((requestAction === "stream" || requestAction === "review") && (error.code === 404 || error.code === "404")) {
+        return sendJson(response, 404, { error: "Artist track not found." });
+      }
       return sendJson(response, error.statusCode || (error.code === 404 ? 400 : 503), {
         error: error.statusCode ? error.message :
           error.code === 404 ? "An uploaded file could not be found." : "The artist draft could not be saved."
@@ -98,6 +167,10 @@ async function verifyAudio(bucketFactory, path) {
   if (!spec || !validContentType || Number(metadata.size) <= 0 || Number(metadata.size) > spec[1]) {
     throw marketplace.statusError("The uploaded audio file is invalid.", 400);
   }
+  if (typeof metadata.generation !== "string" || !/^\d+$/.test(metadata.generation)) {
+    throw new Error("The audio file generation is unavailable.");
+  }
+  return metadata.generation;
 }
 
 async function verifyCover(bucketFactory, path) {

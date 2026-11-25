@@ -46,6 +46,7 @@
     <link rel="stylesheet" href="style.css" />
     <link rel="stylesheet" href="music.css" />
     <script type="module" src="music.js"></script>
+    <script type="module" src="artist-listen.js"></script>
   </head>
   <body>
     <div class="page-shell">
@@ -75,12 +76,23 @@
       </header>
 
       <main class="page-main">
-        <section id="music-library" class="content-section music-library" aria-labelledby="library-title">
-          <div class="music-library-intro">
-            <p class="eyebrow">Listen free &bull; Download $1.49/track</p>
-            <h2 id="library-title">Digital Music Library</h2>
-            <p>Listen online for free. Purchase a track to download its available WAV files for personal listening. Commercial use requires a separate license.</p>
+        <section class="content-section music-library-intro" aria-labelledby="library-title">
+          <p class="eyebrow">Listen free &bull; Wave Engine downloads $1.49/track</p>
+          <h2 id="library-title">Digital Music Library</h2>
+          <p>Browse artists and play music for free. Purchase available Wave Engine MP3 and WAV files for personal listening. Commercial use requires a separate license.</p>
+        </section>
+        <section class="content-section artist-discovery" aria-labelledby="artist-discovery-title">
+          <div class="section-copy">
+            <p class="eyebrow">Discover independent music</p>
+            <h2 id="artist-discovery-title">Browse artists</h2>
+            <p>Scroll to browse, then hover over or select an artist to listen and explore their profile.</p>
           </div>
+          <p id="artist-discovery-status" role="status" aria-live="polite">Loading artists...</p>
+          <div id="artist-discovery-list" class="artist-bubbles"></div>
+          <div id="artist-discovery-selection" class="artist-selection" hidden></div>
+        </section>
+        <section id="music-library" class="content-section music-library" aria-labelledby="wave-library-title">
+          <h2 id="wave-library-title">Wave Engine music</h2>
           <p id="music-status" role="status" aria-live="polite">Loading the music library...</p>
           <div id="music-tracks" class="music-tracks"></div>
           <noscript>JavaScript is required to load the music library.</noscript>

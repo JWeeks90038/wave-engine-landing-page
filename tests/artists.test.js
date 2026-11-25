@@ -8,6 +8,7 @@ const { createHandler: profileHandler } = require("../server/artist-profile-hand
 const { createHandler: releaseHandler } = require("../server/artist-releases-handler");
 const { createHandler: adminHandler } = require("../server/artist-admin-handler");
 const { createHandler: mediaHandler } = require("../server/artist-media-handler");
+const { createHandler: paymentsHandler, artistStripeClient } = require("../server/artist-payments");
 const marketplace = require("../server/artist-marketplace");
 
 class Response extends Writable {
@@ -87,11 +88,11 @@ class FakeDocument {
   }
 }
 
-function request(handler, method, url, body, authorization = "Bearer valid") {
+function request(handler, method, url, body, authorization = "Bearer valid", headers = {}) {
   const input = Readable.from(body === undefined ? [] : [Buffer.from(JSON.stringify(body))]);
   input.method = method;
   input.url = url;
-  input.headers = { authorization };
+  input.headers = { authorization, ...headers };
   const response = new Response();
   return handler(input, response).then(() => response);
 }
@@ -243,6 +244,300 @@ test("artist drafts are owner-scoped and reject storage paths outside the artist
     coverPath: ""
   });
   assert.equal(crossAccount.statusCode, 404);
+});
+
+test("track publication requires rights and review, pins audio, and supports takedown", async () => {
+  const db = new FakeDatabase();
+  const uid = "artist-1";
+  const id = "release-1";
+  const audioPath = `artistUploads/${uid}/${id}-12345678-1234-1234-1234-123456789012/audio.mp3`;
+  db.records.set("artists", new Map([[uid, {
+    artistName: "North Star", slug: "north-star", status: "approved", socialLinks: {}
+  }]]));
+  db.records.set("artistSlugs", new Map([["north-star", { artistUid: uid, status: "approved" }]]));
+  db.records.set("artistReleases", new Map([[id, {
+    artistUid: uid, status: "draft", title: "First Light", description: "", genre: "Rock",
+    releaseType: "single", moods: [], audioPath, coverPath: ""
+  }]]));
+  let generation = "101";
+  let audio = Buffer.from("audio");
+  const bucket = () => ({
+    file: (filePath, options = {}) => ({
+      getMetadata: async () => {
+        assert.equal(filePath, audioPath);
+        if (options.generation && options.generation !== generation) {
+          const error = new Error("Object not found");
+          error.code = 404;
+          throw error;
+        }
+        return [{ contentType: "audio/mpeg", size: audio.length, generation }];
+      },
+      createReadStream: ({ start, end }) => Readable.from([audio.subarray(start, end + 1)])
+    })
+  });
+  const artist = releaseHandler({ database: () => db, authenticate: fakeAuth(), bucket });
+  const admin = adminHandler({
+    database: () => db, authenticate: fakeAuth({ uid: "admin-1", admin: true }), bucket
+  });
+  const visitor = (url, headers) => request(artist, "GET", url, undefined, "", headers);
+  const publicBefore = await visitor("/api/artist-releases?action=public");
+  assert.deepEqual(JSON.parse(publicBefore.body()).artists[0].tracks, []);
+  assert.equal((await visitor(`/api/artist-releases?action=stream&id=${id}`)).statusCode, 404);
+  assert.equal((await request(artist, "POST", "/api/artist-releases", { action: "submit", id })).statusCode, 400);
+  const stranger = releaseHandler({ database: () => db, authenticate: fakeAuth({ uid: "artist-2", email_verified: true }), bucket });
+  db.records.get("artists").set("artist-2", { status: "pending" });
+  assert.equal((await request(stranger, "POST", "/api/artist-releases", {
+    action: "submit", id, rightsConfirmed: true
+  })).statusCode, 404);
+  db.records.get("artistReleases").get(id).downloadPriceCents = 155;
+  assert.equal((await request(artist, "POST", "/api/artist-releases", { action: "submit", id, rightsConfirmed: true })).statusCode, 400);
+  delete db.records.get("artistReleases").get(id).downloadPriceCents;
+  const submitted = await request(artist, "POST", "/api/artist-releases", { action: "submit", id, rightsConfirmed: true });
+  assert.equal(submitted.statusCode, 200);
+  assert.equal(db.records.get("artistReleases").get(id).audioGeneration, "101");
+  assert.equal((await request(admin, "GET", "/api/artist-admin?type=releases")).statusCode, 200);
+  assert.equal((await visitor(`/api/artist-releases?action=stream&id=${id}`)).statusCode, 404);
+  assert.equal((await request(artist, "GET", `/api/artist-releases?action=review&id=${id}`)).statusCode, 403);
+  const review = releaseHandler({ database: () => db, authenticate: fakeAuth({ uid: "admin-1", admin: true }), bucket });
+  assert.equal((await request(review, "GET", `/api/artist-releases?action=review&id=${id}`)).body(), "audio");
+  const edit = await request(artist, "POST", "/api/artist-releases", {
+    action: "update", id, title: "Changed", description: "", genre: "Rock",
+    releaseType: "single", moods: [], audioPath, coverPath: ""
+  });
+  assert.equal(edit.statusCode, 409);
+  const denied = await request(adminHandler({ database: () => db, authenticate: fakeAuth(), bucket }),
+    "POST", "/api/artist-admin", { action: "approve-release", id });
+  assert.equal(denied.statusCode, 403);
+  db.records.get("artistReleases").get(id).rightsConfirmed = false;
+  assert.equal((await request(admin, "POST", "/api/artist-admin", { action: "approve-release", id })).statusCode, 409);
+  db.records.get("artistReleases").get(id).rightsConfirmed = true;
+  assert.equal((await request(admin, "POST", "/api/artist-admin", { action: "approve-release", id })).statusCode, 200);
+  const publicAfter = JSON.parse((await visitor("/api/artist-releases?action=public")).body());
+  const northStar = publicAfter.artists.find((entry) => entry.slug === "north-star");
+  assert.deepEqual(northStar.tracks, [{ id, title: "First Light", genre: "Rock", downloadPriceCents: null }]);
+  assert.doesNotMatch(JSON.stringify(publicAfter), /artistUploads|artistUid|audioGeneration/);
+  const partial = await visitor(`/api/artist-releases?action=stream&id=${id}`, { range: "bytes=1-3" });
+  assert.equal(partial.statusCode, 206);
+  assert.equal(partial.body(), "udi");
+  assert.equal(partial.headers["content-range"], "bytes 1-3/5");
+  assert.equal((await visitor(`/api/artist-releases?action=stream&id=${id}`, { range: "bytes=8-9" })).statusCode, 416);
+  audio = Buffer.alloc(3 * 1024 * 1024);
+  const capped = await visitor(`/api/artist-releases?action=stream&id=${id}`, { range: "bytes=0-" });
+  assert.equal(capped.headers["content-range"], "bytes 0-2097151/3145728");
+  assert.equal(capped.chunks.reduce((size, chunk) => size + chunk.length, 0), 2 * 1024 * 1024);
+  audio = Buffer.from("audio");
+  db.records.get("artistReleases").get(id).rightsConfirmed = false;
+  assert.deepEqual(JSON.parse((await visitor("/api/artist-releases?action=public")).body()).artists[0].tracks, []);
+  assert.equal((await visitor(`/api/artist-releases?action=stream&id=${id}`)).statusCode, 404);
+  db.records.get("artistReleases").get(id).rightsConfirmed = true;
+  db.records.get("artistSlugs").get("north-star").status = "rejected";
+  assert.deepEqual(JSON.parse((await visitor("/api/artist-releases?action=public")).body()).artists, []);
+  assert.equal((await visitor(`/api/artist-releases?action=stream&id=${id}`)).statusCode, 404);
+  db.records.get("artistSlugs").get("north-star").status = "approved";
+  db.records.get("artists").get(uid).status = "suspended";
+  assert.equal((await visitor(`/api/artist-releases?action=stream&id=${id}`)).statusCode, 404);
+  db.records.get("artists").get(uid).status = "approved";
+  generation = "102";
+  assert.equal((await visitor(`/api/artist-releases?action=stream&id=${id}`)).statusCode, 404);
+  generation = "101";
+  assert.equal((await request(artist, "POST", "/api/artist-releases", { action: "withdraw", id })).statusCode, 200);
+  assert.equal((await visitor(`/api/artist-releases?action=stream&id=${id}`)).statusCode, 404);
+  assert.equal((await request(artist, "POST", "/api/artist-releases", { action: "submit", id, rightsConfirmed: true })).statusCode, 200);
+  assert.equal((await request(admin, "POST", "/api/artist-admin", { action: "approve-release", id })).statusCode, 200);
+  assert.equal((await request(admin, "POST", "/api/artist-admin", { action: "unpublish-release", id })).statusCode, 200);
+  assert.equal((await visitor(`/api/artist-releases?action=stream&id=${id}`)).statusCode, 404);
+});
+
+test("artist circles show the selected artist's tracks and stop previous playback", async () => {
+  class Element {
+    constructor(tag) {
+      this.tagName = tag.toUpperCase();
+      this.children = [];
+      this.attributes = {};
+      this.events = {};
+      this.hidden = false;
+      this.paused = false;
+    }
+    append(...children) { this.children.push(...children); }
+    replaceChildren(...children) { this.children = children; }
+    setAttribute(name, value) { this.attributes[name] = value; }
+    addEventListener(name, callback) { this.events[name] = callback; }
+    querySelectorAll(tag) {
+      return this.children.flatMap((child) =>
+        [...(child.tagName === tag.toUpperCase() ? [child] : []), ...child.querySelectorAll(tag)]);
+    }
+    pause() { this.paused = true; }
+  }
+  const status = new Element("p");
+  const list = new Element("div");
+  const selection = new Element("div");
+  selection.hidden = true;
+  const elements = {
+    "#artist-discovery-status": status,
+    "#artist-discovery-list": list,
+    "#artist-discovery-selection": selection
+  };
+  const document = {
+    querySelector: (selector) => elements[selector] || null,
+    createElement: (tag) => new Element(tag),
+    addEventListener() {}
+  };
+  const source = fs.readFileSync(path.join(__dirname, "..", "artist-listen.js"), "utf8");
+  await vm.runInNewContext(`(async () => {\n${source}\n})()`, {
+    document, location: { protocol: "https:", hostname: "example.com" },
+    fetch: async () => ({ ok: true, json: async () => ({ artists: [
+      { artistName: "North Star", slug: "north-star", tracks: [{ id: "track-1", title: "First Light" }] },
+      { artistName: "South Star", slug: "south-star", tracks: [] }
+    ] }) }),
+    URL, URLSearchParams
+  });
+  const first = list.children[0].children[0];
+  const second = list.children[1].children[0];
+  first.events.pointerenter({ pointerType: "mouse" });
+  assert.equal(selection.hidden, false);
+  assert.equal(first.attributes["aria-expanded"], "true");
+  assert.equal(selection.children[1].href, "/artist/north-star");
+  const audio = selection.querySelectorAll("audio")[0];
+  assert.match(audio.src, /action=stream&id=track-1/);
+  second.events.focus();
+  assert.equal(audio.paused, true);
+  assert.equal(first.attributes["aria-expanded"], "false");
+  assert.equal(second.attributes["aria-expanded"], "true");
+  assert.equal(selection.children[2].textContent, "No tracks available yet.");
+});
+
+test("artist checkout uses connected account pricing and verifies paid downloads", async () => {
+  const db = new FakeDatabase();
+  const audioPath = "artistUploads/artist-1/release-1-12345678-1234-1234-1234-123456789012/audio.mp3";
+  db.records.set("artists", new Map([["artist-1", {
+    status: "approved", slug: "north-star", stripeConnectLive: "acct_123"
+  }]]));
+  db.records.set("artistSlugs", new Map([["north-star", { status: "approved", artistUid: "artist-1" }]]));
+  db.records.set("artistReleases", new Map([["release-1", {
+    artistUid: "artist-1", status: "published", rightsConfirmed: true, salesRightsConfirmed: true,
+    title: "First Light", description: "", genre: "", moods: [], releaseType: "single",
+    audioPath, coverPath: "", audioGeneration: "101", downloadPriceCents: 155
+  }]]));
+  let account = { charges_enabled: true, payouts_enabled: true, controller: { fees: { payer: "account" } } };
+  let checkout;
+  let session;
+  const stripe = {
+    accounts: { retrieve: async () => account },
+    checkout: { sessions: {
+      create: async (data, options) => {
+        checkout = { data, options };
+        session = {
+          id: "cs_live_123", url: "https://checkout.stripe.com/test", livemode: true,
+          mode: "payment", status: "complete", payment_status: "paid", currency: "usd",
+          amount_subtotal: 155, amount_total: 155, metadata: data.metadata,
+          line_items: { data: [{ quantity: 1, price: { currency: "usd", unit_amount: 155 } }] },
+          payment_intent: { status: "succeeded", application_fee_amount: 16,
+            latest_charge: { status: "succeeded", refunded: false, amount_refunded: 0,
+              disputed: false, created: Math.floor(Date.now() / 1000) } }
+        };
+        return session;
+      },
+      retrieve: async (id, _options, context) => {
+        assert.equal(id, "cs_live_123");
+        assert.equal(context.stripeAccount, "acct_123");
+        return session;
+      }
+    } }
+  };
+  const bucket = () => ({ file: (_path, options) => ({
+    getMetadata: async () => { assert.equal(options.generation, "101"); return [{ size: 5, contentType: "audio/mpeg" }]; },
+    createReadStream: ({ start, end }) => Readable.from([Buffer.from("audio").subarray(start, end + 1)])
+  }) });
+  const handler = paymentsHandler({
+    database: () => db, authenticate: fakeAuth(), bucket, enabled: () => true,
+    payment: { mode: () => "live", stripeClient: () => stripe, siteUrl: () => new URL("https://example.com/") }
+  });
+  account.controller.fees.payer = "application";
+  assert.equal((await request(handler, "POST", "/api/artist-releases?action=checkout", { id: "release-1" })).statusCode, 409);
+  account.controller.fees.payer = "account";
+  const checkoutResponse = await request(handler, "POST", "/api/artist-releases?action=checkout", { id: "release-1", amount: 1 });
+  assert.equal(checkoutResponse.statusCode, 200);
+  assert.equal(checkout.options.stripeAccount, "acct_123");
+  assert.equal(checkout.data.line_items[0].price_data.unit_amount, 155);
+  assert.equal(checkout.data.payment_intent_data.application_fee_amount, 16);
+  const purchaseId = checkout.data.metadata.purchaseId;
+  const url = `/api/artist-releases?action=purchase&purchase_id=${purchaseId}&session_id=cs_live_123`;
+  assert.equal((await request(handler, "GET", url)).statusCode, 200);
+  const download = await request(handler, "GET", url.replace("action=purchase", "action=download"));
+  assert.equal(download.body(), "audio");
+  assert.match(download.headers["content-disposition"], /attachment/);
+  session.payment_intent.latest_charge.refunded = true;
+  assert.equal((await request(handler, "GET", url)).statusCode, 403);
+  session.payment_intent.latest_charge.refunded = false;
+  session.payment_intent.latest_charge.created -= 600;
+  assert.equal((await request(handler, "GET", url)).statusCode, 410);
+});
+
+test("artist Stripe onboarding creates and reuses an artist-owned account", async () => {
+  const db = new FakeDatabase();
+  db.records.set("artists", new Map([["artist-1", { status: "approved", slug: "north-star" }]]));
+  let creates = 0;
+  const stripe = {
+    accounts: {
+      create: async (data, options) => {
+        creates++;
+        assert.equal(data.type, "standard");
+        assert.match(options.idempotencyKey, /^artist-connect-live-/);
+        return { id: "acct_123" };
+      },
+      retrieve: async () => ({ charges_enabled: true, payouts_enabled: true, controller: { fees: { payer: "account" } } })
+    },
+    accountLinks: { create: async (data) => {
+      assert.equal(data.account, "acct_123");
+      assert.equal(data.type, "account_onboarding");
+      return { url: "https://connect.stripe.com/onboarding" };
+    } }
+  };
+  const handler = paymentsHandler({
+    database: () => db, authenticate: fakeAuth(), enabled: () => true,
+    payment: { mode: () => "live", stripeClient: () => stripe, siteUrl: () => new URL("https://example.com/") }
+  });
+  assert.equal((await request(handler, "POST", "/api/artist-releases?action=connect")).statusCode, 200);
+  assert.equal((await request(handler, "POST", "/api/artist-releases?action=connect")).statusCode, 200);
+  assert.equal(creates, 1);
+  assert.equal(db.records.get("artists").get("artist-1").stripeConnectLive, "acct_123");
+  assert.equal(JSON.parse((await request(handler, "GET", "/api/artist-releases?action=connect")).body()).ready, true);
+});
+
+test("artist Stripe client requires a separate key matching the configured mode", () => {
+  const original = {
+    MUSIC_STRIPE_MODE: process.env.MUSIC_STRIPE_MODE,
+    STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
+    ARTIST_STRIPE_SECRET_KEY: process.env.ARTIST_STRIPE_SECRET_KEY
+  };
+  try {
+    process.env.MUSIC_STRIPE_MODE = "live";
+    process.env.STRIPE_SECRET_KEY = "rk_live_existing";
+    delete process.env.ARTIST_STRIPE_SECRET_KEY;
+    assert.throws(() => artistStripeClient(), /ARTIST_STRIPE_SECRET_KEY/);
+    process.env.ARTIST_STRIPE_SECRET_KEY = "rk_test_artist";
+    assert.throws(() => artistStripeClient(), /ARTIST_STRIPE_SECRET_KEY/);
+    process.env.ARTIST_STRIPE_SECRET_KEY = "rk_live_artist";
+    assert.ok(artistStripeClient().checkout.sessions);
+    process.env.MUSIC_STRIPE_MODE = "test";
+    process.env.ARTIST_STRIPE_SECRET_KEY = "rk_test_artist";
+    assert.ok(artistStripeClient().accounts);
+  } finally {
+    for (const [name, value] of Object.entries(original)) {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
+  }
+});
+
+test("artist draft download prices must be whole cents within the permitted range", () => {
+  const draft = { title: "Track", description: "", genre: "", releaseType: "single", moods: [] };
+  for (const price of [49, 10001, 50.5, "149"]) {
+    assert.throws(() => marketplace.validateReleaseInput("artist-1", "release-1", { ...draft, downloadPriceCents: price }));
+  }
+  for (const price of [50, 10000, null]) {
+    assert.equal(marketplace.validateReleaseInput("artist-1", "release-1", { ...draft, downloadPriceCents: price }).downloadPriceCents, price);
+  }
 });
 
 test("artist images are served only for approved profiles", async () => {
@@ -470,7 +765,7 @@ test("editing a draft preserves its legacy genre and moods while new drafts have
   };
   const releaseForm = element("#artist-release-form");
   releaseForm.elements = {
-    title: { value: "" }, description: { value: "" }, genre,
+    title: { value: "" }, description: { value: "" }, downloadPrice: { value: "" }, genre,
     audio: { value: "", files: [] }, cover: { value: "", files: [] }
   };
   element("#artist-profile-form").elements = [];
