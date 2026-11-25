@@ -40,7 +40,6 @@
 .music-library-intro .eyebrow {
   padding-inline: 0.5rem;
   letter-spacing: 0;
-  white-space: nowrap;
 }
 .music-library-intro h2 {
   margin: 0.6rem 0;
@@ -257,6 +256,55 @@
 .music-admin-list article { padding: 1rem; border: 1px solid var(--line); border-radius: 16px; }
 .music-admin-list h3 { margin: 0 0 0.5rem; }
 .music-admin-list audio { width: 100%; margin-top: 0.75rem; }
+.artist-rights-confirmation { display: flex; align-items: flex-start; gap: 0.65rem; margin: 1rem 0; }
+.artist-rights-confirmation input { margin-top: 0.25rem; }
+.artist-bubbles { display: flex; gap: 1rem; overflow-x: auto; padding: 0.4rem; }
+.artist-bubble { flex: 0 0 100px; min-width: 0; }
+.artist-bubble-profile {
+  display: grid;
+  justify-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+}
+.artist-bubble-profile:focus-visible { outline: 2px solid #fff; outline-offset: 4px; border-radius: 12px; }
+.artist-bubble-profile img,
+.artist-bubble-placeholder {
+  width: 80px;
+  aspect-ratio: 1;
+  border: 2px solid #83b5f5;
+  border-radius: 50%;
+  object-fit: cover;
+  background: #182640;
+}
+.artist-bubble-profile:hover img,
+.artist-bubble-profile:hover .artist-bubble-placeholder,
+.artist-bubble-profile[aria-expanded="true"] img,
+.artist-bubble-profile[aria-expanded="true"] .artist-bubble-placeholder { border-color: #fff; box-shadow: 0 0 0 3px rgba(131, 181, 245, 0.3); }
+.artist-bubble-placeholder { display: grid; place-items: center; font-size: 2rem; font-weight: 700; }
+.artist-bubble-name { max-width: 100%; overflow-wrap: anywhere; font-size: 0.9rem; font-weight: 700; }
+.artist-selection {
+  max-width: 36rem;
+  margin: 1.5rem auto 0;
+  padding: 1.25rem;
+  border: 1px solid rgba(148, 181, 225, 0.3);
+  border-radius: 20px;
+  background: radial-gradient(circle at top, rgba(80, 140, 220, 0.2), transparent 60%), var(--surface);
+}
+.artist-selection[hidden] { display: none; }
+.artist-selection h3 { margin: 0 0 0.5rem; overflow-wrap: anywhere; }
+.artist-selection-link { color: #b7d3ff; text-decoration: underline; text-underline-offset: 0.2em; }
+.artist-download-notice { color: var(--muted); font-size: 0.9rem; }
+.artist-public-track { margin-top: 1rem; }
+.artist-public-track p { margin: 0 0 0.4rem; overflow-wrap: anywhere; }
+.artist-public-track h4 { margin: 0 0 0.3rem; overflow-wrap: anywhere; }
+.artist-download:disabled { opacity: 0.6; cursor: not-allowed; }
 .artist-dashboard,
 .artist-storefront {
   display: grid;
