@@ -102,6 +102,8 @@ single-track drafts, and an administrator approval screen. Approved profiles are
 available at `/artist/{slug}`. Draft audio and artwork are not public, and this
 phase does not publish music, enable third-party streaming, or accept artist
 sales. Existing `musicTracks` records and Stripe checkout are unchanged.
+Artists can search and select one optional genre for each draft; existing custom
+genre and mood data is retained when an older draft is edited.
 
 The artist APIs use the existing Firebase Admin credentials and Firestore
 project. The browser uploads directly to Firebase Storage; the
