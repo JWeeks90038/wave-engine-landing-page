@@ -4,7 +4,7 @@
   "rewrites": [
     {
       "source": "/artist/:slug",
-      "destination": "/artist.html?slug=:slug"
+      "destination": "/artist?slug=:slug"
     }
   ],
   "redirects": [

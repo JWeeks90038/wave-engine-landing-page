@@ -21,7 +21,7 @@ test("internal page links use clean URLs that resolve to existing pages", () => 
     route.source === "/index.html" && route.destination === "/" && route.permanent
   ));
   assert.ok(config.rewrites.some((route) =>
-    route.source === "/artist/:slug" && route.destination === "/artist.html?slug=:slug"
+    route.source === "/artist/:slug" && route.destination === "/artist?slug=:slug"
   ));
 
   for (const file of pages) {
