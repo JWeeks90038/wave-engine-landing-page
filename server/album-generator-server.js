@@ -11,6 +11,10 @@ const apparelWebhookHandler = require("../api/apparel-webhook");
 const apparelAdminHandler = require("../api/apparel-admin");
 const apparelFirebaseConfigHandler = require("../api/apparel-firebase-config");
 const musicHandler = require("../api/music");
+const artistAdminHandler = require("../api/artist-admin");
+const artistMediaHandler = require("../api/artist-media");
+const artistProfileHandler = require("../api/artist-profile");
+const artistReleasesHandler = require("../api/artist-releases");
 const { sendJson } = require("./api-utils");
 
 const HOST = process.env.ALBUM_GENERATOR_HOST || "127.0.0.1";
@@ -28,7 +32,11 @@ const routeHandlers = {
   "/api/apparel-webhook": apparelWebhookHandler,
   "/api/apparel-admin": apparelAdminHandler,
   "/api/apparel-firebase-config": apparelFirebaseConfigHandler,
-  "/api/music": musicHandler
+  "/api/music": musicHandler,
+  "/api/artist-admin": artistAdminHandler,
+  "/api/artist-media": artistMediaHandler,
+  "/api/artist-profile": artistProfileHandler,
+  "/api/artist-releases": artistReleasesHandler
 };
 
 const server = http.createServer(async (request, response) => {

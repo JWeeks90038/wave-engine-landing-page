@@ -1,5 +1,8 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
+const vm = require("node:vm");
 const { Readable, Writable } = require("node:stream");
 const { createHandler: profileHandler } = require("../server/artist-profile-handler");
 const { createHandler: releaseHandler } = require("../server/artist-releases-handler");
@@ -350,4 +353,82 @@ test("artist profile reads reconcile stale upload claims", async () => {
   assert.equal(result.statusCode, 200);
   assert.equal(JSON.parse(result.body()).tokenRefreshRequired, true);
   assert.deepEqual(claimChanges, [["artist-1", true]]);
+});
+
+test("approved storefront renders with metadata from the page", async () => {
+  const html = fs.readFileSync(path.join(__dirname, "..", "artist.html"), "utf8");
+  const source = fs.readFileSync(path.join(__dirname, "..", "artist.js"), "utf8");
+  const selectors = [
+    "#storefront-status", "#storefront-profile", "#storefront-name",
+    "#storefront-bio", "#storefront-socials"
+  ];
+  const elements = Object.fromEntries(selectors.map((selector) => [selector, { hidden: true, append() {} }]));
+  for (const [attribute, name] of [
+    ["property", "og:title"], ["property", "og:description"],
+    ["name", "description"], ["name", "twitter:title"], ["name", "twitter:description"]
+  ]) {
+    if (html.includes(`${attribute}="${name}"`)) elements[`meta[${attribute}="${name}"]`] = {};
+  }
+  const document = {
+    querySelector: (selector) => elements[selector] || null,
+    createElement: () => ({}),
+    head: { append() {} }
+  };
+  await vm.runInNewContext(`(async () => {\n${source}\n})()`, {
+    document,
+    location: { protocol: "https:", hostname: "example.com", origin: "https://example.com", pathname: "/artist/north-star", search: "" },
+    fetch: async () => ({ ok: true, json: async () => ({
+      profile: { artistName: "North Star", slug: "north-star", biography: "Independent music.", socialLinks: {} }
+    }) }),
+    URL, URLSearchParams
+  });
+  assert.equal(elements["#storefront-profile"].hidden, false);
+  assert.equal(elements["#storefront-status"].textContent, "");
+  assert.equal(elements['meta[name="twitter:title"]'].content, "North Star | Wave Engine Music");
+});
+
+test("switching from a rejected artist to a new account enables the profile form", async () => {
+  const source = fs.readFileSync(path.join(__dirname, "..", "artist-dashboard.js"), "utf8")
+    .replace(/^import[\s\S]*?from "[^"]+";\r?\n/gm, "");
+  const elements = new Map();
+  function element(selector) {
+    if (!elements.has(selector)) elements.set(selector, {
+      hidden: false, textContent: "", addEventListener() {}, replaceChildren() {},
+      querySelectorAll: () => [], contains: () => false, reset() {}
+    });
+    return elements.get(selector);
+  }
+  const controls = ["artistName", "slug", "biography", "website", "instagram", "youtube", "tiktok"]
+    .map(() => ({ value: "", disabled: false }));
+  for (const [index, name] of ["artistName", "slug", "biography", "website", "instagram", "youtube", "tiktok"].entries()) {
+    controls[name] = controls[index];
+  }
+  element("#artist-profile-form").elements = controls;
+  const document = { querySelector: element, createElement: () => ({}) };
+  let onAuth;
+  await vm.runInNewContext(`(async () => {\n${source}\n})()`, {
+    document,
+    location: { protocol: "https:", hostname: "example.com" },
+    firebaseClient: async () => ({}), getAuth: () => ({}), getStorage: () => ({}),
+    onAuthStateChanged: (_auth, callback) => { onAuth = callback; },
+    fetch: async (url) => {
+      if (url.includes("action=config")) return { ok: true, json: async () => ({ storageBucket: "bucket" }) };
+      if (url.includes("artist-releases")) return { ok: true, json: async () => ({ releases: [] }) };
+      if (url.includes("artist-profile")) {
+        return currentAccount === "rejected"
+          ? { ok: true, json: async () => ({ profile: { status: "rejected", artistName: "Artist", slug: "artist", socialLinks: {} } }) }
+          : { ok: false, json: async () => ({ error: "No artist profile is registered for this account." }) };
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    },
+    URL, URLSearchParams
+  });
+  let currentAccount = "rejected";
+  const user = { email: "artist@example.com", emailVerified: true, getIdToken: async () => "token" };
+  await onAuth(user);
+  assert.ok(controls.every((control) => control.disabled));
+  await onAuth(null);
+  currentAccount = "new";
+  await onAuth(user);
+  assert.ok(controls.every((control) => !control.disabled));
 });

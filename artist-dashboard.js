@@ -231,6 +231,7 @@ async function initializeAccount(user) {
   } catch (error) {
     if (/No artist profile is registered/.test(error.message)) {
       currentProfile = null;
+      setBusy(busy);
       profileSection.hidden = false;
       releaseSection.hidden = true;
       document.querySelector("#artist-profile-title").textContent = "Create your artist profile";
