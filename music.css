@@ -298,7 +298,6 @@
 .artist-dashboard section h2 { margin: 0; }
 .artist-dashboard .music-admin-form p,
 .artist-dashboard section > p { color: var(--muted); line-height: 1.6; }
-.artist-dashboard .music-admin-form select[multiple] { min-height: 9rem; }
 .artist-dashboard .music-admin-form label { color: #e6ecfb; }
 .artist-dashboard .music-admin-form input:focus-visible,
 .artist-dashboard .music-admin-form textarea:focus-visible,

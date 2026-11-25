@@ -404,6 +404,9 @@ test("switching from a rejected artist to a new account enables the profile form
     controls[name] = controls[index];
   }
   element("#artist-profile-form").elements = controls;
+  element("#artist-release-form").elements = {
+    genre: { querySelector: () => null, querySelectorAll: () => [], options: [], addEventListener() {} }
+  };
   const document = { querySelector: element, createElement: () => ({}) };
   let onAuth;
   await vm.runInNewContext(`(async () => {\n${source}\n})()`, {
@@ -431,4 +434,92 @@ test("switching from a rejected artist to a new account enables the profile form
   currentAccount = "new";
   await onAuth(user);
   assert.ok(controls.every((control) => !control.disabled));
+});
+
+test("draft form offers genre selections without a mood control", () => {
+  const html = fs.readFileSync(path.join(__dirname, "..", "artist-dashboard.html"), "utf8");
+  assert.match(html, /<select id="artist-genre" name="genre">/);
+  assert.doesNotMatch(html, /name="moods"/);
+  for (const genre of ["Rock", "Hip-Hop", "Gospel", "Cinematic", "Afrobeats", "Other"]) {
+    assert.ok(html.includes(`<option>${genre}</option>`));
+  }
+});
+
+test("editing a draft preserves its legacy genre and moods while new drafts have no moods", async () => {
+  const source = fs.readFileSync(path.join(__dirname, "..", "artist-dashboard.js"), "utf8")
+    .replace(/^import[\s\S]*?from "[^"]+";\r?\n/gm, "");
+  const elements = new Map();
+  function element(selector) {
+    if (!elements.has(selector)) elements.set(selector, {
+      listeners: {}, hidden: false, textContent: "",
+      addEventListener(name, callback) { this.listeners[name] = callback; },
+      replaceChildren() {}, append() {}, querySelectorAll: () => [],
+      contains: () => false, reset() {}, scrollIntoView() {}
+    });
+    return elements.get(selector);
+  }
+  const genre = {
+    value: "", options: [{ value: "" }, { value: "Rock" }, { value: "Raï" }, { value: "Other" }],
+    addEventListener() {},
+    querySelectorAll: () => [],
+    querySelector() { return this.options.find((option) => option.dataset && option.dataset.legacyGenre) || null; },
+    append(option) {
+      option.remove = () => { this.options = this.options.filter((item) => item !== option); };
+      this.options.push(option);
+    }
+  };
+  const releaseForm = element("#artist-release-form");
+  releaseForm.elements = {
+    title: { value: "" }, description: { value: "" }, genre,
+    audio: { value: "", files: [] }, cover: { value: "", files: [] }
+  };
+  element("#artist-profile-form").elements = [];
+  const submitted = [];
+  const document = { querySelector: element, createElement: () => ({ dataset: {} }) };
+  const context = {
+    document, location: { protocol: "https:", hostname: "example.com" },
+    firebaseClient: async () => ({}), getAuth: () => ({}), getStorage: () => ({}),
+    onAuthStateChanged() {},
+    fetch: async (url, options = {}) => {
+      if (url.includes("action=config")) return { ok: true, json: async () => ({ storageBucket: "bucket" }) };
+      if (url.includes("artist-releases") && options.method === "POST") {
+        const body = JSON.parse(options.body);
+        submitted.push(body);
+        return { ok: true, json: async () => ({ release: { ...body, id: body.id || "new-id" } }) };
+      }
+      if (url.includes("artist-releases")) return { ok: true, json: async () => ({ releases: [] }) };
+      throw new Error(`Unexpected request: ${url}`);
+    },
+    URL, URLSearchParams
+  };
+  await vm.runInNewContext(`(async () => {\n${source}\nglobalThis.testEditDraft = editDraft;\nglobalThis.testSetUser = (user) => { currentUser = user; };\n})()`, context);
+  context.testSetUser({ uid: "artist-1", getIdToken: async () => "token" });
+  context.testEditDraft({ id: "old-id", title: "Existing", genre: "Unlisted genre", moods: ["inspired"] });
+  assert.equal(genre.value, "Unlisted genre");
+  const search = element("#artist-genre-search");
+  search.value = "RAI";
+  search.listeners.input();
+  assert.equal(genre.options.find((option) => option.value === "Raï").hidden, false);
+  assert.equal(genre.options.find((option) => option.value === "Rock").hidden, true);
+  assert.equal(genre.options.find((option) => option.value === "Unlisted genre").hidden, false);
+  search.value = "no such genre";
+  search.listeners.input();
+  assert.match(element("#artist-genre-search-status").textContent, /No matching genres/);
+  assert.equal(genre.options.find((option) => option.value === "Other").hidden, false);
+  assert.equal(genre.value, "Unlisted genre");
+  await releaseForm.listeners.submit({ preventDefault() {} });
+  assert.equal(submitted[0].genre, "Unlisted genre");
+  assert.deepEqual(submitted[0].moods, ["inspired"]);
+  assert.equal(genre.querySelector(), null);
+  assert.equal(search.value, "");
+  assert.equal(genre.options.find((option) => option.value === "Rock").hidden, false);
+
+  releaseForm.elements.title.value = "New";
+  genre.value = "Rock";
+  await releaseForm.listeners.submit({ preventDefault() {} });
+  assert.equal(submitted[1].action, "create");
+  assert.equal(submitted[1].genre, "Rock");
+  assert.deepEqual(submitted[1].moods, []);
+  assert.equal(submitted[2].genre, "Rock");
+  assert.deepEqual(submitted[2].moods, []);
 });

@@ -22,6 +22,8 @@ const profileForm = document.querySelector("#artist-profile-form");
 const releaseSection = document.querySelector("#artist-releases-section");
 const releaseForm = document.querySelector("#artist-release-form");
 const releasesList = document.querySelector("#artist-releases");
+const genreSearch = document.querySelector("#artist-genre-search");
+const genreSearchStatus = document.querySelector("#artist-genre-search-status");
 const uploadSpecs = {
   avatar: { types: ["image/jpeg", "image/png", "image/webp"], max: 10 * 1024 * 1024 },
   banner: { types: ["image/jpeg", "image/png", "image/webp"], max: 10 * 1024 * 1024 },
@@ -191,12 +193,45 @@ async function loadReleases() {
   if (!data.releases.length) releasesList.textContent = "No drafts yet.";
 }
 
+function filterGenres() {
+  const genreSelect = releaseForm.elements.genre;
+  const normalize = (value) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const query = normalize(genreSearch.value.trim());
+  let matches = 0;
+  for (const option of genreSelect.options) {
+    const matchesQuery = option.value && normalize(option.textContent || option.value).includes(query);
+    if (matchesQuery) matches++;
+    option.hidden = Boolean(query) && option.value !== "" && !matchesQuery &&
+      option.value !== genreSelect.value && option.value !== "Other";
+  }
+  for (const group of genreSelect.querySelectorAll("optgroup")) {
+    group.hidden = Array.from(group.children).every((option) => option.hidden);
+  }
+  genreSearchStatus.textContent = !query ? "Search to narrow the genre list."
+    : matches ? `${matches} matching ${matches === 1 ? "genre" : "genres"}.`
+      : "No matching genres. Try another search or choose Other; your current selection is kept.";
+}
+
+genreSearch.addEventListener("input", filterGenres);
+releaseForm.elements.genre.addEventListener("change", filterGenres);
+
 function editDraft(release) {
   editingRelease = release;
   releaseForm.elements.title.value = release.title || "";
   releaseForm.elements.description.value = release.description || "";
-  releaseForm.elements.genre.value = release.genre || "";
-  for (const option of releaseForm.elements.moods.options) option.selected = (release.moods || []).includes(option.value);
+  const genreSelect = releaseForm.elements.genre;
+  const oldGenre = genreSelect.querySelector("option[data-legacy-genre]");
+  if (oldGenre) oldGenre.remove();
+  if (release.genre && !Array.from(genreSelect.options).some((option) => option.value === release.genre)) {
+    const option = document.createElement("option");
+    option.value = release.genre;
+    option.textContent = release.genre;
+    option.dataset.legacyGenre = "true";
+    genreSelect.append(option);
+  }
+  genreSelect.value = release.genre || "";
+  genreSearch.value = "";
+  filterGenres();
   releaseForm.elements.audio.value = "";
   releaseForm.elements.cover.value = "";
   document.querySelector("#artist-release-title").textContent = `Edit draft: ${release.title}`;
@@ -206,7 +241,11 @@ function editDraft(release) {
 
 function resetReleaseForm() {
   editingRelease = null;
+  const oldGenre = releaseForm.elements.genre.querySelector("option[data-legacy-genre]");
+  if (oldGenre) oldGenre.remove();
   releaseForm.reset();
+  genreSearch.value = "";
+  filterGenres();
   document.querySelector("#artist-release-title").textContent = "New single draft";
   document.querySelector("#artist-release-cancel").hidden = true;
 }
@@ -348,12 +387,11 @@ releaseForm.addEventListener("submit", async (event) => {
     const title = releaseForm.elements.title.value.trim();
     const description = releaseForm.elements.description.value.trim();
     const genre = releaseForm.elements.genre.value.trim();
-    const moods = Array.from(releaseForm.elements.moods.selectedOptions, (option) => option.value);
+    const moods = editingRelease ? editingRelease.moods || [] : [];
     const audio = releaseForm.elements.audio.files[0];
     const cover = releaseForm.elements.cover.files[0];
     validateUpload(audio, "audio");
     validateUpload(cover, "cover");
-    if (moods.length > 5) throw new Error("Choose no more than five moods.");
 
     let release = editingRelease;
     if (!release) {
