@@ -257,8 +257,101 @@
 .music-admin-list article { padding: 1rem; border: 1px solid var(--line); border-radius: 16px; }
 .music-admin-list h3 { margin: 0 0 0.5rem; }
 .music-admin-list audio { width: 100%; margin-top: 0.75rem; }
+.artist-dashboard,
+.artist-storefront {
+  display: grid;
+  gap: 1.5rem;
+  background:
+    radial-gradient(circle at top right, rgba(49, 102, 178, 0.16), transparent 42%),
+    var(--surface);
+}
+.artist-dashboard h1,
+.artist-storefront h1 {
+  margin: 0;
+  font-family: "Archivo", sans-serif;
+  font-size: clamp(2rem, 5vw, 3.5rem);
+  letter-spacing: -0.035em;
+}
+.artist-panel {
+  display: grid;
+  gap: 1.5rem;
+  padding: clamp(1rem, 3vw, 1.5rem);
+  border: 1px solid rgba(148, 181, 225, 0.2);
+  border-radius: 20px;
+  background: rgba(5, 10, 23, 0.58);
+}
+.artist-panel[hidden],
+#artist-profile-section[hidden],
+#artist-releases-section[hidden] { display: none; }
+.artist-auth-toggle,
+.artist-account-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+.artist-auth-toggle { justify-content: flex-start; }
+.artist-account-bar p { overflow-wrap: anywhere; }
+.artist-dashboard .music-admin-form h2,
+.artist-dashboard .music-admin-form h3,
+.artist-dashboard section h2 { margin: 0; }
+.artist-dashboard .music-admin-form p,
+.artist-dashboard section > p { color: var(--muted); line-height: 1.6; }
+.artist-dashboard .music-admin-form select[multiple] { min-height: 9rem; }
+.artist-dashboard .music-admin-form label { color: #e6ecfb; }
+.artist-dashboard .music-admin-form input:focus-visible,
+.artist-dashboard .music-admin-form textarea:focus-visible,
+.artist-dashboard .music-admin-form select:focus-visible {
+  outline: 2px solid #83b5f5;
+  outline-offset: 2px;
+}
+.artist-notice {
+  padding: 0.85rem 1rem;
+  border-left: 3px solid #83b5f5;
+  background: rgba(50, 107, 177, 0.12);
+}
+.artist-profile-link { overflow-wrap: anywhere; }
+.artist-profile-link a,
+.artist-socials a { color: #9dc5ff; text-decoration: underline; text-underline-offset: 0.2em; }
+.artist-banner {
+  min-height: clamp(150px, 30vw, 300px);
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 75% 20%, rgba(80, 140, 220, 0.32), transparent 40%),
+    linear-gradient(125deg, #182640, #080d1a 72%);
+  background-position: center;
+  background-size: cover;
+}
+.artist-storefront-header {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: clamp(1rem, 3vw, 2rem);
+}
+.artist-avatar {
+  width: clamp(88px, 18vw, 150px);
+  aspect-ratio: 1;
+  object-fit: cover;
+  border: 3px solid rgba(255, 255, 255, 0.8);
+  border-radius: 50%;
+  background: #101a2d;
+}
+.artist-storefront-header > div { min-width: 0; }
+.artist-storefront-header .eyebrow { margin: 0 0 0.6rem; }
+.artist-storefront-header #storefront-bio { max-width: 55rem; color: #c4d2e8; line-height: 1.7; white-space: pre-wrap; }
+.artist-socials { display: flex; flex-wrap: wrap; gap: 0.8rem 1.2rem; }
+.artist-releases-public {
+  padding-top: 1.4rem;
+  border-top: 1px solid var(--line);
+}
+.artist-releases-public p { color: var(--muted); line-height: 1.6; }
 @media (min-width: 650px) {
   .music-hero { grid-template-columns: minmax(0, 240px) minmax(0, 1fr); align-items: end; gap: 2rem; }
   .music-card.has-cover { grid-template-columns: auto minmax(0, 1fr); }
   .music-cover { width: 180px; }
+}
+@media (max-width: 560px) {
+  .artist-storefront-header { grid-template-columns: 1fr; justify-items: start; }
+  .artist-storefront-header .artist-avatar { grid-row: 1; }
 }

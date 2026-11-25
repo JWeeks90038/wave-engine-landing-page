@@ -94,6 +94,44 @@ with alternate delivery if necessary. Buyers should save their files
 immediately. Downloaded files do not expire. Review the digital music license
 and refund policy with counsel before enabling sales.
 
+### Artist foundation (development)
+
+The initial artist workflow adds email-verified account registration, one artist
+profile per Firebase user, unique artist slugs, private profile/release uploads,
+single-track drafts, and an administrator approval screen. Approved profiles are
+available at `/artist/{slug}`. Draft audio and artwork are not public, and this
+phase does not publish music, enable third-party streaming, or accept artist
+sales. Existing `musicTracks` records and Stripe checkout are unchanged.
+
+The artist APIs use the existing Firebase Admin credentials and Firestore
+project. The browser uploads directly to Firebase Storage; the
+`artistUploads/{uid}/...` rule restricts verified users with a pending or
+approved artist profile to new, size-limited files under their own UID using a
+server-assigned `artistUpload` custom claim. This avoids granting the Storage
+service agent broad read access to Firestore. Removing a claim does not revoke
+already-issued ID tokens immediately; they can remain valid for up to about an
+hour, but files remain private and confined to the former artist's UID.
+Public profile images are streamed by `/api/artist-media` only after profile approval. Merge the additional
+`artistUploads` match block in `music-storage.rules` into your currently
+deployed Storage rules; do not replace the deployed rules wholesale. Test the
+merged rules against a separate Firebase staging project before deployment.
+
+The artist dashboard requires Firebase email/password authentication and a
+verified email. Enable the email/password provider and add the staging host to
+Firebase Authentication's authorized domains. The existing administrator
+account and `admin: true` custom claim can review applications at
+`/artist-admin`. Configure the staging deployment with the Firebase Admin
+credentials and `FIREBASE_STORAGE_BUCKET` used by the music API. The Vercel
+rewrite serves the shared storefront shell for `/artist/{slug}`; confirm that
+the staging host uses this Vercel configuration before testing clean artist
+URLs. Social metadata is updated client-side in this first iteration;
+crawler-specific server rendering is not included.
+
+No new package dependencies were added. Costs are limited to existing Vercel
+function usage, Firebase Auth, Firestore, and Storage upload/egress usage; no
+provider billing settings were inspected, so estimate costs from actual staging
+traffic before enabling public uploads at scale.
+
 ### Firebase music setup
 
 1. Complete the Firebase inventory setup below using the existing project and

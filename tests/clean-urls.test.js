@@ -20,6 +20,9 @@ test("internal page links use clean URLs that resolve to existing pages", () => 
   assert.ok(config.redirects.some((route) =>
     route.source === "/index.html" && route.destination === "/" && route.permanent
   ));
+  assert.ok(config.rewrites.some((route) =>
+    route.source === "/artist/:slug" && route.destination === "/artist.html?slug=:slug"
+  ));
 
   for (const file of pages) {
     const sourcePath = file === "index.html" ? "/" : `/${file.slice(0, -5)}`;
