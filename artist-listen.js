@@ -6,18 +6,142 @@ const list = document.querySelector("#artist-discovery-list");
 const isProfile = Boolean(document.querySelector("#storefront-profile"));
 const selection = document.querySelector("#artist-discovery-selection");
 
+function element(tag, value, className) {
+  const node = document.createElement(tag);
+  if (value) node.textContent = value;
+  if (className) node.className = className;
+  return node;
+}
+
+function formatTime(seconds) {
+  if (!Number.isFinite(seconds) || seconds < 0) return "--:--";
+  const total = Math.floor(seconds);
+  const minutes = Math.floor(total / 60);
+  const remaining = String(total % 60).padStart(2, "0");
+  if (minutes < 60) return `${minutes}:${remaining}`;
+  return `${Math.floor(minutes / 60)}:${String(minutes % 60).padStart(2, "0")}:${remaining}`;
+}
+
 function trackPlayer(track) {
   const container = document.createElement("div");
   container.className = "artist-public-track";
-  const title = document.createElement("p");
-  title.textContent = track.title;
+  const details = element("div", "", "music-details");
+  details.append(element("h4", track.title));
+  if (track.genre) details.append(element("p", track.genre, "music-meta"));
+
   const audio = document.createElement("audio");
-  audio.controls = true;
   audio.preload = "none";
+  audio.hidden = true;
   audio.src = `${apiBase}/api/artist-releases?action=stream&id=${encodeURIComponent(track.id)}`;
-  audio.setAttribute("aria-label", `Play ${track.title}`);
   audio.addEventListener("error", () => { status.textContent = `Unable to play ${track.title}. Please try again later.`; });
-  container.append(title, audio);
+
+  const panel = element("div", "", "music-player");
+  panel.hidden = true;
+  const toggle = element("button", "", "music-player-toggle");
+  toggle.type = "button";
+  const icon = element("span", "", "music-player-icon");
+  icon.setAttribute("aria-hidden", "true");
+  const toggleText = element("span", "Play");
+  toggle.append(icon, toggleText);
+  const progress = element("input", "", "music-player-range");
+  progress.type = "range";
+  progress.min = "0";
+  progress.max = "1000";
+  progress.step = "1";
+  progress.value = "0";
+  progress.disabled = true;
+  progress.setAttribute("aria-label", `Seek in ${track.title}`);
+  const elapsed = element("span", "0:00");
+  const duration = element("span", "--:--");
+  const times = element("div", "", "music-player-times");
+  times.append(elapsed, duration);
+  const timeline = element("div", "", "music-player-timeline");
+  timeline.append(progress, times);
+  const controls = element("div", "", "music-player-controls");
+  controls.append(toggle, timeline);
+
+  const mute = element("button", "", "music-player-mute");
+  mute.type = "button";
+  const volume = element("input", "", "music-player-range music-player-volume");
+  volume.type = "range";
+  volume.min = "0";
+  volume.max = "1";
+  volume.step = "0.05";
+  volume.value = String(audio.volume);
+  volume.setAttribute("aria-label", `Volume for ${track.title}`);
+  const speed = element("select", "", "music-player-speed");
+  speed.setAttribute("aria-label", `Playback speed for ${track.title}`);
+  for (const rate of [0.75, 1, 1.25, 1.5, 2]) {
+    const option = element("option", `${rate}x`);
+    option.value = String(rate);
+    option.selected = rate === 1;
+    speed.append(option);
+  }
+  const options = element("div", "", "music-player-options");
+  options.append(mute, volume, speed);
+
+  function updatePlayback() {
+    const playing = !audio.paused && !audio.ended;
+    toggleText.textContent = playing ? "Pause" : "Play";
+    toggle.className = playing ? "music-player-toggle is-playing" : "music-player-toggle";
+    toggle.setAttribute("aria-label", `${playing ? "Pause" : "Play"} ${track.title}`);
+  }
+  function updateProgress() {
+    const valid = Number.isFinite(audio.duration) && audio.duration > 0;
+    const current = Number.isFinite(audio.currentTime) ? audio.currentTime : 0;
+    const position = valid ? Math.min(1000, Math.max(0, current / audio.duration * 1000)) : 0;
+    progress.disabled = !valid;
+    progress.value = String(position);
+    progress.style.setProperty("--range-fill", `${position / 10}%`);
+    elapsed.textContent = formatTime(current);
+    duration.textContent = valid ? formatTime(audio.duration) : "--:--";
+  }
+  function updateVolume() {
+    const muted = audio.muted || audio.volume === 0;
+    mute.textContent = muted ? "Unmute" : "Mute";
+    mute.setAttribute("aria-label", `${muted ? "Unmute" : "Mute"} ${track.title}`);
+    volume.value = String(audio.muted ? 0 : audio.volume);
+    volume.style.setProperty("--range-fill", `${Number(volume.value) * 100}%`);
+  }
+  async function play() {
+    panel.hidden = false;
+    try { await audio.play(); }
+    catch { status.textContent = `Unable to play ${track.title}. Please select Listen to try again.`; }
+  }
+  audio.addEventListener("play", updatePlayback);
+  audio.addEventListener("pause", updatePlayback);
+  audio.addEventListener("ended", updatePlayback);
+  for (const name of ["loadedmetadata", "durationchange", "timeupdate", "emptied"]) audio.addEventListener(name, updateProgress);
+  audio.addEventListener("volumechange", updateVolume);
+  toggle.addEventListener("click", () => { if (audio.paused || audio.ended) play(); else audio.pause(); });
+  progress.addEventListener("input", () => {
+    if (!Number.isFinite(audio.duration) || audio.duration <= 0) return;
+    audio.currentTime = Number(progress.value) / 1000 * audio.duration;
+    updateProgress();
+  });
+  mute.addEventListener("click", () => {
+    if (audio.muted || audio.volume === 0) {
+      if (audio.volume === 0) audio.volume = 1;
+      audio.muted = false;
+    } else {
+      audio.muted = true;
+    }
+  });
+  volume.addEventListener("input", () => { audio.volume = Number(volume.value); audio.muted = false; });
+  speed.addEventListener("change", () => { audio.playbackRate = Number(speed.value); });
+  updatePlayback();
+  updateProgress();
+  updateVolume();
+
+  const actions = element("div", "", "music-actions");
+  const listen = element("button", "Listen", "cta-button cta-primary");
+  listen.type = "button";
+  listen.addEventListener("click", play);
+  actions.append(listen);
+  panel.append(element("p", "Wave Engine Studio / Audio Player", "music-player-label"), controls, options, audio);
+  details.append(actions, panel);
+  container.append(details);
+
   if (Number.isSafeInteger(track.downloadPriceCents)) {
     const button = document.createElement("button");
     button.type = "button";
@@ -37,7 +161,12 @@ function trackPlayer(track) {
         button.disabled = false;
       }
     });
-    container.append(button);
+    actions.append(button);
+  } else {
+    const unavailable = element("button", "Download coming soon", "cta-button artist-download");
+    unavailable.type = "button";
+    unavailable.disabled = true;
+    actions.append(unavailable);
   }
   return container;
 }

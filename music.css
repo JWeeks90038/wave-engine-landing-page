@@ -303,8 +303,8 @@
 .artist-download-notice { color: var(--muted); font-size: 0.9rem; }
 .artist-public-track { margin-top: 1rem; }
 .artist-public-track p { margin: 0 0 0.4rem; overflow-wrap: anywhere; }
-.artist-public-track audio { display: block; width: 100%; }
-.artist-download { margin-top: 0.6rem; }
+.artist-public-track h4 { margin: 0 0 0.3rem; overflow-wrap: anywhere; }
+.artist-download:disabled { opacity: 0.6; cursor: not-allowed; }
 .artist-dashboard,
 .artist-storefront {
   display: grid;

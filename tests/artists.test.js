@@ -357,6 +357,7 @@ test("artist circles show the selected artist's tracks and stop previous playbac
       this.events = {};
       this.hidden = false;
       this.paused = false;
+      this.style = { setProperty() {} };
     }
     append(...children) { this.children.push(...children); }
     replaceChildren(...children) { this.children = children; }
