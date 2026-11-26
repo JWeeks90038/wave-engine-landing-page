@@ -314,7 +314,7 @@ test("track publication requires rights and review, pins audio, and supports tak
   assert.equal((await request(admin, "POST", "/api/artist-admin", { action: "approve-release", id })).statusCode, 200);
   const publicAfter = JSON.parse((await visitor("/api/artist-releases?action=public")).body());
   const northStar = publicAfter.artists.find((entry) => entry.slug === "north-star");
-  assert.deepEqual(northStar.tracks, [{ id, title: "First Light", genre: "Rock", downloadPriceCents: null, format: "MP3" }]);
+  assert.deepEqual(northStar.tracks, [{ id, title: "First Light", genre: "Rock", downloadPriceCents: null, coverUrl: "", format: "MP3" }]);
   assert.doesNotMatch(JSON.stringify(publicAfter), /artistUploads|artistUid|audioGeneration/);
   const partial = await visitor(`/api/artist-releases?action=stream&id=${id}`, { range: "bytes=1-3" });
   assert.equal(partial.statusCode, 206);
@@ -572,6 +572,31 @@ test("artist images are served only for approved profiles", async () => {
   assert.equal(publicImage.headers["content-type"], "image/png");
   assert.equal(publicImage.body(), "img");
   assert.equal(storageReads, 1);
+});
+
+test("release covers are served only for published tracks of approved artists", async () => {
+  const path = "artistUploads/artist-1/rel1-12345678-1234-1234-1234-123456789012/cover.png";
+  const db = new FakeDatabase();
+  db.records.set("artistSlugs", new Map([["north-star", { artistUid: "artist-1", status: "approved" }]]));
+  db.records.set("artists", new Map([["artist-1", { slug: "north-star", status: "approved" }]]));
+  db.records.set("artistReleases", new Map([["rel1", {
+    artistUid: "artist-1", status: "submitted", rightsConfirmed: true, coverPath: path
+  }]]));
+  const handler = mediaHandler({
+    database: () => db,
+    bucket: () => ({
+      file: () => ({
+        getMetadata: async () => [{ contentType: "image/png", size: 3 }],
+        createReadStream: () => Readable.from([Buffer.from("img")])
+      })
+    })
+  });
+  const url = "/api/artist-media?release=rel1&asset=cover";
+  assert.equal((await request(handler, "GET", url, undefined, "")).statusCode, 404);
+  db.records.get("artistReleases").get("rel1").status = "published";
+  const published = await request(handler, "GET", url, undefined, "");
+  assert.equal(published.statusCode, 200);
+  assert.equal(published.body(), "img");
 });
 
 test("artist identifiers, URLs, and upload paths reject unsafe values", () => {

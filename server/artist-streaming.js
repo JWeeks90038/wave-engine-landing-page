@@ -1,3 +1,4 @@
+const crypto = require("crypto");
 const { sendJson, setCorsHeaders } = require("./api-utils");
 const { byteRange } = require("./music-library");
 const marketplace = require("./artist-marketplace");
@@ -22,6 +23,9 @@ async function publicArtists(db) {
       ? release.downloadPriceCents : null;
     tracksByArtist.get(release.artistUid).push({
       id: entry.id, title: release.title, genre: release.genre, downloadPriceCents: price,
+      coverUrl: typeof release.coverPath === "string" && release.coverPath
+        ? `/api/artist-media?release=${encodeURIComponent(entry.id)}&asset=cover&v=${crypto.createHash("sha256").update(release.coverPath).digest("hex").slice(0, 12)}`
+        : "",
       format: typeof release.audioPath === "string" && release.audioPath.endsWith(".wav") ? "WAV" : "MP3"
     });
   }
