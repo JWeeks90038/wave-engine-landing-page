@@ -34,6 +34,7 @@ function fixture() {
     songTitles: ["First", "Second"], archivePath: "musicAlbums/album1/upload1/album.zip" };
   const records = new Map();
   const calls = [];
+  const fileAccesses = [];
   let session;
   const charge = { status: "succeeded", refunded: false, amount_refunded: 0, disputed: false,
     created: Math.floor(Date.now() / 1000) };
@@ -46,10 +47,16 @@ function fixture() {
       update: async (value) => Object.assign(records.get(id), value)
     })
   }) };
-  const bucket = () => ({ file: (filePath, options) => ({
-    getMetadata: async () => [{ generation: "123", size: "20" }],
+  const bucket = () => ({ file: (filePath, options) => {
+    fileAccesses.push(filePath);
+    return {
+    getMetadata: async () => filePath.endsWith("/cover")
+      ? [{ generation: "124", size: "5", contentType: "image/png" }]
+      : [{ generation: "123", size: "20" }],
+    createReadStream: () => Readable.from(["image"]),
     getSignedUrl: async (config) => { calls.push({ filePath, options, config }); return ["https://storage.example/download"]; }
-  }) });
+    };
+  } });
   const stripe = { checkout: { sessions: {
     create: async (input) => {
       session = {
@@ -65,7 +72,7 @@ function fixture() {
   } } };
   const payment = { mode: () => "test", stripeClient: () => stripe,
     siteUrl: () => new URL("https://example.com/"), denied: payments.denied };
-  return { album, records, charge, calls, session: () => session, handler: createHandler({ database: () => db, bucket, payment }) };
+  return { album, records, charge, calls, fileAccesses, session: () => session, handler: createHandler({ database: () => db, bucket, payment }) };
 }
 
 test("album listing and paid ZIP delivery use a pinned purchase snapshot", async () => {
@@ -75,7 +82,7 @@ test("album listing and paid ZIP delivery use a pinned purchase snapshot", async
     const f = fixture();
     const listing = await request(f.handler, "/api/music?action=albums");
     assert.deepEqual(JSON.parse(listing.body()).albums[0], {
-      id: "album1", title: "Test Album", priceCents: 500, songTitles: ["First", "Second"]
+      id: "album1", title: "Test Album", priceCents: 500, songTitles: ["First", "Second"], hasCover: false
     });
     const checkout = await request(f.handler, "/api/music?action=album-checkout", { id: "album1" });
     assert.equal(checkout.statusCode, 200);
@@ -110,6 +117,26 @@ test("album listing and paid ZIP delivery use a pinned purchase snapshot", async
     if (previous === undefined) delete process.env.MUSIC_ALBUM_SALES_ENABLED;
     else process.env.MUSIC_ALBUM_SALES_ENABLED = previous;
   }
+});
+
+test("album covers are public only for published albums and never expose storage paths", async () => {
+  const f = fixture();
+  f.album.coverPath = "musicAlbums/album1/upload2/cover";
+  const listing = await request(f.handler, "/api/music?action=albums");
+  const listed = JSON.parse(listing.body()).albums[0];
+  assert.equal(listed.hasCover, true);
+  assert.equal(listed.coverPath, undefined);
+  const cover = await request(f.handler, "/api/music?action=album-cover&id=album1");
+  assert.equal(cover.statusCode, 200);
+  assert.equal(cover.headers["content-type"], "image/png");
+  assert.equal(cover.body(), "image");
+  assert.deepEqual(f.fileAccesses, ["musicAlbums/album1/upload2/cover"]);
+  f.album.published = false;
+  assert.equal((await request(f.handler, "/api/music?action=album-cover&id=album1")).statusCode, 404);
+  f.album.published = true;
+  f.album.coverPath = "musicAlbums/other/upload/cover";
+  assert.equal((await request(f.handler, "/api/music?action=album-cover&id=album1")).statusCode, 404);
+  assert.equal(f.fileAccesses.length, 1);
 });
 
 test("album checkout fails closed for invalid and unpublished albums", async () => {

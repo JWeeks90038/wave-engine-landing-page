@@ -27,6 +27,17 @@ match /musicAlbums/{albumId}/{uploadId}/album.zip {
   allow update: if false;
 }
 
+match /musicAlbums/{albumId}/{uploadId}/cover {
+  function isAdmin() {
+    return request.auth != null && request.auth.token.admin == true;
+  }
+  allow read, delete: if isAdmin();
+  allow create: if isAdmin() && request.resource.size > 0
+    && request.resource.size <= 10 * 1024 * 1024
+    && request.resource.contentType in ['image/png', 'image/jpeg', 'image/webp'];
+  allow update: if false;
+}
+
 match /artistUploads/{artistUid}/{uploadId}/{fileName} {
   function isOwner() {
     return request.auth != null && request.auth.uid == artistUid

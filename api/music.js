@@ -15,7 +15,7 @@ module.exports = (request, response) => {
   if (action === "config") return config(request, response);
   if (action === "checkout") return checkout(request, response);
   if (action === "purchase") return purchase(request, response);
-  if (["albums", "album-checkout", "album-purchase", "album-download"].includes(action)) return albums(request, response);
+  if (["albums", "album-cover", "album-checkout", "album-purchase", "album-download"].includes(action)) return albums(request, response);
   if (action === "count-stream") return countStream(request, response);
   return sendJson(response, 404, { error: "Music endpoint not found." });
 };

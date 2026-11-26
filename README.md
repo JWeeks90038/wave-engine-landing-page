@@ -134,10 +134,13 @@ The browser prepares an uncompressed ZIP and uploads it directly to Storage;
 keep the admin page open until the upload finishes. Editing an album without
 selecting files preserves its archive. Selecting files replaces the entire
 archive, not just individual songs. Set a price from $0.50 to $100.00 and
-publish the album to show it below individual songs on the music page.
+optionally upload PNG, JPEG or WebP cover artwork (up to 10 MiB). Published
+album covers appear below individual songs on the music page. Editing an album
+without choosing a cover retains the existing image; it can also be replaced or
+removed.
 Individual tracks must still be uploaded and managed separately.
 
-Deploy `firestore.rules` and merge the `musicAlbums` block in
+Deploy `firestore.rules` and merge the `musicAlbums` blocks in
 `music-storage.rules` into the existing Storage rules. The Firebase Admin
 credential must be able to read album objects and sign Cloud Storage V4 URLs
 (a service-account private key or configured IAM signing permissions). Album

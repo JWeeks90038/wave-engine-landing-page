@@ -146,12 +146,16 @@ async function loadAlbums() {
     actions.append(action("Delete", async () => {
       if (busy || !confirm(`Delete "${album.title}"? Existing album archives are retained for customers with an open checkout.`)) return;
       setBusy(true);
+      let deleted = false;
       try {
         await deleteDoc(doc(db, "musicAlbums", album.id));
+        deleted = true;
+        const failures = await removeFiles([album.coverPath]);
         if (editingAlbum && editingAlbum.id === album.id) resetAlbum();
         await loadAlbums();
-        show("Album deleted. Its archives are retained for existing purchases.");
-      } catch (error) { show(`Album delete failed: ${error.message}`); }
+        show(failures.length ? `Album deleted, but its cover could not be removed: ${failures.join(", ")}` :
+          "Album deleted. Its archives are retained for existing purchases.");
+      } catch (error) { show(`${deleted ? "Album deleted, but refresh failed" : "Album delete failed"}: ${error.message}`); }
       finally { setBusy(false); }
     }));
     card.append(title, info, songs, actions);
@@ -245,18 +249,26 @@ albumForm.addEventListener("submit", async (event) => {
   const price = albumForm.elements.price.value;
   const priceCents = Math.round(Number(price) * 100);
   const files = Array.from(albumForm.elements.songs.files);
+  const cover = albumForm.elements.cover.files[0];
+  const removeCover = albumForm.elements.removeCover.checked;
   if (!title || title.length > 160 || !/^\d+(?:\.\d{1,2})?$/.test(price) ||
       !Number.isSafeInteger(priceCents) || priceCents < 50 || priceCents > 10000) {
     show("Enter an album title and a price from $0.50 to $100.00.");
     return;
   }
   let songTitles;
-  try { songTitles = files.length ? validateAlbumFiles(files) : editingAlbum && editingAlbum.songTitles; }
+  try {
+    songTitles = files.length ? validateAlbumFiles(files) : editingAlbum && editingAlbum.songTitles;
+    if (cover) validateFile(cover, "cover");
+    if (cover && removeCover) throw new Error("Choose either replacing or removing the album cover, not both.");
+  }
   catch (error) { show(error.message); return; }
   if (!songTitles) { show("Choose between 1 and 20 songs for the album."); return; }
   const target = editingAlbum ? doc(db, "musicAlbums", editingAlbum.id) : doc(collection(db, "musicAlbums"));
   let archivePath = editingAlbum ? editingAlbum.archivePath : "";
-  let uploaded = false;
+  const oldCoverPath = editingAlbum ? editingAlbum.coverPath || "" : "";
+  let coverPath = removeCover ? "" : oldCoverPath;
+  const uploaded = [];
   let saved = false;
   setBusy(true);
   try {
@@ -265,20 +277,27 @@ albumForm.addEventListener("submit", async (event) => {
       const archive = await makeAlbumZip(files, (done, total) => show(`Preparing album ZIP: ${done} of ${total} files.`));
       archivePath = `musicAlbums/${target.id}/${crypto.randomUUID()}/album.zip`;
       await upload(archivePath, archive, "album");
-      uploaded = true;
+      uploaded.push(archivePath);
+    }
+    if (cover) {
+      coverPath = `musicAlbums/${target.id}/${crypto.randomUUID()}/cover`;
+      await upload(coverPath, cover, "cover");
+      uploaded.push(coverPath);
     }
     await setDoc(target, {
       title, priceCents, songTitles, archivePath, published: albumForm.elements.published.checked,
+      ...(coverPath ? { coverPath } : {}),
       createdAt: editingAlbum ? editingAlbum.createdAt : serverTimestamp(),
       createdBy: editingAlbum ? editingAlbum.createdBy : auth.currentUser.uid,
       updatedAt: serverTimestamp()
     });
     saved = true;
+    const failures = oldCoverPath && oldCoverPath !== coverPath ? await removeFiles([oldCoverPath]) : [];
     resetAlbum();
     await loadAlbums();
-    show("Album saved.");
+    show(failures.length ? `Album saved, but the old cover could not be removed: ${failures.join(", ")}` : "Album saved.");
   } catch (error) {
-    const failures = uploaded && !saved ? await removeFiles([archivePath]) : [];
+    const failures = saved ? [] : await removeFiles(uploaded);
     show(`${saved ? "Album saved, but refresh failed" : "Album save failed"}: ${error.message}${failures.length ? `. Cleanup failed: ${failures.join(", ")}` : ""}`);
   } finally { setBusy(false); }
 });

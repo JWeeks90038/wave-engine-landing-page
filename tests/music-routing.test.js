@@ -100,3 +100,92 @@ test("music admin initializes and loads tracks and albums after sign-in", async 
   nodes.get("#album-new").listeners.click();
   assert.equal(nodes.get("#album-editor-title").textContent, "New album");
 });
+
+test("music admin replaces and removes an album cover without replacing the archive", async () => {
+  const nodes = new Map();
+  const element = () => ({
+    children: [], listeners: {},
+    elements: { title: {}, price: {}, published: {}, songs: { files: [] },
+      cover: { files: [] }, removeCover: { checked: false } },
+    addEventListener(event, callback) { this.listeners[event] = callback; },
+    querySelectorAll() { return []; },
+    replaceChildren(...children) { this.children = children; },
+    append(...children) { this.children.push(...children); },
+    reset() { this.elements.cover.files = []; this.elements.removeCover.checked = false; },
+    scrollIntoView() {}
+  });
+  const document = {
+    querySelector(selector) {
+      if (!nodes.has(selector)) nodes.set(selector, element());
+      return nodes.get(selector);
+    },
+    createElement: element
+  };
+  let album = { title: "Album", songTitles: ["Song"], priceCents: 500, published: true,
+    archivePath: "musicAlbums/album/archive/album.zip", coverPath: "musicAlbums/album/old/cover",
+    createdAt: "created", createdBy: "admin" };
+  const removed = [];
+  let saved;
+  let authListener;
+  const source = fs.readFileSync(path.join(__dirname, "..", "music-admin.js"), "utf8")
+    .replace(/^import .*;\r?\n/gm, "");
+  await vm.runInNewContext(`(async () => {\n${source}\n})()`, {
+    document, location: { protocol: "https:", hostname: "example.com" },
+    firebaseClient: async () => ({}), fetch: async () => ({ ok: true, json: async () => ({ storageBucket: "bucket" }) }),
+    getAuth: () => ({ currentUser: { uid: "admin" } }), getFirestore: () => ({}), getStorage: () => ({}),
+    onAuthStateChanged: (auth, listener) => { authListener = listener; },
+    collection: (db, name) => name,
+    getDocs: async (name) => ({ docs: name === "musicAlbums" ? [{ id: "album", data: () => album }] : [] }),
+    doc: (db, name, id) => ({ id }),
+    ref: (storage, path) => path,
+    uploadBytesResumable: () => ({ on: (event, progress, reject, resolve) => resolve() }),
+    setDoc: async (target, data) => { saved = data; album = data; },
+    deleteObject: async (path) => { removed.push(path); },
+    serverTimestamp: () => "updated",
+    crypto: { randomUUID: () => "new" }, URL
+  });
+  await authListener({ getIdTokenResult: async () => ({ claims: { admin: true } }) });
+  const edit = () => nodes.get("#admin-albums").children[0].children[3].children[0].listeners.click();
+  const form = nodes.get("#album-form");
+  edit();
+  form.elements.cover.files = [{ type: "image/png", size: 12 }];
+  await form.listeners.submit({ preventDefault() {} });
+  assert.equal(saved.coverPath, "musicAlbums/album/new/cover");
+  assert.equal(saved.archivePath, "musicAlbums/album/archive/album.zip");
+  assert.deepEqual(removed, ["musicAlbums/album/old/cover"]);
+  edit();
+  form.elements.removeCover.checked = true;
+  await form.listeners.submit({ preventDefault() {} });
+  assert.equal("coverPath" in saved, false);
+  assert.equal(saved.archivePath, "musicAlbums/album/archive/album.zip");
+  assert.deepEqual(removed, ["musicAlbums/album/old/cover", "musicAlbums/album/new/cover"]);
+});
+
+test("album listing renders uploaded cover artwork", async () => {
+  const nodes = new Map();
+  const element = (tag) => ({
+    tag, children: [], addEventListener() {},
+    append(...children) { this.children.push(...children); },
+    replaceChildren(...children) { this.children = children; }
+  });
+  const document = {
+    querySelector(selector) {
+      if (!nodes.has(selector)) nodes.set(selector, element("div"));
+      return nodes.get(selector);
+    },
+    createElement: element
+  };
+  const source = fs.readFileSync(path.join(__dirname, "..", "music-albums.js"), "utf8");
+  await vm.runInNewContext(`(async () => {\n${source}\n})()`, {
+    document, location: { protocol: "https:", hostname: "example.com" },
+    fetch: async () => ({ ok: true, json: async () => ({
+      albums: [{ id: "album", title: "Album", songTitles: ["Song"], priceCents: 500, hasCover: true }]
+    }) }),
+    URLSearchParams
+  });
+  const card = nodes.get("#music-albums").children[0];
+  assert.match(card.className, /has-cover/);
+  assert.equal(card.children[0].tag, "img");
+  assert.match(card.children[0].src, /action=album-cover&id=album/);
+  assert.equal(card.children[0].alt, "Cover artwork for Album");
+});

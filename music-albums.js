@@ -7,6 +7,16 @@ const container = document.querySelector("#music-albums");
 function renderAlbum(album) {
   const card = document.createElement("article");
   card.className = "music-card";
+  if (album.hasCover) {
+    card.className += " has-cover";
+    const cover = document.createElement("img");
+    const query = new URLSearchParams({ action: "album-cover", id: album.id });
+    cover.src = `${apiBase}/api/music?${query}`;
+    cover.alt = `Cover artwork for ${album.title}`;
+    cover.loading = "lazy";
+    cover.className = "music-cover";
+    card.append(cover);
+  }
   const details = document.createElement("div");
   details.className = "music-details";
   const title = document.createElement("h3");

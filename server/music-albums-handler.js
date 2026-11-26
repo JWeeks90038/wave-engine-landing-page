@@ -7,6 +7,8 @@ const validId = (id) => typeof id === "string" && /^[a-zA-Z0-9_-]{1,128}$/.test(
 const validPrice = (price) => Number.isSafeInteger(price) && price >= 50 && price <= 10000;
 const validArchive = (id, path) => typeof path === "string" &&
   new RegExp(`^musicAlbums/${id}/[a-zA-Z0-9_-]{1,128}/album\\.zip$`).test(path);
+const validCover = (id, path) => validId(id) && typeof path === "string" &&
+  new RegExp(`^musicAlbums/${id}/[a-zA-Z0-9_-]{1,128}/cover$`).test(path);
 
 function availableAlbum(id, album) {
   return validId(id) && album && album.published === true &&
@@ -38,9 +40,39 @@ function createHandler({ database = music.database, bucket = music.bucket, payme
         const snapshot = await db.collection("musicAlbums").where("published", "==", true).get();
         const albums = snapshot.docs.filter((doc) => availableAlbum(doc.id, doc.data())).map((doc) => {
           const album = doc.data();
-          return { id: doc.id, title: album.title, priceCents: album.priceCents, songTitles: album.songTitles };
+          return { id: doc.id, title: album.title, priceCents: album.priceCents, songTitles: album.songTitles,
+            hasCover: validCover(doc.id, album.coverPath) };
         }).sort((a, b) => a.title.localeCompare(b.title));
         return sendJson(response, 200, { albums });
+      }
+      if (action === "album-cover" && request.method === "GET") {
+        const id = params.get("id");
+        if (!validId(id)) throw fail("Invalid album.", 400);
+        const snapshot = await db.collection("musicAlbums").doc(id).get();
+        const album = snapshot.exists && snapshot.data();
+        if (!availableAlbum(id, album) || !validCover(id, album.coverPath)) {
+          throw fail("Album cover not found.", 404);
+        }
+        const file = bucket().file(album.coverPath);
+        const [metadata] = await file.getMetadata();
+        const size = Number(metadata.size);
+        if (!Number.isSafeInteger(size) || size <= 0 || size > 10 * 1024 * 1024 ||
+            !["image/png", "image/jpeg", "image/webp"].includes(metadata.contentType)) {
+          throw new Error("Invalid album cover metadata.");
+        }
+        setCorsHeaders(response);
+        response.setHeader("Content-Type", metadata.contentType);
+        response.setHeader("Content-Length", String(size));
+        response.setHeader("X-Content-Type-Options", "nosniff");
+        response.writeHead(200);
+        await new Promise((resolve, reject) => {
+          const source = file.createReadStream();
+          source.on("error", reject);
+          response.on("close", () => { source.destroy(); resolve(); });
+          response.on("finish", resolve);
+          source.pipe(response);
+        });
+        return;
       }
       if (action === "album-checkout" && request.method === "POST") {
         if (process.env.MUSIC_ALBUM_SALES_ENABLED !== "true" ||
@@ -129,6 +161,7 @@ function createHandler({ database = music.database, bucket = music.bucket, payme
       return sendJson(response, 405, { error: "Method not allowed." });
     } catch (error) {
       console.error("Music album error:", error.message);
+      if (response.headersSent) return response.destroy(error);
       return sendJson(response, error.statusCode || (error.code === 404 ? 404 : 503), {
         error: error.statusCode ? error.message :
           error.code === 404 ? "This album archive is no longer available. Please contact us for help." :
