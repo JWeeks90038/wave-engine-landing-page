@@ -49,6 +49,7 @@
     <script defer src="mobile-nav.js"></script>
     <link rel="stylesheet" href="music.css" />
     <script type="module" src="music.js"></script>
+    <script type="module" src="music-albums.js"></script>
     <script type="module" src="artist-listen.js"></script>
   </head>
   <body>
@@ -89,6 +90,12 @@
           <h2 id="wave-library-title">The Patriot Collection</h2>
           <p id="music-status" role="status" aria-live="polite">Loading the music library...</p>
           <div id="music-tracks" class="music-tracks"></div>
+          <div class="music-albums" aria-labelledby="music-albums-title">
+            <h2 id="music-albums-title">Full albums</h2>
+            <p>Purchase an entire album and download all included MP3 and WAV files together.</p>
+            <p id="music-albums-status" role="status" aria-live="polite">Loading albums...</p>
+            <div id="music-albums" class="music-tracks"></div>
+          </div>
           <noscript>JavaScript is required to load the music library.</noscript>
         </section>
 

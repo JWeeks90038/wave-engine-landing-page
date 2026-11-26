@@ -1,7 +1,8 @@
 import { attachStreamCounter } from "./song-stream-counter.js";
 
 const isLocal = location.protocol === "file:" || ["localhost", "127.0.0.1"].includes(location.hostname);
-const apiBase = isLocal ? "http://127.0.0.1:8787" : "https://wave-engine-landing-page.vercel.app";
+const apiBase = isLocal ? "http://127.0.0.1:8787" :
+  location.hostname.endsWith(".vercel.app") ? location.origin : "https://wave-engine-landing-page.vercel.app";
 const status = document.querySelector("#music-status");
 const tracks = document.querySelector("#music-tracks");
 const players = [];

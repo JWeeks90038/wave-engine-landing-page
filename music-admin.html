@@ -57,6 +57,20 @@
           </form>
           <h2>Tracks</h2>
           <div id="admin-tracks" class="music-admin-list"></div>
+          <h2 id="album-editor-title">New album</h2>
+          <p>Upload 1–20 songs as MP3 and/or WAV files. Give both formats of the same song the same filename, apart from the extension. These uploads are separate from individual tracks.</p>
+          <form id="album-form" class="music-admin-form">
+            <label>Album title <input name="title" maxlength="160" required /></label>
+            <label>Album price in USD ($0.50–$100.00) <input name="price" type="number" min="0.50" max="100" step="0.01" required /></label>
+            <label>Song files (MP3 and WAV, up to 100 MiB per file) <input name="songs" type="file" accept=".mp3,.wav,audio/mpeg,audio/wav,audio/x-wav" multiple /></label>
+            <label><span>Published <input name="published" type="checkbox" /></span></label>
+            <div class="music-actions">
+              <button class="cta-button cta-primary" type="submit">Save album</button>
+              <button id="album-new" class="cta-button" type="button">New album</button>
+            </div>
+          </form>
+          <h2>Albums</h2>
+          <div id="admin-albums" class="music-admin-list"></div>
         </div>
       </main>
     </div>

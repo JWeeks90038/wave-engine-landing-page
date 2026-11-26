@@ -125,6 +125,46 @@ with alternate delivery if necessary. Buyers should save their files
 immediately. Downloaded files do not expire. Review the digital music license
 and refund policy with counsel before enabling sales.
 
+#### Wave Engine album downloads
+
+The music administrator can create multiple albums separately from individual
+tracks. Choose 1–20 songs as MP3 and/or WAV files (up to 100 MiB per file).
+Use the same filename before the extension to include both formats of a song.
+The browser prepares an uncompressed ZIP and uploads it directly to Storage;
+keep the admin page open until the upload finishes. Editing an album without
+selecting files preserves its archive. Selecting files replaces the entire
+archive, not just individual songs. Set a price from $0.50 to $100.00 and
+publish the album to show it below individual songs on the music page.
+Individual tracks must still be uploaded and managed separately.
+
+Deploy `firestore.rules` and merge the `musicAlbums` block in
+`music-storage.rules` into the existing Storage rules. The Firebase Admin
+credential must be able to read album objects and sign Cloud Storage V4 URLs
+(a service-account private key or configured IAM signing permissions). Album
+checkout uses the existing `STRIPE_SECRET_KEY`, `MUSIC_STRIPE_MODE` and
+`MUSIC_SITE_URL`, creates USD prices in Stripe dynamically, and requires
+`MUSIC_ALBUM_SALES_ENABLED=true`. Live checkout also requires
+`MUSIC_LIVE_CHECKOUT_ENABLED=true`. Leave album sales disabled until the
+complete checkout, signing, ZIP extraction, large-file delivery, expiration,
+refund and support workflows have been tested in a separate staging project.
+For testing, use the staging deployment's `*.vercel.app` URL and configure
+`MUSIC_SITE_URL` to that same URL. Music library, album, admin, and purchase
+pages on Vercel hosts use their own deployment's API; other non-local domains
+use the production Vercel API.
+
+After payment, the buyer receives one ZIP with every uploaded format. The
+private purchase link expires 10 minutes after the charge, like individual
+downloads. A verified click redirects to a signed Storage URL valid for at
+most one minute and never beyond the purchase link's expiration; that URL is
+also a bearer link and can remain usable briefly after a refund. Storage
+downloads and archive creation may incur substantial bandwidth, storage and
+Stripe costs. The purchase records and old archives are retained when an
+album is edited, unpublished or deleted so already-open checkouts can be
+fulfilled. Establish and apply a retention and cleanup policy that preserves
+active purchases, and monitor abandoned checkout records and storage use.
+Removing an archived object prevents fulfillment and requires support. Large
+albums can take considerable time and local disk space to prepare and download.
+
 ### Artist foundation (development)
 
 The initial artist workflow adds email-verified account registration, one artist
@@ -334,8 +374,9 @@ traffic before enabling public uploads at scale.
    separate test project. Deleting a track removes its metadata first and then
    its files. Any failed file cleanup is reported with the affected paths.
 
-The public library and admin page use the existing Vercel API origin; localhost
-uses the Node API on port 8787. Firebase Storage download tokens must not be
+The public library and admin page use the current Vercel deployment's API on
+`*.vercel.app`, the production Vercel API on other non-local domains, and the
+Node API on port 8787 for localhost. Firebase Storage download tokens must not be
 shared: anyone holding a tokenized URL can bypass Storage rules. Public clients
 receive only API links, not Storage paths or tokens. Restrict Firebase Console,
 service-account IAM, and administrator accounts accordingly. Music delivery

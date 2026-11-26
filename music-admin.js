@@ -2,14 +2,18 @@ import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from
 import { getFirestore, collection, doc, getDocs, setDoc, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
 import { getStorage, ref, uploadBytesResumable, deleteObject, getBlob } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-storage.js";
 import { firebaseClient } from "./firebase-client.js";
+import { makeAlbumZip, validateAlbumFiles } from "./music-album-zip.js";
 
 const isLocal = location.protocol === "file:" || ["localhost", "127.0.0.1"].includes(location.hostname);
-const apiBase = isLocal ? "http://127.0.0.1:8787" : "https://wave-engine-landing-page.vercel.app";
+const apiBase = isLocal ? "http://127.0.0.1:8787" :
+  location.hostname.endsWith(".vercel.app") ? location.origin : "https://wave-engine-landing-page.vercel.app";
 const status = document.querySelector("#admin-status");
 const login = document.querySelector("#admin-login");
 const content = document.querySelector("#admin-content");
 const form = document.querySelector("#track-form");
 const list = document.querySelector("#admin-tracks");
+const albumForm = document.querySelector("#album-form");
+const albumList = document.querySelector("#admin-albums");
 const fields = ["title", "artist", "album", "description", "genre", "releaseDate", "duration"];
 const formats = {
   mp3: { types: ["audio/mpeg"], extension: ".mp3", limit: 100 * 1024 * 1024, file: "mp3.mp3" },
@@ -17,6 +21,7 @@ const formats = {
   cover: { types: ["image/png", "image/jpeg", "image/webp"], limit: 10 * 1024 * 1024, file: "cover" }
 };
 let auth, db, storage, editing = null, busy = false;
+let editingAlbum = null;
 let previewUrls = [];
 
 function show(message) { status.textContent = message; }
@@ -89,6 +94,51 @@ async function loadTracks() {
         } catch (error) { show(`Preview failed: ${error.message}`); }
         finally { setBusy(false); }
       }));
+    }
+    function resetAlbum() {
+      editingAlbum = null;
+      albumForm.reset();
+      document.querySelector("#album-editor-title").textContent = "New album";
+    }
+    async function loadAlbums() {
+      albumList.replaceChildren();
+      const snapshot = await getDocs(collection(db, "musicAlbums"));
+      const albums = snapshot.docs.map((entry) => ({ id: entry.id, ...entry.data() }))
+        .sort((a, b) => a.title.localeCompare(b.title));
+      for (const album of albums) {
+        const card = document.createElement("article");
+        const title = document.createElement("h3");
+        title.textContent = album.title;
+        const info = document.createElement("p");
+        info.textContent = `${album.published ? "Published" : "Unpublished"} · ${album.songTitles.length} songs · $${(album.priceCents / 100).toFixed(2)}`;
+        const songs = document.createElement("p");
+        songs.textContent = album.songTitles.join(", ");
+        const actions = document.createElement("div");
+        actions.className = "music-actions";
+        actions.append(action("Edit", () => {
+          editingAlbum = album;
+          albumForm.reset();
+          albumForm.elements.title.value = album.title;
+          albumForm.elements.price.value = (album.priceCents / 100).toFixed(2);
+          albumForm.elements.published.checked = album.published;
+          document.querySelector("#album-editor-title").textContent = `Edit: ${album.title}`;
+          albumForm.scrollIntoView({ behavior: "smooth" });
+        }));
+        actions.append(action("Delete", async () => {
+          if (busy || !confirm(`Delete "${album.title}"? Existing album archives are retained for customers with an open checkout.`)) return;
+          setBusy(true);
+          try {
+            await deleteDoc(doc(db, "musicAlbums", album.id));
+            if (editingAlbum && editingAlbum.id === album.id) resetAlbum();
+            await loadAlbums();
+            show("Album deleted. Its archives are retained for existing purchases.");
+          } catch (error) { show(`Album delete failed: ${error.message}`); }
+          finally { setBusy(false); }
+        }));
+        card.append(title, info, songs, actions);
+        albumList.append(card);
+      }
+      if (!albums.length) albumList.textContent = "No albums yet.";
     }
     actions.append(action("Delete", async () => {
       if (busy || !confirm(`Delete "${track.title}" and its files?`)) return;
@@ -188,6 +238,51 @@ form.addEventListener("submit", async (event) => {
   } finally { setBusy(false); }
 });
 
+albumForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (busy) return;
+  const title = albumForm.elements.title.value.trim();
+  const price = albumForm.elements.price.value;
+  const priceCents = Math.round(Number(price) * 100);
+  const files = Array.from(albumForm.elements.songs.files);
+  if (!title || title.length > 160 || !/^\d+(?:\.\d{1,2})?$/.test(price) ||
+      !Number.isSafeInteger(priceCents) || priceCents < 50 || priceCents > 10000) {
+    show("Enter an album title and a price from $0.50 to $100.00.");
+    return;
+  }
+  let songTitles;
+  try { songTitles = files.length ? validateAlbumFiles(files) : editingAlbum && editingAlbum.songTitles; }
+  catch (error) { show(error.message); return; }
+  if (!songTitles) { show("Choose between 1 and 20 songs for the album."); return; }
+  const target = editingAlbum ? doc(db, "musicAlbums", editingAlbum.id) : doc(collection(db, "musicAlbums"));
+  let archivePath = editingAlbum ? editingAlbum.archivePath : "";
+  let uploaded = false;
+  let saved = false;
+  setBusy(true);
+  try {
+    if (files.length) {
+      show("Preparing album ZIP. Keep this page open.");
+      const archive = await makeAlbumZip(files, (done, total) => show(`Preparing album ZIP: ${done} of ${total} files.`));
+      archivePath = `musicAlbums/${target.id}/${crypto.randomUUID()}/album.zip`;
+      await upload(archivePath, archive, "album");
+      uploaded = true;
+    }
+    await setDoc(target, {
+      title, priceCents, songTitles, archivePath, published: albumForm.elements.published.checked,
+      createdAt: editingAlbum ? editingAlbum.createdAt : serverTimestamp(),
+      createdBy: editingAlbum ? editingAlbum.createdBy : auth.currentUser.uid,
+      updatedAt: serverTimestamp()
+    });
+    saved = true;
+    resetAlbum();
+    await loadAlbums();
+    show("Album saved.");
+  } catch (error) {
+    const failures = uploaded && !saved ? await removeFiles([archivePath]) : [];
+    show(`${saved ? "Album saved, but refresh failed" : "Album save failed"}: ${error.message}${failures.length ? `. Cleanup failed: ${failures.join(", ")}` : ""}`);
+  } finally { setBusy(false); }
+});
+
 try {
   const [app, configResponse] = await Promise.all([firebaseClient(apiBase), fetch(`${apiBase}/api/music?action=config`)]);
   const config = await configResponse.json();
@@ -204,22 +299,24 @@ try {
   });
   document.querySelector("#admin-logout").addEventListener("click", () => signOut(auth));
   document.querySelector("#admin-new").addEventListener("click", resetEditor);
+  document.querySelector("#album-new").addEventListener("click", resetAlbum);
   document.querySelector("#admin-refresh").addEventListener("click", async () => {
-    try { await loadTracks(); show("Tracks refreshed."); }
+    try { await Promise.all([loadTracks(), loadAlbums()]); show("Tracks and albums refreshed."); }
     catch (error) { show(`Refresh failed: ${error.message}`); }
   });
   onAuthStateChanged(auth, async (user) => {
     clearPreviews();
     list.replaceChildren();
+    albumList.replaceChildren();
     content.hidden = true;
     login.hidden = Boolean(user);
-    if (!user) { resetEditor(); show("Sign in with an administrator account."); return; }
+    if (!user) { resetEditor(); resetAlbum(); show("Sign in with an administrator account."); return; }
     try {
       const token = await user.getIdTokenResult(true);
       if (token.claims.admin !== true) { await signOut(auth); show("Administrator access is required."); return; }
       content.hidden = false;
-      await loadTracks();
-      show("Manage and preview tracks before publishing.");
+      await Promise.all([loadTracks(), loadAlbums()]);
+      show("Manage tracks and albums before publishing.");
     } catch (error) { show(`Unable to load tracks: ${error.message}`); }
   });
 } catch (error) { show(error.message || "Authentication could not be loaded."); }

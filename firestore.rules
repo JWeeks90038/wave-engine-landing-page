@@ -31,6 +31,30 @@ service cloud.firestore {
         && request.resource.data.createdBy == resource.data.createdBy;
       allow delete: if isAdmin();
     }
+    match /musicAlbums/{albumId} {
+      function isAdmin() {
+        return request.auth != null && request.auth.token.admin == true;
+      }
+      function validAlbum() {
+        let data = request.resource.data;
+        return data.keys().hasOnly(['title', 'priceCents', 'songTitles', 'archivePath', 'published',
+          'createdAt', 'updatedAt', 'createdBy'])
+          && data.title is string && data.title.size() > 0 && data.title.size() <= 160
+          && data.priceCents is int && data.priceCents >= 50 && data.priceCents <= 10000
+          && data.songTitles is list && data.songTitles.size() >= 1 && data.songTitles.size() <= 20
+          && data.archivePath is string
+          && data.archivePath.matches('^musicAlbums/' + albumId + '/[a-zA-Z0-9_-]+/album[.]zip$')
+          && data.published is bool && data.updatedAt == request.time
+          && data.createdAt is timestamp && data.createdBy is string;
+      }
+      allow read: if isAdmin();
+      allow create: if isAdmin() && validAlbum() && request.resource.data.createdAt == request.time
+        && request.resource.data.createdBy == request.auth.uid;
+      allow update: if isAdmin() && validAlbum()
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.createdBy == resource.data.createdBy;
+      allow delete: if isAdmin();
+    }
     // The server exposes availability and checks admin claims; clients never write directly.
     match /{document=**} {
       allow read, write: if false;

@@ -4,6 +4,7 @@ const file = require("../server/music-file-handler");
 const config = require("../server/music-config-handler");
 const checkout = require("../server/music-checkout-handler");
 const purchase = require("../server/music-purchase-handler");
+const albums = require("../server/music-albums-handler");
 const { createHandler: createStreamCountHandler } = require("../server/song-stream-counts");
 const countStream = createStreamCountHandler("music");
 
@@ -14,6 +15,7 @@ module.exports = (request, response) => {
   if (action === "config") return config(request, response);
   if (action === "checkout") return checkout(request, response);
   if (action === "purchase") return purchase(request, response);
+  if (["albums", "album-checkout", "album-purchase", "album-download"].includes(action)) return albums(request, response);
   if (action === "count-stream") return countStream(request, response);
   return sendJson(response, 404, { error: "Music endpoint not found." });
 };

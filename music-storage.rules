@@ -16,6 +16,17 @@ match /musicTracks/{trackId}/{uploadId}/{fileName} {
   allow update: if false;
 }
 
+match /musicAlbums/{albumId}/{uploadId}/album.zip {
+  function isAdmin() {
+    return request.auth != null && request.auth.token.admin == true;
+  }
+  allow read, delete: if isAdmin();
+  allow create: if isAdmin() && request.resource.size > 0
+    && request.resource.size <= 4 * 1024 * 1024 * 1024
+    && request.resource.contentType == 'application/zip';
+  allow update: if false;
+}
+
 match /artistUploads/{artistUid}/{uploadId}/{fileName} {
   function isOwner() {
     return request.auth != null && request.auth.uid == artistUid
