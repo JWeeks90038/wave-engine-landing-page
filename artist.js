@@ -47,6 +47,8 @@ try {
     const banner = document.querySelector("#storefront-banner");
     const bannerUrl = new URL(profile.bannerUrl, apiBase).href;
     banner.style.backgroundImage = `linear-gradient(90deg, rgba(5, 8, 22, 0.18), rgba(5, 8, 22, 0.78)), url("${bannerUrl}")`;
+    const positionY = Number.isInteger(profile.bannerPositionY) ? profile.bannerPositionY : 50;
+    banner.style.backgroundPosition = `center ${positionY}%`;
   }
   const socials = document.querySelector("#storefront-socials");
   for (const [key, label] of [["website", "Website"], ["instagram", "Instagram"], ["youtube", "YouTube"], ["tiktok", "TikTok"]]) {

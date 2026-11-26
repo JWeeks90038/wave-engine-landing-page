@@ -66,6 +66,7 @@ function createHandler({
         const socialLinks = marketplace.validateSocialLinks(body.socialLinks || {});
         const avatarPath = marketplace.validateProfileAssetPath(user.uid, "avatar", body.avatarPath);
         const bannerPath = marketplace.validateProfileAssetPath(user.uid, "banner", body.bannerPath);
+        const bannerPositionY = marketplace.validateBannerPosition(body.bannerPositionY);
         if (avatarPath) await verifyProfileImage(bucket, avatarPath);
         if (bannerPath) await verifyProfileImage(bucket, bannerPath);
         const slugRef = db.collection("artistSlugs").doc(slug);
@@ -75,7 +76,7 @@ function createHandler({
           if (existingArtist.exists) throw marketplace.statusError("An artist profile already exists for this account.", 409);
           if (existingSlug.exists) throw marketplace.statusError("That artist URL is already in use.", 409);
           transaction.create(artistRef, {
-            artistName, slug, biography, socialLinks, avatarPath, bannerPath,
+            artistName, slug, biography, socialLinks, avatarPath, bannerPath, bannerPositionY,
             status: "pending", createdAt: marketplace.FieldValue.serverTimestamp(),
             updatedAt: marketplace.FieldValue.serverTimestamp()
           });
@@ -83,7 +84,7 @@ function createHandler({
         });
         await setArtistUploadClaim(user.uid, true);
         return sendJson(response, 201, { profile: profileResponse({
-          artistName, slug, biography, socialLinks, avatarPath, bannerPath, status: "pending"
+          artistName, slug, biography, socialLinks, avatarPath, bannerPath, bannerPositionY, status: "pending"
         }), tokenRefreshRequired: true });
       }
 
@@ -92,6 +93,7 @@ function createHandler({
       const socialLinks = marketplace.validateSocialLinks(body.socialLinks || {});
       const avatarPath = marketplace.validateProfileAssetPath(user.uid, "avatar", body.avatarPath);
       const bannerPath = marketplace.validateProfileAssetPath(user.uid, "banner", body.bannerPath);
+      const bannerPositionY = marketplace.validateBannerPosition(body.bannerPositionY);
       if (avatarPath) await verifyProfileImage(bucket, avatarPath);
       if (bannerPath) await verifyProfileImage(bucket, bannerPath);
       let updatedProfile;
@@ -103,8 +105,10 @@ function createHandler({
         if (["rejected", "suspended"].includes(current.status)) {
           throw marketplace.statusError("This artist profile cannot be edited. Contact Wave Engine support.", 403);
         }
+        const keptPosition = body.bannerPositionY === undefined && Number.isInteger(current.bannerPositionY)
+          ? current.bannerPositionY : bannerPositionY;
         updatedProfile = {
-          ...current, artistName, biography, socialLinks,
+          ...current, artistName, biography, socialLinks, bannerPositionY: keptPosition,
           avatarPath: avatarPath || current.avatarPath || "",
           bannerPath: bannerPath || current.bannerPath || ""
         };
@@ -113,7 +117,7 @@ function createHandler({
           bannerPath && current.bannerPath && bannerPath !== current.bannerPath ? current.bannerPath : ""
         ].filter(Boolean);
         transaction.update(artistRef, {
-          artistName, biography, socialLinks,
+          artistName, biography, socialLinks, bannerPositionY: keptPosition,
           ...(avatarPath ? { avatarPath } : {}),
           ...(bannerPath ? { bannerPath } : {}),
           updatedAt: marketplace.FieldValue.serverTimestamp()

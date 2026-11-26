@@ -102,6 +102,14 @@ function validateSocialLinks(value) {
   return result;
 }
 
+function validateBannerPosition(value) {
+  if (value === undefined || value === null) return 50;
+  if (!Number.isInteger(value) || value < 0 || value > 100) {
+    throw statusError("Banner position must be a whole number from 0 to 100.", 400);
+  }
+  return value;
+}
+
 function validateProfileAssetPath(uid, asset, value) {
   if (value === undefined || value === "") return "";
   if (typeof value !== "string") throw statusError("Invalid profile image.", 400);
@@ -170,7 +178,8 @@ function profileResponse(profile) {
     socialLinks: profile.socialLinks || {},
     status: profile.status,
     avatarUrl: assetUrl("avatar", profile.avatarPath),
-    bannerUrl: assetUrl("banner", profile.bannerPath)
+    bannerUrl: assetUrl("banner", profile.bannerPath),
+    bannerPositionY: Number.isInteger(profile.bannerPositionY) ? profile.bannerPositionY : 50
   };
 }
 
@@ -185,6 +194,7 @@ module.exports = {
   statusError,
   validateArtistName,
   validateBiography,
+  validateBannerPosition,
   validateProfileAssetPath,
   validateReleaseInput,
   validateSlug,
