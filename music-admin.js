@@ -95,51 +95,6 @@ async function loadTracks() {
         finally { setBusy(false); }
       }));
     }
-    function resetAlbum() {
-      editingAlbum = null;
-      albumForm.reset();
-      document.querySelector("#album-editor-title").textContent = "New album";
-    }
-    async function loadAlbums() {
-      albumList.replaceChildren();
-      const snapshot = await getDocs(collection(db, "musicAlbums"));
-      const albums = snapshot.docs.map((entry) => ({ id: entry.id, ...entry.data() }))
-        .sort((a, b) => a.title.localeCompare(b.title));
-      for (const album of albums) {
-        const card = document.createElement("article");
-        const title = document.createElement("h3");
-        title.textContent = album.title;
-        const info = document.createElement("p");
-        info.textContent = `${album.published ? "Published" : "Unpublished"} · ${album.songTitles.length} songs · $${(album.priceCents / 100).toFixed(2)}`;
-        const songs = document.createElement("p");
-        songs.textContent = album.songTitles.join(", ");
-        const actions = document.createElement("div");
-        actions.className = "music-actions";
-        actions.append(action("Edit", () => {
-          editingAlbum = album;
-          albumForm.reset();
-          albumForm.elements.title.value = album.title;
-          albumForm.elements.price.value = (album.priceCents / 100).toFixed(2);
-          albumForm.elements.published.checked = album.published;
-          document.querySelector("#album-editor-title").textContent = `Edit: ${album.title}`;
-          albumForm.scrollIntoView({ behavior: "smooth" });
-        }));
-        actions.append(action("Delete", async () => {
-          if (busy || !confirm(`Delete "${album.title}"? Existing album archives are retained for customers with an open checkout.`)) return;
-          setBusy(true);
-          try {
-            await deleteDoc(doc(db, "musicAlbums", album.id));
-            if (editingAlbum && editingAlbum.id === album.id) resetAlbum();
-            await loadAlbums();
-            show("Album deleted. Its archives are retained for existing purchases.");
-          } catch (error) { show(`Album delete failed: ${error.message}`); }
-          finally { setBusy(false); }
-        }));
-        card.append(title, info, songs, actions);
-        albumList.append(card);
-      }
-      if (!albums.length) albumList.textContent = "No albums yet.";
-    }
     actions.append(action("Delete", async () => {
       if (busy || !confirm(`Delete "${track.title}" and its files?`)) return;
       setBusy(true);
@@ -158,6 +113,51 @@ async function loadTracks() {
     list.append(card);
   }
   if (!records.length) list.textContent = "No tracks yet.";
+}
+function resetAlbum() {
+  editingAlbum = null;
+  albumForm.reset();
+  document.querySelector("#album-editor-title").textContent = "New album";
+}
+async function loadAlbums() {
+  albumList.replaceChildren();
+  const snapshot = await getDocs(collection(db, "musicAlbums"));
+  const albums = snapshot.docs.map((entry) => ({ id: entry.id, ...entry.data() }))
+    .sort((a, b) => a.title.localeCompare(b.title));
+  for (const album of albums) {
+    const card = document.createElement("article");
+    const title = document.createElement("h3");
+    title.textContent = album.title;
+    const info = document.createElement("p");
+    info.textContent = `${album.published ? "Published" : "Unpublished"} · ${album.songTitles.length} songs · $${(album.priceCents / 100).toFixed(2)}`;
+    const songs = document.createElement("p");
+    songs.textContent = album.songTitles.join(", ");
+    const actions = document.createElement("div");
+    actions.className = "music-actions";
+    actions.append(action("Edit", () => {
+      editingAlbum = album;
+      albumForm.reset();
+      albumForm.elements.title.value = album.title;
+      albumForm.elements.price.value = (album.priceCents / 100).toFixed(2);
+      albumForm.elements.published.checked = album.published;
+      document.querySelector("#album-editor-title").textContent = `Edit: ${album.title}`;
+      albumForm.scrollIntoView({ behavior: "smooth" });
+    }));
+    actions.append(action("Delete", async () => {
+      if (busy || !confirm(`Delete "${album.title}"? Existing album archives are retained for customers with an open checkout.`)) return;
+      setBusy(true);
+      try {
+        await deleteDoc(doc(db, "musicAlbums", album.id));
+        if (editingAlbum && editingAlbum.id === album.id) resetAlbum();
+        await loadAlbums();
+        show("Album deleted. Its archives are retained for existing purchases.");
+      } catch (error) { show(`Album delete failed: ${error.message}`); }
+      finally { setBusy(false); }
+    }));
+    card.append(title, info, songs, actions);
+    albumList.append(card);
+  }
+  if (!albums.length) albumList.textContent = "No albums yet.";
 }
 async function removeFiles(paths) {
   const failed = [];
