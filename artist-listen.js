@@ -145,7 +145,7 @@ function trackPlayer(track) {
   if (Number.isSafeInteger(track.downloadPriceCents)) {
     const button = document.createElement("button");
     button.type = "button";
-    button.className = "cta-button artist-download";
+    button.className = "cta-button music-download-wav artist-download";
     button.textContent = `Download ${track.format || "MP3"}`;
     button.addEventListener("click", async () => {
       button.disabled = true;

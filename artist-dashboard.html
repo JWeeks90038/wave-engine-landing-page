@@ -74,6 +74,10 @@
               <label>Banner image (PNG, JPEG or WebP; up to 10 MiB)
                 <input name="banner" type="file" accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp" />
               </label>
+              <label>Banner vertical position
+                <input name="bannerPositionY" type="range" min="0" max="100" step="1" value="50" />
+              </label>
+              <div id="banner-preview" class="artist-banner" aria-label="Banner preview"></div>
               <button class="cta-button cta-primary" type="submit">Save artist profile</button>
             </form>
             <p id="artist-profile-link" class="artist-profile-link"></p>

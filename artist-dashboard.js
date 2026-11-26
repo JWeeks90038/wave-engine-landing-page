@@ -125,9 +125,26 @@ function profileFormData() {
       instagram: String(values.get("instagram") || "").trim(),
       youtube: String(values.get("youtube") || "").trim(),
       tiktok: String(values.get("tiktok") || "").trim()
-    }
+    },
+    bannerPositionY: Number(values.get("bannerPositionY"))
   };
 }
+
+const bannerPreview = document.querySelector("#banner-preview");
+let bannerPreviewObjectUrl = "";
+
+function updateBannerPreview(url) {
+  if (url !== undefined) bannerPreview.style.backgroundImage = url ? `url("${url}")` : "";
+  bannerPreview.style.backgroundPosition = `center ${profileForm.elements.bannerPositionY.value}%`;
+}
+
+profileForm.elements.bannerPositionY.addEventListener("input", () => updateBannerPreview());
+profileForm.elements.banner.addEventListener("change", () => {
+  if (bannerPreviewObjectUrl) URL.revokeObjectURL(bannerPreviewObjectUrl);
+  const file = profileForm.elements.banner.files[0];
+  bannerPreviewObjectUrl = file ? URL.createObjectURL(file) : "";
+  if (file) updateBannerPreview(bannerPreviewObjectUrl);
+});
 
 function renderProfile(profile) {
   currentProfile = profile;
@@ -148,6 +165,9 @@ function renderProfile(profile) {
   for (const field of ["website", "instagram", "youtube", "tiktok"]) {
     profileForm.elements[field].value = profile.socialLinks && profile.socialLinks[field] || "";
   }
+  profileForm.elements.bannerPositionY.value = Number.isInteger(profile.bannerPositionY) ? profile.bannerPositionY : 50;
+  if (!bannerPreviewObjectUrl) updateBannerPreview(profile.bannerUrl || "");
+  else updateBannerPreview();
   for (const control of profileForm.elements) control.disabled = blocked || busy;
   const link = document.querySelector("#artist-profile-link");
   link.replaceChildren();

@@ -699,6 +699,10 @@ test("switching from a rejected artist to a new account enables the profile form
   for (const [index, name] of ["artistName", "slug", "biography", "website", "instagram", "youtube", "tiktok"].entries()) {
     controls[name] = controls[index];
   }
+  const profileControls = { value: "50", addEventListener() {} };
+  controls.bannerPositionY = profileControls;
+  controls.banner = { files: [], addEventListener() {} };
+  element("#banner-preview").style = {};
   element("#artist-profile-form").elements = controls;
   element("#artist-release-form").elements = {
     genre: { querySelector: () => null, querySelectorAll: () => [], options: [], addEventListener() {} }
@@ -730,6 +734,15 @@ test("switching from a rejected artist to a new account enables the profile form
   currentAccount = "new";
   await onAuth(user);
   assert.ok(controls.every((control) => !control.disabled));
+});
+
+test("banner position accepts whole numbers from 0 to 100 and defaults to center", () => {
+  assert.equal(marketplace.validateBannerPosition(undefined), 50);
+  assert.equal(marketplace.validateBannerPosition(0), 0);
+  assert.equal(marketplace.validateBannerPosition(100), 100);
+  for (const bad of [-1, 101, 12.5, "40", NaN]) {
+    assert.throws(() => marketplace.validateBannerPosition(bad), /0 to 100/);
+  }
 });
 
 test("draft form offers genre selections without a mood control", () => {
@@ -770,6 +783,9 @@ test("editing a draft preserves its legacy genre and moods while new drafts have
     audio: { value: "", files: [] }, cover: { value: "", files: [] }
   };
   element("#artist-profile-form").elements = [];
+  element("#artist-profile-form").elements.bannerPositionY = { value: "50", addEventListener() {} };
+  element("#artist-profile-form").elements.banner = { files: [], addEventListener() {} };
+  element("#banner-preview").style = {};
   const submitted = [];
   const document = { querySelector: element, createElement: () => ({ dataset: {} }) };
   const context = {
