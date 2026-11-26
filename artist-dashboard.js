@@ -345,6 +345,9 @@ function renderProfile(profile) {
   const link = document.querySelector("#artist-storefront-link");
   link.hidden = !approved;
   link.href = approved ? `/artist/${encodeURIComponent(profile.slug)}` : "";
+  const navLink = document.querySelector("#studio-profile-link");
+  navLink.hidden = !approved;
+  navLink.href = link.href;
   document.querySelector("#artist-storefront-unavailable").hidden = approved;
   document.querySelector("#artist-storefront-notice").textContent = approved ? "" :
     profile.status === "pending" ? "Your profile is awaiting review. Your storefront will be available after approval." :
@@ -984,6 +987,9 @@ try {
   auth = getAuth(app);
   storage = getStorage(app, `gs://${config.storageBucket}`);
   onAuthStateChanged(auth, async (user) => {
+    const navLink = document.querySelector("#studio-profile-link");
+    navLink.hidden = true;
+    navLink.href = "";
     verificationGeneration++;
     verificationCheck = null;
     clearInterval(verificationTimer);

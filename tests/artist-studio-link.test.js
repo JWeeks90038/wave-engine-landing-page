@@ -38,6 +38,8 @@ function user() {
 test("only the signed-in owner sees the Artist Studio link on their storefront", async () => {
   const html = fs.readFileSync(path.join(__dirname, "..", "artist.html"), "utf8");
   assert.match(html, /<a id="storefront-studio-link" href="\/artist-dashboard" hidden>Artist Studio<\/a>/);
+  const dashboard = fs.readFileSync(path.join(__dirname, "..", "artist-dashboard.html"), "utf8");
+  assert.match(dashboard, /<a id="studio-profile-link" hidden>Artist Profile<\/a>/);
   const page = await setup({
     fetchProfile: async () => ({ ok: true, json: async () => ({ profile: { slug: "north-star" } }) })
   });
