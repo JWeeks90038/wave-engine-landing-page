@@ -301,7 +301,15 @@
 .artist-selection h3 { margin: 0 0 0.5rem; overflow-wrap: anywhere; }
 .artist-selection-link { color: #b7d3ff; text-decoration: underline; text-underline-offset: 0.2em; }
 .artist-download-notice { color: var(--muted); font-size: 0.9rem; }
-.artist-public-track { margin-top: 1rem; }
+.artist-public-track { margin-top: 1rem; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 1rem; align-items: start; }
+.artist-public-track > .music-details { grid-column: 2; }
+.artist-track-cover { width: 120px; max-width: 120px; }
+.artist-public-track:not(:has(.artist-track-cover)) { grid-template-columns: minmax(0, 1fr); }
+.artist-public-track:not(:has(.artist-track-cover)) > .music-details { grid-column: 1; }
+@media (max-width: 560px) {
+  .artist-public-track { grid-template-columns: minmax(0, 1fr); }
+  .artist-public-track > .music-details { grid-column: 1; }
+}
 .artist-public-track p { margin: 0 0 0.4rem; overflow-wrap: anywhere; }
 .artist-public-track h4 { margin: 0 0 0.3rem; overflow-wrap: anywhere; }
 .artist-download:disabled { opacity: 0.6; cursor: not-allowed; }

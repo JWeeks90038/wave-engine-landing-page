@@ -25,6 +25,14 @@ function formatTime(seconds) {
 function trackPlayer(track) {
   const container = document.createElement("div");
   container.className = "artist-public-track";
+  if (track.coverUrl) {
+    const cover = document.createElement("img");
+    cover.className = "music-cover artist-track-cover";
+    cover.src = new URL(track.coverUrl, apiBase).href;
+    cover.alt = `${track.title} cover art`;
+    cover.loading = "lazy";
+    container.append(cover);
+  }
   const details = element("div", "", "music-details");
   details.append(element("h4", track.title));
   if (track.genre) details.append(element("p", track.genre, "music-meta"));
@@ -204,7 +212,7 @@ try {
       for (const audio of selection.querySelectorAll("audio")) audio.pause();
       selection.replaceChildren(heading, profile);
       if (artist.tracks.length) {
-        selection.append(...artist.tracks.map(trackPlayer));
+        selection.append(...artist.tracks.slice(0, 3).map(trackPlayer));
       }
       else {
         const empty = document.createElement("p");
