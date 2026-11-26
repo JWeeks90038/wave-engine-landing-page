@@ -16,7 +16,8 @@
     <meta name="twitter:image" content="https://waveenginemusic.com/Images/wave-engine-social-card-4k-v1.png" />
     <!-- artist-meta:end -->
     <meta name="theme-color" content="#050816" />
-    <link rel="icon" type="image/png" href="../Images/headphones_favicon.png" />
+    <link rel="icon" type="image/png" href="../Images/optimized/headphones_favicon.png" />
+    <link rel="preconnect" href="https://wave-engine-landing-page.vercel.app" crossorigin />
     <link rel="stylesheet" href="../style.css" />
     <link rel="stylesheet" href="../music.css" />
     <script type="module" src="../artist.js"></script>
@@ -48,10 +49,15 @@
               <p></p>
             </section>
           </div>
+          <section class="artist-releases-public">
+            <h2>Music</h2>
+            <p>Downloads are for personal listening. Links expire 10 minutes after payment and may stop working sooner if the release is withdrawn. <a href="/legal/policies#music-license">Music download terms</a></p>
+            <p id="artist-discovery-status" role="status" aria-live="polite">Loading tracks...</p>
+            <div id="artist-discovery-list" class="artist-profile-tracks"></div>
+          </section>
           <section class="artist-support" aria-labelledby="artist-support-title">
             <h2 id="artist-support-title">Support This Artist</h2>
-            <p>Choose an amount to contribute securely through Stripe.</p>
-            <p>Contributions require artist Stripe setup and must be enabled by Wave Engine.</p>
+            <p>Contributions require artist Stripe setup.</p>
             <p><a href="/legal/policies#artist-payments">Contribution terms and policies</a></p>
             <form id="artist-support-form" class="music-admin-form">
               <label>Contribution amount (USD)
@@ -63,12 +69,6 @@
               </div>
               <p id="artist-support-status" role="status" aria-live="polite"></p>
             </form>
-          </section>
-          <section class="artist-releases-public">
-            <h2>Music</h2>
-            <p>Downloads are for personal listening. Links expire 10 minutes after payment and may stop working sooner if the release is withdrawn. <a href="/legal/policies#music-license">Music download terms</a></p>
-            <p id="artist-discovery-status" role="status" aria-live="polite">Loading tracks...</p>
-            <div id="artist-discovery-list" class="artist-profile-tracks"></div>
           </section>
           <section id="artist-gallery" class="artist-gallery" hidden aria-labelledby="artist-gallery-title">
             <h2 id="artist-gallery-title">Photos</h2>

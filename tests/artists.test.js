@@ -9,6 +9,7 @@ const { createHandler: releaseHandler } = require("../server/artist-releases-han
 const { createHandler: adminHandler } = require("../server/artist-admin-handler");
 const { createHandler: mediaHandler } = require("../server/artist-media-handler");
 const { createHandler: paymentsHandler, artistStripeClient } = require("../server/artist-payments");
+const { publicArtists } = require("../server/artist-streaming");
 const marketplace = require("../server/artist-marketplace");
 
 class Response extends Writable {
@@ -117,6 +118,39 @@ function addCustomizationControls(controls, element) {
   }
   element("#artist-style-preview").style = { setProperty() {} };
 }
+
+test("artist discovery checks slugs concurrently in bounded batches without exposing inactive profiles", async () => {
+  const db = new FakeDatabase();
+  for (let index = 0; index < 43; index++) {
+    const uid = `artist-${index}`;
+    const slug = `artist-${index}`;
+    db.collection("artists").doc(uid);
+    db.collection("artistSlugs").doc(slug);
+    db.records.get("artists").set(uid, { artistName: `Artist ${index}`, slug, status: "approved" });
+    db.records.get("artistSlugs").set(slug, { artistUid: uid, status: index === 42 ? "pending" : "approved" });
+  }
+  const originalCollection = db.collection.bind(db);
+  let active = 0;
+  let maximum = 0;
+  db.collection = (name) => {
+    const collection = originalCollection(name);
+    if (name !== "artistSlugs") return collection;
+    return { doc: (id) => {
+      const ref = collection.doc(id);
+      return { get: async () => {
+        active++;
+        maximum = Math.max(maximum, active);
+        await new Promise((resolve) => setImmediate(resolve));
+        active--;
+        return ref.get();
+      } };
+    } };
+  };
+  const artists = await publicArtists(db);
+  assert.equal(artists.length, 42);
+  assert.equal(maximum, 20);
+  assert.equal(artists.some((artist) => artist.slug === "artist-42"), false);
+});
 
 test("artist profile creation reserves a unique slug and stays private until approval", async () => {
   const db = new FakeDatabase();

@@ -90,3 +90,8 @@ test("artist support links to the fee terms without displaying them in the suppo
   assert.match(policy, /id="artist-payments"/);
   assert.match(policy, /5% of each artist contribution/);
 });
+
+test("artist support follows the music section", () => {
+  const artist = fs.readFileSync(path.join(root, "artist.html"), "utf8");
+  assert.match(artist, /<section class="artist-releases-public">[\s\S]*?<\/section>\s*<section class="artist-support"/);
+});

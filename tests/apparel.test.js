@@ -33,7 +33,12 @@ test("each product has at least six distinct gallery images that exist", () => {
   for (const product of products) {
     assert.ok(product.images.length >= 6);
     assert.equal(new Set(product.images.map((image) => image.src)).size, product.images.length);
-    for (const image of product.images) assert.ok(require("node:fs").existsSync(image.src));
+    for (const image of product.images) {
+      const fs = require("node:fs");
+      assert.ok(fs.existsSync(image.src));
+      assert.ok(fs.existsSync(image.previewSrc));
+      assert.ok(fs.statSync(image.previewSrc).size < fs.statSync(image.src).size / 5);
+    }
   }
 });
 

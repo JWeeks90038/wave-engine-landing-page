@@ -57,26 +57,31 @@ async function publicArtists(db) {
     });
   }
   const artists = [];
-  for (const doc of profiles.docs) {
-    const profile = doc.data();
-    const slug = marketplace.validateSlug(profile.slug);
-    const slugDoc = await db.collection("artistSlugs").doc(slug).get();
-    if (!slugDoc.exists || slugDoc.data().status !== "approved" || slugDoc.data().artistUid !== doc.id) continue;
-    const salesAvailable = process.env.ARTIST_SALES_ENABLED === "true" &&
-      profile[process.env.MUSIC_STRIPE_MODE === "test" ? "stripeConnectTest" : "stripeConnectLive"];
-    artists.push({
-      artistName: profile.artistName,
-      slug,
-      avatarUrl: marketplace.profileResponse(profile).avatarUrl,
-      tracks: (tracksByArtist.get(doc.id) || []).map((track) => ({
-        ...track,
-        downloadPriceCents: salesAvailable ? track.downloadPriceCents : null
-      })),
-      albums: (albumsByArtist.get(doc.id) || []).map((album) => ({
-        ...album, downloadPriceCents: salesAvailable ? album.downloadPriceCents : null,
-        tracks: album.tracks.map((track) => ({ ...track, downloadPriceCents: salesAvailable ? track.downloadPriceCents : null }))
-      }))
-    });
+  for (let offset = 0; offset < profiles.docs.length; offset += 20) {
+    const batch = profiles.docs.slice(offset, offset + 20);
+    const slugs = batch.map((doc) => marketplace.validateSlug(doc.data().slug));
+    const slugDocs = await Promise.all(slugs.map((slug) => db.collection("artistSlugs").doc(slug).get()));
+    for (const [index, doc] of batch.entries()) {
+      const profile = doc.data();
+      const slug = slugs[index];
+      const slugDoc = slugDocs[index];
+      if (!slugDoc.exists || slugDoc.data().status !== "approved" || slugDoc.data().artistUid !== doc.id) continue;
+      const salesAvailable = process.env.ARTIST_SALES_ENABLED === "true" &&
+        profile[process.env.MUSIC_STRIPE_MODE === "test" ? "stripeConnectTest" : "stripeConnectLive"];
+      artists.push({
+        artistName: profile.artistName,
+        slug,
+        avatarUrl: marketplace.profileResponse(profile).avatarUrl,
+        tracks: (tracksByArtist.get(doc.id) || []).map((track) => ({
+          ...track,
+          downloadPriceCents: salesAvailable ? track.downloadPriceCents : null
+        })),
+        albums: (albumsByArtist.get(doc.id) || []).map((album) => ({
+          ...album, downloadPriceCents: salesAvailable ? album.downloadPriceCents : null,
+          tracks: album.tracks.map((track) => ({ ...track, downloadPriceCents: salesAvailable ? track.downloadPriceCents : null }))
+        }))
+      });
+    }
   }
   return artists.sort((a, b) => a.artistName.localeCompare(b.artistName));
 }

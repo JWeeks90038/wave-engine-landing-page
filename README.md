@@ -66,6 +66,12 @@ listener has already selected another format for that song.
 The player provides play and pause, seeking, volume, mute, and playback-speed
 controls.
 
+Page and product previews use smaller images from `Images/optimized`; the
+product image dialog still loads the original full-size image. Artist-uploaded
+artwork and audio are served from Storage in their uploaded formats, so their
+size, network conditions, and function latency still affect load times. MP3
+uploads generally stream faster than larger WAV files.
+
 ### Paid music downloads
 
 Listening is free. A $1.49 USD Stripe Checkout purchase covers one track in

@@ -183,20 +183,22 @@ function renderProduct(product) {
   card.querySelector(".product-disclaimer").textContent = `${product.pricePlaceholder ? "Placeholder imagery and price." : ""} `;
   const mainImage = card.querySelector(".main-image img");
   const thumbs = card.querySelector(".thumbnails");
+  let selectedImage;
   product.images.forEach((image, index) => {
     const button = document.createElement("button");
     button.type = "button"; button.setAttribute("aria-label", `${product.name}: ${image.label}`);
     const thumbnail = document.createElement("img");
-    thumbnail.src = image.src; thumbnail.alt = ""; thumbnail.loading = "lazy"; thumbnail.decoding = "async";
+    thumbnail.src = image.previewSrc || image.src; thumbnail.alt = ""; thumbnail.loading = "lazy"; thumbnail.decoding = "async";
     button.append(thumbnail); thumbs.append(button);
     button.addEventListener("click", () => {
-      mainImage.src = image.src; mainImage.alt = `${product.name}, ${image.label}`;
+      selectedImage = image.src;
+      mainImage.src = image.previewSrc || image.src; mainImage.alt = `${product.name}, ${image.label}`;
       thumbs.querySelectorAll("button").forEach((thumb) => thumb.setAttribute("aria-pressed", String(thumb === button)));
     });
     if (index === 0) button.click();
   });
   card.querySelector(".main-image").addEventListener("click", () => {
-    const image = dialog.querySelector("img"); image.src = mainImage.src; image.alt = mainImage.alt;
+    const image = dialog.querySelector("img"); image.src = selectedImage; image.alt = mainImage.alt;
     dialog.showModal();
   });
   const form = card.querySelector("form");

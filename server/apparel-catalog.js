@@ -1,5 +1,13 @@
 const sizes = ["S", "M", "L", "XL", "XXL"];
 
+function productImage(name, label) {
+  return {
+    src: `Images/apparel/${name}.png`,
+    previewSrc: `Images/optimized/apparel/${name}.jpg`,
+    label
+  };
+}
+
 const products = [
   {
     id: "freedom 1",
@@ -11,13 +19,13 @@ const products = [
     colors: ["Black"],
     sizes,
     images: [
-      { src: "Images/apparel/Freedom Unfiltered T-shirt in patriotic studio light.png", label: "Front" },
-      { src: "Images/apparel/Freedom Unfiltered shirt on dark patriotic backdrop.png", label: "Back" },
-      { src: "Images/apparel/Freedom Unfiltered T-Shirt Studio Portrait (1).png", label: "On model, front" },
-      { src: "Images/apparel/Freedom Unfiltered Black T-Shirt Portrait.png", label: "On model, back" },
-      { src: "Images/apparel/Freedom eagle shirt back print.png", label: "Alternate front" },
-      { src: "Images/apparel/Freedom Unfiltered Eagle T-Shirt Showcase.png", label: "Alternate back" },
-      { src: "Images/apparel/Freedom Unfiltered four-model apparel showcase.png", label: "Alternate back" }
+      productImage("Freedom Unfiltered T-shirt in patriotic studio light", "Front"),
+      productImage("Freedom Unfiltered shirt on dark patriotic backdrop", "Back"),
+      productImage("Freedom Unfiltered T-Shirt Studio Portrait (1)", "On model, front"),
+      productImage("Freedom Unfiltered Black T-Shirt Portrait", "On model, back"),
+      productImage("Freedom eagle shirt back print", "Alternate front"),
+      productImage("Freedom Unfiltered Eagle T-Shirt Showcase", "Alternate back"),
+      productImage("Freedom Unfiltered four-model apparel showcase", "Alternate back")
     ]
   },
   {
@@ -30,13 +38,13 @@ const products = [
     colors: ["Black"],
     sizes,
     images: [
-      { src: "Images/apparel/Freedom Unfiltered T-shirt in patriotic studio light.png", label: "Front" },
-      { src: "Images/apparel/Black Freedom Unfiltered shirt, patriotic studio backdrop.png", label: "Back" },
-      { src: "Images/apparel/Freedom Unfiltered T-Shirt Studio Portrait (1).png", label: "On model, front" },
-      { src: "Images/apparel/Freedom Unfiltered Black T-Shirt Portrait.png", label: "On model, back" },
-      { src: "Images/apparel/Freedom Eagle Graphic T-Shirt.png", label: "Alternate front" },
-      { src: "Images/apparel/Freedom_Unfiltered_Woman_Back_Product_1312x1199_Close_Crop.png", label: "Alternate back" },
-      { src: "Images/apparel/Freedom Unfiltered four-model apparel showcase.png", label: "Alternate back" }
+      productImage("Freedom Unfiltered T-shirt in patriotic studio light", "Front"),
+      productImage("Black Freedom Unfiltered shirt, patriotic studio backdrop", "Back"),
+      productImage("Freedom Unfiltered T-Shirt Studio Portrait (1)", "On model, front"),
+      productImage("Freedom Unfiltered Black T-Shirt Portrait", "On model, back"),
+      productImage("Freedom Eagle Graphic T-Shirt", "Alternate front"),
+      productImage("Freedom_Unfiltered_Woman_Back_Product_1312x1199_Close_Crop", "Alternate back"),
+      productImage("Freedom Unfiltered four-model apparel showcase", "Alternate back")
     ]
   }
 ];
