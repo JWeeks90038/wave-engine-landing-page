@@ -66,6 +66,19 @@ listener has already selected another format for that song.
 The player provides play and pause, seeking, volume, mute, and playback-speed
 controls.
 
+Song counters start at zero when this feature is deployed; earlier plays are
+not included. A play is counted after 30 seconds of listening, or after a
+shorter song finishes. Album tracks have separate counters. The browser sends
+the song ID to the API without a listener identifier, and the server stores
+aggregate counts in the private `songStreamCounts` Firestore collection.
+Counts are approximate: interruptions or failed requests may be missed, and
+anonymous requests can be manipulated. The endpoint is not fraud-resistant.
+Each count incurs Firestore reads and a write, and public listings read count
+documents for published releases. Monitor Firebase costs and traffic; heavy
+traffic or abuse can increase costs, and popular releases can experience
+write contention. The existing Firestore catch-all rule denies direct client
+access to this collection; no new client access rule is needed.
+
 Page and product previews use smaller images from `Images/optimized`; the
 product image dialog still loads the original full-size image. Artist-uploaded
 artwork and audio are served from Storage in their uploaded formats, so their

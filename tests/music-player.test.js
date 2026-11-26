@@ -52,19 +52,36 @@ function descendants(element, tagName) {
 async function loadLibrary(trackData) {
   const status = new Element("p");
   const tracks = new Element("div");
+  const counters = [];
   const document = {
     querySelector: (selector) => selector === "#music-status" ? status : tracks,
     createElement: (tagName) => new Element(tagName)
   };
-  const source = fs.readFileSync(path.join(__dirname, "..", "music.js"), "utf8");
+  const source = fs.readFileSync(path.join(__dirname, "..", "music.js"), "utf8")
+    .replace(/^import .*?;\r?\n/m, "");
   await vm.runInNewContext(`(async () => {\n${source}\n})()`, {
     document,
     location: { protocol: "https:", hostname: "example.com" },
     fetch: async () => ({ ok: true, json: async () => ({ tracks: trackData }) }),
-    URLSearchParams
+    URLSearchParams,
+    attachStreamCounter(audio, container, count, url, body) { counters.push({ audio, container, count, url, body }); }
   });
-  return { status, tracks, audio: descendants(tracks, "audio") };
+  return { status, tracks, audio: descendants(tracks, "audio"), counters };
 }
+
+test("playable songs attach their own stream counter", async () => {
+  const { audio, counters } = await loadLibrary([
+    { id: "first", title: "First", hasMp3: true, streamCount: 12 },
+    { id: "unavailable", title: "Unavailable" },
+    { id: "second", title: "Second", hasWav: true, streamCount: 3 }
+  ]);
+  assert.equal(counters.length, 2);
+  assert.equal(counters[0].audio, audio[0]);
+  assert.equal(counters[0].count, 12);
+  assert.match(counters[0].url, /action=count-stream/);
+  assert.equal(counters[0].body.id, "first");
+  assert.equal(counters[1].body.id, "second");
+});
 
 test("WAV download buttons omit the price while MP3-only downloads keep their label", async () => {
   const { tracks } = await loadLibrary([

@@ -1,3 +1,5 @@
+import { attachStreamCounter } from "./song-stream-counter.js";
+
 const isLocal = location.protocol === "file:" || ["localhost", "127.0.0.1"].includes(location.hostname);
 const apiBase = isLocal ? "http://127.0.0.1:8787" :
   location.hostname.endsWith(".vercel.app") ? location.origin : "https://wave-engine-landing-page.vercel.app";
@@ -63,6 +65,8 @@ function trackPlayer(track) {
   audio.hidden = true;
   audio.src = `${apiBase}/api/artist-releases?action=stream&id=${encodeURIComponent(track.id)}` +
     (track.trackId ? `&track=${encodeURIComponent(track.trackId)}` : "");
+  attachStreamCounter(audio, details, track.streamCount, `${apiBase}/api/artist-releases?action=count-stream`,
+    { id: track.id, ...(track.trackId ? { trackId: track.trackId } : {}) });
   audio.addEventListener("error", () => { status.textContent = `Unable to play ${track.title}. Please try again later.`; });
 
   const panel = element("div", "", "music-player");

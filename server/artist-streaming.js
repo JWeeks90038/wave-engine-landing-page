@@ -2,6 +2,7 @@ const crypto = require("crypto");
 const { sendJson, setCorsHeaders } = require("./api-utils");
 const { byteRange } = require("./music-library");
 const marketplace = require("./artist-marketplace");
+const { countDocuments, countFor } = require("./song-stream-counts");
 
 function validId(id) {
   return typeof id === "string" && /^[A-Za-z0-9_-]{1,128}$/.test(id);
@@ -12,6 +13,7 @@ async function publicArtists(db) {
     db.collection("artists").where("status", "==", "approved").get(),
     db.collection("artistReleases").where("status", "==", "published").get()
   ]);
+  const counts = await countDocuments(db, "artist", releases.docs);
   const tracksByArtist = new Map();
   const albumsByArtist = new Map();
   for (const entry of releases.docs) {
@@ -36,6 +38,7 @@ async function publicArtists(db) {
         coverUrl: `/api/artist-media?release=${encodeURIComponent(entry.id)}&asset=cover&v=${crypto.createHash("sha256").update(release.coverPath).digest("hex").slice(0, 12)}`,
         tracks: tracks.map((track) => ({
           id: entry.id, trackId: track.id, title: track.title, genre: release.genre,
+          streamCount: countFor(counts.get(`artist_${entry.id}`), track.id),
           downloadPriceCents: release.salesRightsConfirmed === true && ["tracks", "both"].includes(release.saleMode) ? track.downloadPriceCents : null,
           format: track.audioPath.endsWith(".wav") ? "WAV" : "MP3"
         }))
@@ -50,6 +53,7 @@ async function publicArtists(db) {
       ? release.downloadPriceCents : null;
     tracksByArtist.get(release.artistUid).push({
       id: entry.id, title: release.title, genre: release.genre, downloadPriceCents: price,
+      streamCount: countFor(counts.get(`artist_${entry.id}`), "single"),
       coverUrl: typeof release.coverPath === "string" && release.coverPath
         ? `/api/artist-media?release=${encodeURIComponent(entry.id)}&asset=cover&v=${crypto.createHash("sha256").update(release.coverPath).digest("hex").slice(0, 12)}`
         : "",

@@ -1,5 +1,6 @@
 const { sendJson, setCorsHeaders } = require("./api-utils");
 const music = require("./music-library");
+const { countDocuments, countFor } = require("./song-stream-counts");
 
 function createHandler({ database, publicTrack } = music) {
   return async (request, response) => {
@@ -10,8 +11,12 @@ function createHandler({ database, publicTrack } = music) {
   }
   if (request.method !== "GET") return sendJson(response, 405, { error: "Method not allowed." });
   try {
-    const snapshot = await database().collection("musicTracks").where("published", "==", true).get();
-    const tracks = snapshot.docs.map(publicTrack).sort((a, b) =>
+    const db = database();
+    const snapshot = await db.collection("musicTracks").where("published", "==", true).get();
+    const counts = await countDocuments(db, "music", snapshot.docs);
+    const tracks = snapshot.docs.map((doc) => ({
+      ...publicTrack(doc), streamCount: countFor(counts.get(`music_${doc.id}`), "single")
+    })).sort((a, b) =>
       (Number(a.sortOrder) || 0) - (Number(b.sortOrder) || 0) || a.title.localeCompare(b.title));
     response.setHeader("Cache-Control", "no-store");
     return sendJson(response, 200, { tracks });

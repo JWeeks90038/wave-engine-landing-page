@@ -1,3 +1,5 @@
+import { attachStreamCounter } from "./song-stream-counter.js";
+
 const isLocal = location.protocol === "file:" || ["localhost", "127.0.0.1"].includes(location.hostname);
 const apiBase = isLocal ? "http://127.0.0.1:8787" : "https://wave-engine-landing-page.vercel.app";
 const status = document.querySelector("#music-status");
@@ -69,6 +71,7 @@ function renderTrack(track) {
     const player = document.createElement("audio");
     player.preload = "none";
     player.hidden = true;
+    attachStreamCounter(player, details, track.streamCount, `${apiBase}/api/music?action=count-stream`, { id: track.id });
 
     const controls = document.createElement("div");
     controls.className = "music-player-controls";

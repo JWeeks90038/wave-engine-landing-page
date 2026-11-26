@@ -36,8 +36,8 @@ function fakeMusic(track, content = "0123456789") {
       return { trackId: "track1", title: "Test" };
     },
     database: () => ({
-      collection: () => ({
-        doc: (id) => ({ get: async () => ({ exists: Boolean(track), data: () => track, id }) }),
+      collection: (name) => ({
+        doc: (id) => ({ get: async () => ({ exists: name === "musicTracks" && Boolean(track), data: () => track, id }) }),
         where: (field, operator, value) => ({
           get: async () => ({ docs: track && track[field] === value ? [{ id: "track1", data: () => track }] : [] })
         })

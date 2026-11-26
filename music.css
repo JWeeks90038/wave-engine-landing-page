@@ -313,6 +313,7 @@
 .artist-selection-close { min-height: 44px; padding: 0.55rem 0.8rem; border-radius: 12px; font-size: 0.9rem; }
 .artist-selection-link { color: #b7d3ff; text-decoration: underline; text-underline-offset: 0.2em; }
 .artist-download-notice { color: var(--muted); font-size: 0.9rem; }
+.music-details .song-stream-count { color: var(--muted); font-size: 0.8rem; }
 .artist-public-track { margin-top: 1rem; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 1rem; align-items: start; }
 .artist-public-track > .music-details { grid-column: 2; }
 .artist-track-cover { width: 120px; max-width: 120px; }

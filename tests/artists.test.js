@@ -10,6 +10,9 @@ const { createHandler: adminHandler } = require("../server/artist-admin-handler"
 const { createHandler: mediaHandler } = require("../server/artist-media-handler");
 const { createHandler: paymentsHandler, artistStripeClient } = require("../server/artist-payments");
 const { publicArtists } = require("../server/artist-streaming");
+const { createHandler: streamCountHandler } = require("../server/song-stream-counts");
+const { createHandler: musicLibraryHandler } = require("../server/music-library-handler");
+const musicLibrary = require("../server/music-library");
 const marketplace = require("../server/artist-marketplace");
 
 class Response extends Writable {
@@ -54,13 +57,16 @@ class FakeDatabase {
     const transaction = {
       get: (ref) => ref.get(),
       create: (ref, data) => writes.push({ type: "create", ref, data }),
-      update: (ref, data) => writes.push({ type: "update", ref, data })
+      update: (ref, data) => writes.push({ type: "update", ref, data }),
+      set: (ref, data) => writes.push({ type: "set", ref, data })
     };
     const result = await work(transaction);
     for (const write of writes) {
       const current = write.ref.current();
       if (write.type === "create") {
         if (current) throw new Error("Document already exists.");
+        write.ref.records().set(write.ref.id, write.data);
+      } else if (write.type === "set") {
         write.ref.records().set(write.ref.id, write.data);
       } else {
         if (!current) throw new Error("Document does not exist.");
@@ -559,6 +565,14 @@ test("album submission reviews and pins every song and publishes one shared cove
   assert.equal((await request(admin, "POST", "/api/artist-admin", { action: "approve-release", id })).statusCode, 200);
   const album = JSON.parse((await request(artist, "GET", "/api/artist-releases?action=public")).body()).artists[0].albums[0];
   assert.equal(album.tracks.length, 2);
+  const count = streamCountHandler("artist", { getDatabase: () => db });
+  const countTrack = (trackId) => request(count, "POST", "/api/artist-releases?action=count-stream", { id, trackId });
+  assert.equal(JSON.parse((await countTrack(tracks[0].id)).body()).count, 1);
+  assert.equal(JSON.parse((await countTrack(tracks[0].id)).body()).count, 2);
+  assert.equal(JSON.parse((await countTrack(tracks[1].id)).body()).count, 1);
+  assert.equal((await countTrack("00000003-1234-1234-1234-123456789012")).statusCode, 404);
+  const countedAlbum = JSON.parse((await request(artist, "GET", "/api/artist-releases?action=public")).body()).artists[0].albums[0];
+  assert.deepEqual(countedAlbum.tracks.map((entry) => entry.streamCount), [2, 1]);
   assert.match(album.coverUrl, /asset=cover/);
   assert.doesNotMatch(JSON.stringify(album), /artistUploads|Generation/);
   const oldSales = process.env.ARTIST_SALES_ENABLED;
@@ -584,6 +598,40 @@ test("album submission reviews and pins every song and publishes one shared cove
   assert.equal((await request(artist, "GET", `/api/artist-releases?action=stream&id=${id}`)).statusCode, 404);
   assert.equal((await request(artist, "POST", "/api/artist-releases", { action: "withdraw", id })).statusCode, 200);
   assert.equal((await request(artist, "GET", `/api/artist-releases?action=stream&id=${id}&track=${tracks[0].id}`)).statusCode, 404);
+  assert.equal((await countTrack(tracks[0].id)).statusCode, 404);
+  assert.deepEqual(JSON.parse((await request(artist, "GET", "/api/artist-releases?action=public")).body()).artists[0].albums, []);
+});
+
+test("stream counts require a published playable song and reject invalid requests", async () => {
+  const db = new FakeDatabase();
+  const handler = streamCountHandler("music", { getDatabase: () => db });
+  const song = { published: true, mp3StoragePath: "musicTracks/song-1/file/mp3.mp3" };
+  db.records.set("musicTracks", new Map([["song-1", song]]));
+  const post = (body) => request(handler, "POST", "/api/music?action=count-stream", body);
+  for (const body of [null, [], {}, { id: "../song-1" }, { id: "song-1", trackId: "bad" }]) {
+    assert.equal((await post(body)).statusCode, 400);
+  }
+  assert.equal((await request(handler, "GET", "/api/music?action=count-stream")).statusCode, 405);
+  assert.equal(JSON.parse((await post({ id: "song-1" })).body()).count, 1);
+  assert.equal(JSON.parse((await post({ id: "song-1" })).body()).count, 2);
+  const library = musicLibraryHandler({ ...musicLibrary, database: () => db });
+  assert.equal(JSON.parse((await request(library, "GET", "/api/music?action=library")).body()).tracks[0].streamCount, 2);
+  const transaction = db.runTransaction.bind(db);
+  let pending = Promise.resolve();
+  db.runTransaction = (work) => {
+    const operation = pending.then(() => transaction(work));
+    pending = operation.catch(() => {});
+    return operation;
+  };
+  const results = await Promise.all(Array.from({ length: 5 }, () => post({ id: "song-1" })));
+  assert.deepEqual(results.map((response) => JSON.parse(response.body()).count), [3, 4, 5, 6, 7]);
+  song.published = false;
+  assert.equal((await post({ id: "song-1" })).statusCode, 404);
+  assert.deepEqual(JSON.parse((await request(library, "GET", "/api/music?action=library")).body()).tracks, []);
+  song.published = true;
+  song.mp3StoragePath = "other/song.mp3";
+  assert.equal((await post({ id: "song-1" })).statusCode, 404);
+  assert.equal(db.records.get("songStreamCounts").get("music_song-1").counts.single, 7);
 });
 
 test("track publication requires rights and review, pins audio, and supports takedown", async () => {
@@ -654,8 +702,12 @@ test("track publication requires rights and review, pins audio, and supports tak
   assert.equal((await request(admin, "POST", "/api/artist-admin", { action: "approve-release", id })).statusCode, 200);
   const publicAfter = JSON.parse((await visitor("/api/artist-releases?action=public")).body());
   const northStar = publicAfter.artists.find((entry) => entry.slug === "north-star");
-  assert.deepEqual(northStar.tracks, [{ id, title: "First Light", genre: "Rock", downloadPriceCents: null, coverUrl: "", format: "MP3" }]);
+  assert.deepEqual(northStar.tracks, [{ id, title: "First Light", genre: "Rock", downloadPriceCents: null, streamCount: 0, coverUrl: "", format: "MP3" }]);
   assert.doesNotMatch(JSON.stringify(publicAfter), /artistUploads|artistUid|audioGeneration/);
+  const count = streamCountHandler("artist", { getDatabase: () => db });
+  const countSingle = () => request(count, "POST", "/api/artist-releases?action=count-stream", { id });
+  assert.equal(JSON.parse((await countSingle()).body()).count, 1);
+  assert.equal(JSON.parse((await visitor("/api/artist-releases?action=public")).body()).artists[0].tracks[0].streamCount, 1);
   const partial = await visitor(`/api/artist-releases?action=stream&id=${id}`, { range: "bytes=1-3" });
   assert.equal(partial.statusCode, 206);
   assert.equal(partial.body(), "udi");
@@ -667,14 +719,17 @@ test("track publication requires rights and review, pins audio, and supports tak
   assert.equal(capped.chunks.reduce((size, chunk) => size + chunk.length, 0), 2 * 1024 * 1024);
   audio = Buffer.from("audio");
   db.records.get("artistReleases").get(id).rightsConfirmed = false;
+  assert.equal((await countSingle()).statusCode, 404);
   assert.deepEqual(JSON.parse((await visitor("/api/artist-releases?action=public")).body()).artists[0].tracks, []);
   assert.equal((await visitor(`/api/artist-releases?action=stream&id=${id}`)).statusCode, 404);
   db.records.get("artistReleases").get(id).rightsConfirmed = true;
   db.records.get("artistSlugs").get("north-star").status = "rejected";
+  assert.equal((await countSingle()).statusCode, 404);
   assert.deepEqual(JSON.parse((await visitor("/api/artist-releases?action=public")).body()).artists, []);
   assert.equal((await visitor(`/api/artist-releases?action=stream&id=${id}`)).statusCode, 404);
   db.records.get("artistSlugs").get("north-star").status = "approved";
   db.records.get("artists").get(uid).status = "suspended";
+  assert.equal((await countSingle()).statusCode, 404);
   assert.equal((await visitor(`/api/artist-releases?action=stream&id=${id}`)).statusCode, 404);
   db.records.get("artists").get(uid).status = "approved";
   generation = "102";
@@ -710,8 +765,10 @@ test("artist storefront and previews omit song prices while retaining purchase o
     }
     pause() { this.paused = true; }
   }
-  const source = fs.readFileSync(path.join(__dirname, "..", "artist-listen.js"), "utf8");
+  const source = fs.readFileSync(path.join(__dirname, "..", "artist-listen.js"), "utf8")
+    .replace(/^import .*?;\r?\n/m, "");
   const checkouts = [];
+  const counters = [];
   async function loadPage(profile) {
     const status = new Element("p");
     const list = new Element("div");
@@ -737,14 +794,15 @@ test("artist storefront and previews omit song prices while retaining purchase o
         }
         return { ok: true, json: async () => ({ artists: [
           { artistName: "North Star", slug: "north-star", tracks: [
-            { id: "track-1", title: "First Light", downloadPriceCents: 149, format: "WAV" }
+            { id: "track-1", title: "First Light", downloadPriceCents: 149, format: "WAV", streamCount: 4 }
           ], albums: [{ id: "album-1", title: "Album", downloadPriceCents: 500, tracks: [
-            { id: "album-1", trackId: "song-1", title: "Song", downloadPriceCents: 125, format: "MP3" }
+            { id: "album-1", trackId: "song-1", title: "Song", downloadPriceCents: 125, format: "MP3", streamCount: 7 }
           ] }] },
           { artistName: "South Star", slug: "south-star", tracks: [] }
         ] }) };
       },
-      URL, URLSearchParams
+      URL, URLSearchParams,
+      attachStreamCounter(audio, container, count, url, body) { counters.push({ count, url, body }); }
     });
     return { status, list, selection };
   }
@@ -757,6 +815,11 @@ test("artist storefront and previews omit song prices while retaining purchase o
     return buttons;
   }
   const storefront = await loadPage(true);
+  assert.equal(counters[0].count, 4);
+  assert.equal(counters[0].body.id, "track-1");
+  assert.equal(counters[1].count, 7);
+  assert.equal(counters[1].body.trackId, "song-1");
+  assert.match(counters[1].url, /action=count-stream/);
   const storefrontButtons = checkPrices(storefront.list);
   await storefrontButtons[0].events.click();
 
