@@ -1617,7 +1617,8 @@ test("storefront displays personalized colors, message, gallery, and controllabl
   const profile = {
     artistName: "North Star", slug: "north-star", socialLinks: {},
     appearance: { accentColor: "#ffffff", backgroundColor: "#112233", featuredMessage: "<Welcome>" },
-    backgroundImages: images("background", ["first", "second"]), galleryImages: images("gallery", ["photo"])
+    backgroundImages: images("background", ["first", "second"]),
+    galleryImages: images("gallery", ["one", "two", "three", "four", "five", "six"])
   };
   await vm.runInNewContext(`(async () => {\n${source}\n})()`, {
     document: { body, querySelector: element, createElement: () => ({}), head: { append() {} } },
@@ -1634,6 +1635,7 @@ test("storefront displays personalized colors, message, gallery, and controllabl
   assert.equal(element("#artist-featured-message p").textContent, "<Welcome>");
   assert.equal(element("#artist-featured-message").hidden, false);
   assert.equal(element("#artist-gallery-images").children[0].alt, "North Star gallery image 1");
+  assert.equal(element("#artist-gallery-images").children.length, 6);
   assert.equal(element("#artist-gallery").hidden, false);
   const toggle = element("#artist-background-toggle");
   assert.equal(toggle.textContent, "Play background slideshow");
@@ -1649,6 +1651,7 @@ test("storefront displays personalized colors, message, gallery, and controllabl
 
 test("approved storefront renders with metadata from the page", async () => {
   const html = fs.readFileSync(path.join(__dirname, "..", "artist.html"), "utf8");
+  assert.ok(html.indexOf('id="artist-gallery"') < html.indexOf('aria-labelledby="artist-support-title"'));
   const source = fs.readFileSync(path.join(__dirname, "..", "artist.js"), "utf8");
   const selectors = [
     "#storefront-status", "#storefront-profile", "#storefront-name",
@@ -2161,7 +2164,7 @@ test("profile editor saves image sets and safely handles uncertain saves and acc
     controls.galleryImages.files = [image(name)];
     controls.galleryImages.listeners.change();
   }
-  assert.match(element("#artist-gallery-selection").textContent, /3 new gallery photos/);
+  assert.equal(element("#artist-gallery-selection").textContent, "1 saved; 3 selected; 2 slots remaining.");
   await submit();
   assert.equal(submitted[0].appearance.accentColor, "#123456");
   assert.equal(submitted[0].appearance.backgroundColor, "#abcdef");
@@ -2181,16 +2184,26 @@ test("profile editor saves image sets and safely handles uncertain saves and acc
   controls.galleryImages.files = [image("over-limit")];
   controls.galleryImages.listeners.change();
   assert.match(element("#artist-status").textContent, /up to 6/);
-  assert.match(element("#artist-gallery-selection").textContent, /No new gallery photos/);
+  assert.match(element("#artist-gallery-error").textContent, /0 more can be selected/);
+  assert.equal(element("#artist-gallery-selection").textContent, "6 saved; 0 selected; 0 slots remaining.");
 
   controls.clearGalleryImages.checked = true;
   await submit();
   assert.deepEqual(submitted[2].galleryPaths, []);
   assert.equal("backgroundPaths" in submitted[2], false);
+  for (let index = 0; index < 6; index++) {
+    controls.galleryImages.files = [image(`batch-${index}`)];
+    controls.galleryImages.listeners.change();
+  }
+  assert.equal(element("#artist-gallery-selection").textContent, "0 saved; 6 selected; 0 slots remaining.");
+  assert.equal(element("#artist-gallery-selection-list").children.length, 6);
+  await submit();
+  assert.equal(submitted[3].addGalleryPaths.length, 6);
+  assert.equal(profile.galleryImages.length, 6);
   controls.backgroundImages.files = Array.from({ length: 6 }, (_, index) => image(`excess-${index}`));
   await submit();
   assert.match(element("#artist-status").textContent, /up to 5/);
-  assert.equal(submitted.length, 3);
+  assert.equal(submitted.length, 4);
 
   for (const nextMode of ["saved", "verify-fails", "not-saved", "switch"]) {
     context.testSetUser(user);

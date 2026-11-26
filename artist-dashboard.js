@@ -237,9 +237,12 @@ function refreshProfileImages(kind) {
 function renderGallerySelection() {
   const list = document.querySelector("#artist-gallery-selection-list");
   list.replaceChildren();
-  document.querySelector("#artist-gallery-selection").textContent = galleryFiles.length
-    ? `${galleryFiles.length} new gallery photo${galleryFiles.length === 1 ? "" : "s"} selected.`
-    : "No new gallery photos selected.";
+  const saved = currentProfile && currentProfile.galleryImages ? currentProfile.galleryImages.length : 0;
+  const clearing = profileForm.elements.clearGalleryImages.checked;
+  const remaining = imagePreviews.gallery.limit - saved - galleryFiles.length;
+  document.querySelector("#artist-gallery-selection").textContent =
+    clearing ? `${saved} saved photos will be removed when you save your profile.` :
+      `${saved} saved; ${galleryFiles.length} selected; ${remaining} slots remaining.`;
   for (const [index, file] of galleryFiles.entries()) {
     const row = document.createElement("div");
     const name = document.createElement("span");
@@ -251,6 +254,7 @@ function renderGallerySelection() {
     remove.addEventListener("click", () => {
       if (busy) return;
       galleryFiles.splice(index, 1);
+      document.querySelector("#artist-gallery-error").textContent = "";
       renderGallerySelection();
       refreshProfileImages("gallery");
     });
@@ -268,18 +272,28 @@ for (const [kind, config] of Object.entries(imagePreviews)) {
       const selected = Array.from(profileForm.elements[config.input].files);
       profileForm.elements[config.input].value = "";
       if (!selected.length) return;
+      const errorMessage = document.querySelector("#artist-gallery-error");
+      errorMessage.textContent = "";
       try {
+        if (profileForm.elements[config.clear].checked) {
+          throw new Error("Save your profile to remove the existing gallery before adding new photos.");
+        }
         const savedCount = currentProfile && currentProfile.galleryImages ? currentProfile.galleryImages.length : 0;
         if (savedCount + galleryFiles.length + selected.length > config.limit) {
-          throw new Error(`Choose up to ${config.limit} gallery images in total.`);
+          const remaining = config.limit - savedCount - galleryFiles.length;
+          throw new Error(`Choose up to ${config.limit} gallery images in total. ${remaining} more can be selected; existing selections were kept.`);
         }
         for (const file of selected) {
-          validateUpload(file, kind);
-          uploadName(kind, file);
+          try {
+            validateUpload(file, kind);
+            uploadName(kind, file);
+          } catch (error) {
+            throw new Error(`${file.name}: ${error.message}`);
+          }
         }
         galleryFiles.push(...selected);
         renderGallerySelection();
-      } catch (error) { show(error.message); return; }
+      } catch (error) { errorMessage.textContent = error.message; show(error.message); return; }
     }
     profileForm.elements[config.clear].checked = false;
     refreshProfileImages(kind);
@@ -287,7 +301,11 @@ for (const [kind, config] of Object.entries(imagePreviews)) {
   profileForm.elements[config.clear].addEventListener("change", () => {
     if (profileForm.elements[config.clear].checked) {
       profileForm.elements[config.input].value = "";
-      if (kind === "gallery") { galleryFiles = []; renderGallerySelection(); }
+      if (kind === "gallery") galleryFiles = [];
+    }
+    if (kind === "gallery") {
+      document.querySelector("#artist-gallery-error").textContent = "";
+      renderGallerySelection();
     }
     refreshProfileImages(kind);
   });
@@ -295,6 +313,7 @@ for (const [kind, config] of Object.entries(imagePreviews)) {
 
 function renderProfile(profile) {
   currentProfile = profile;
+  renderGallerySelection();
   const blocked = ["rejected", "suspended"].includes(profile.status);
   profileSection.hidden = false;
   releaseSection.hidden = blocked;
@@ -784,6 +803,7 @@ profileForm.addEventListener("submit", async (event) => {
         profileForm.elements[config.clear].checked = false;
       }
       galleryFiles = [];
+      document.querySelector("#artist-gallery-error").textContent = "";
       renderGallerySelection();
       renderProfile(result.profile);
     }
@@ -983,6 +1003,7 @@ try {
       currentProfile = null;
       profileForm.reset();
       galleryFiles = [];
+      document.querySelector("#artist-gallery-error").textContent = "";
       renderGallerySelection();
       if (bannerPreviewObjectUrl) URL.revokeObjectURL(bannerPreviewObjectUrl);
       bannerPreviewObjectUrl = "";
