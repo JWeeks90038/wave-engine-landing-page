@@ -25,6 +25,41 @@ export function validateAlbumFiles(files) {
   return Array.from(songs.values(), (song) => song.title);
 }
 
+export async function readAlbumZip(archive) {
+  const invalid = () => new Error("The existing album archive could not be read. Its songs were not changed.");
+  if (archive.size < 22) throw invalid();
+  const end = new DataView(await archive.slice(archive.size - 22).arrayBuffer());
+  if (end.getUint32(0, true) !== 0x06054b50 || end.getUint16(4, true) !== 0 ||
+      end.getUint16(6, true) !== 0 || end.getUint16(8, true) !== end.getUint16(10, true) ||
+      end.getUint16(20, true) !== 0) throw invalid();
+  const count = end.getUint16(10, true);
+  const directorySize = end.getUint32(12, true);
+  const directoryOffset = end.getUint32(16, true);
+  if (!count || count > 40 || directoryOffset + directorySize !== archive.size - 22) throw invalid();
+  const decoder = new TextDecoder("utf-8", { fatal: true });
+  const files = [];
+  let offset = 0;
+  for (let i = 0; i < count; i++) {
+    if (offset + 30 > directoryOffset) throw invalid();
+    const header = new DataView(await archive.slice(offset, offset + 30).arrayBuffer());
+    if (header.getUint32(0, true) !== 0x04034b50 || header.getUint16(6, true) !== 0x800 ||
+        header.getUint16(8, true) !== 0 || header.getUint32(18, true) !== header.getUint32(22, true)) throw invalid();
+    const size = header.getUint32(18, true);
+    const nameLength = header.getUint16(26, true);
+    const start = offset + 30 + nameLength + header.getUint16(28, true);
+    if (start + size > directoryOffset) throw invalid();
+    let name;
+    try { name = decoder.decode(await archive.slice(offset + 30, offset + 30 + nameLength).arrayBuffer()); }
+    catch { throw invalid(); }
+    const type = /\.mp3$/i.test(name) ? "audio/mpeg" : "audio/wav";
+    files.push(new File([archive.slice(start, start + size)], name, { type }));
+    offset = start + size;
+  }
+  if (offset !== directoryOffset) throw invalid();
+  validateAlbumFiles(files);
+  return files;
+}
+
 function header(size) {
   const bytes = new Uint8Array(size);
   return { bytes, view: new DataView(bytes.buffer) };

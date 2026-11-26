@@ -2,7 +2,7 @@ import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from
 import { getFirestore, collection, doc, getDocs, setDoc, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
 import { getStorage, ref, uploadBytesResumable, deleteObject, getBlob } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-storage.js";
 import { firebaseClient } from "./firebase-client.js";
-import { makeAlbumZip, validateAlbumFiles } from "./music-album-zip.js";
+import { makeAlbumZip, readAlbumZip, validateAlbumFiles } from "./music-album-zip.js";
 
 const isLocal = location.protocol === "file:" || ["localhost", "127.0.0.1"].includes(location.hostname);
 const apiBase = isLocal ? "http://127.0.0.1:8787" :
@@ -14,6 +14,8 @@ const form = document.querySelector("#track-form");
 const list = document.querySelector("#admin-tracks");
 const albumForm = document.querySelector("#album-form");
 const albumList = document.querySelector("#admin-albums");
+const albumFileList = document.querySelector("#album-file-list");
+const albumSelectedFiles = document.querySelector("#album-selected-files");
 const fields = ["title", "artist", "album", "description", "genre", "releaseDate", "duration"];
 const formats = {
   mp3: { types: ["audio/mpeg"], extension: ".mp3", limit: 100 * 1024 * 1024, file: "mp3.mp3" },
@@ -22,6 +24,7 @@ const formats = {
 };
 let auth, db, storage, editing = null, busy = false;
 let editingAlbum = null;
+let albumFiles = [];
 let previewUrls = [];
 
 function show(message) { status.textContent = message; }
@@ -117,7 +120,26 @@ async function loadTracks() {
 function resetAlbum() {
   editingAlbum = null;
   albumForm.reset();
+  albumFiles = [];
+  renderAlbumFiles();
   document.querySelector("#album-editor-title").textContent = "New album";
+}
+function renderAlbumFiles() {
+  albumFileList.replaceChildren();
+  albumSelectedFiles.textContent = albumFiles.length ?
+    `${albumFiles.length} new file${albumFiles.length === 1 ? "" : "s"} selected (${validateAlbumFiles(albumFiles).length} songs).` :
+    "No new song files selected.";
+  for (const [index, file] of albumFiles.entries()) {
+    const row = document.createElement("div");
+    const name = document.createElement("span");
+    name.textContent = file.name;
+    row.append(name, action("Remove", () => {
+      if (busy) return;
+      albumFiles.splice(index, 1);
+      renderAlbumFiles();
+    }));
+    albumFileList.append(row);
+  }
 }
 async function loadAlbums() {
   albumList.replaceChildren();
@@ -137,6 +159,8 @@ async function loadAlbums() {
     actions.append(action("Edit", () => {
       editingAlbum = album;
       albumForm.reset();
+      albumFiles = [];
+      renderAlbumFiles();
       albumForm.elements.title.value = album.title;
       albumForm.elements.price.value = (album.priceCents / 100).toFixed(2);
       albumForm.elements.published.checked = album.published;
@@ -242,13 +266,27 @@ form.addEventListener("submit", async (event) => {
   } finally { setBusy(false); }
 });
 
+albumForm.elements.songs.addEventListener("change", () => {
+  if (busy) return;
+  const selected = Array.from(albumForm.elements.songs.files);
+  albumForm.elements.songs.value = "";
+  if (!selected.length) return;
+  try {
+    validateAlbumFiles([...albumFiles, ...selected]);
+    albumFiles.push(...selected);
+    renderAlbumFiles();
+    show("Song files added to the album selection.");
+  } catch (error) { show(error.message); }
+});
+
 albumForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (busy) return;
   const title = albumForm.elements.title.value.trim();
   const price = albumForm.elements.price.value;
   const priceCents = Math.round(Number(price) * 100);
-  const files = Array.from(albumForm.elements.songs.files);
+  let files = [...albumFiles];
+  const replaceSongs = albumForm.elements.replaceSongs.checked;
   const cover = albumForm.elements.cover.files[0];
   const removeCover = albumForm.elements.removeCover.checked;
   if (!title || title.length > 160 || !/^\d+(?:\.\d{1,2})?$/.test(price) ||
@@ -261,6 +299,7 @@ albumForm.addEventListener("submit", async (event) => {
     songTitles = files.length ? validateAlbumFiles(files) : editingAlbum && editingAlbum.songTitles;
     if (cover) validateFile(cover, "cover");
     if (cover && removeCover) throw new Error("Choose either replacing or removing the album cover, not both.");
+    if (replaceSongs && !files.length) throw new Error("Select replacement song files before replacing the existing songs.");
   }
   catch (error) { show(error.message); return; }
   if (!songTitles) { show("Choose between 1 and 20 songs for the album."); return; }
@@ -273,6 +312,18 @@ albumForm.addEventListener("submit", async (event) => {
   setBusy(true);
   try {
     if (files.length) {
+      if (editingAlbum && !replaceSongs) {
+        show("Loading existing album songs. Keep this page open.");
+        const existingArchive = await getBlob(ref(storage, archivePath), 4 * 1024 * 1024 * 1024);
+        const existingFiles = await readAlbumZip(existingArchive);
+        const existingTitles = validateAlbumFiles(existingFiles);
+        if (existingTitles.length !== editingAlbum.songTitles.length ||
+            existingTitles.some((title, index) => title !== editingAlbum.songTitles[index])) {
+          throw new Error("The existing album's song list does not match its archive. Its songs were not changed.");
+        }
+        files = [...existingFiles, ...files];
+        songTitles = validateAlbumFiles(files);
+      }
       show("Preparing album ZIP. Keep this page open.");
       const archive = await makeAlbumZip(files, (done, total) => show(`Preparing album ZIP: ${done} of ${total} files.`));
       archivePath = `musicAlbums/${target.id}/${crypto.randomUUID()}/album.zip`;

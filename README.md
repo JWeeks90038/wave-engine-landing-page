@@ -129,11 +129,14 @@ and refund policy with counsel before enabling sales.
 
 The music administrator can create multiple albums separately from individual
 tracks. Choose 1–20 songs as MP3 and/or WAV files (up to 100 MiB per file).
+Select files in one or several batches; the selected list shows what will be added.
 Use the same filename before the extension to include both formats of a song.
 The browser prepares an uncompressed ZIP and uploads it directly to Storage;
 keep the admin page open until the upload finishes. Editing an album without
-selecting files preserves its archive. Selecting files replaces the entire
-archive, not just individual songs. Set a price from $0.50 to $100.00 and
+selecting files preserves its archive. Selecting files adds them to the existing
+archive, up to 20 songs total. Select "Replace all existing songs" to replace
+the entire archive instead. Adding files downloads and rebuilds the existing
+archive in the browser. Set a price from $0.50 to $100.00 and
 optionally upload PNG, JPEG or WebP cover artwork (up to 10 MiB). Published
 album covers appear below individual songs on the music page. Editing an album
 without choosing a cover retains the existing image; it can also be replaced or

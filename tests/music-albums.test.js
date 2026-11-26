@@ -161,8 +161,9 @@ test("album checkout fails closed for invalid and unpublished albums", async () 
 test("album ZIP includes every selected format and validates song count", async () => {
   const source = fs.readFileSync(path.join(__dirname, "..", "music-album-zip.js"), "utf8")
     .replace(/export function /g, "function ").replace(/export async function /g, "async function ");
-  const { makeAlbumZip, validateAlbumFiles } = vm.runInNewContext(
-    `${source}\n({ makeAlbumZip, validateAlbumFiles })`, { TextEncoder, Uint8Array, Uint32Array, DataView, Blob }
+  const { makeAlbumZip, readAlbumZip, validateAlbumFiles } = vm.runInNewContext(
+    `${source}\n({ makeAlbumZip, readAlbumZip, validateAlbumFiles })`,
+    { TextEncoder, TextDecoder, Uint8Array, Uint32Array, DataView, Blob, File }
   );
   const file = (name, data = "123456789") => {
     const blob = new Blob([data], { type: name.toLowerCase().endsWith(".wav") ? "audio/wav" : "audio/mpeg" });
@@ -186,4 +187,8 @@ test("album ZIP includes every selected format and validates song count", async 
   assert.equal(view.getUint32(second, true), 0x04034b50);
   assert.equal(view.getUint32(zip.length - 22, true), 0x06054b50);
   assert.equal(view.getUint16(zip.length - 12, true), 2);
+  const recovered = await readAlbumZip(new Blob([zip]));
+  assert.deepEqual(Array.from(recovered, (item) => item.name), ["Song.mp3", "Song.wav"]);
+  assert.deepEqual(Array.from(await Promise.all(recovered.map((item) => item.text()))), ["123456789", "wav"]);
+  await assert.rejects(readAlbumZip(new Blob([zip.slice(0, -1)])), /could not be read/);
 });

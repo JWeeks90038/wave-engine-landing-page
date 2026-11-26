@@ -8,6 +8,7 @@ async function requestsFor(file, location) {
   const requests = [];
   const nodes = new Map();
   const node = () => ({
+    elements: { songs: { addEventListener() {} } },
     addEventListener() {}, replaceChildren() {}, append(child) { this.link = child; }
   });
   const document = {
@@ -55,7 +56,7 @@ test("music pages use preview API, while production and localhost keep their exi
 test("music admin initializes and loads tracks and albums after sign-in", async () => {
   const nodes = new Map();
   const element = () => ({
-    children: [], listeners: {}, elements: { title: {}, price: {}, published: {} },
+    children: [], listeners: {}, elements: { title: {}, price: {}, published: {}, songs: { addEventListener() {} } },
     addEventListener(event, callback) { this.listeners[event] = callback; },
     querySelectorAll() { return []; },
     replaceChildren(...children) { this.children = children; },
@@ -105,8 +106,8 @@ test("music admin replaces and removes an album cover without replacing the arch
   const nodes = new Map();
   const element = () => ({
     children: [], listeners: {},
-    elements: { title: {}, price: {}, published: {}, songs: { files: [] },
-      cover: { files: [] }, removeCover: { checked: false } },
+    elements: { title: {}, price: {}, published: {}, songs: { files: [], addEventListener() {} },
+      cover: { files: [] }, removeCover: { checked: false }, replaceSongs: { checked: false } },
     addEventListener(event, callback) { this.listeners[event] = callback; },
     querySelectorAll() { return []; },
     replaceChildren(...children) { this.children = children; },
@@ -159,6 +160,104 @@ test("music admin replaces and removes an album cover without replacing the arch
   assert.equal("coverPath" in saved, false);
   assert.equal(saved.archivePath, "musicAlbums/album/archive/album.zip");
   assert.deepEqual(removed, ["musicAlbums/album/old/cover", "musicAlbums/album/new/cover"]);
+});
+
+test("music admin accumulates song selections and adds them to an existing album", async () => {
+  const zipSource = fs.readFileSync(path.join(__dirname, "..", "music-album-zip.js"), "utf8")
+    .replace(/export function /g, "function ").replace(/export async function /g, "async function ");
+  const zip = vm.runInNewContext(`${zipSource}\n({ makeAlbumZip, readAlbumZip, validateAlbumFiles })`,
+    { TextEncoder, TextDecoder, Uint8Array, Uint32Array, DataView, Blob, File });
+  const nodes = new Map();
+  const element = () => ({
+    children: [], listeners: {},
+    elements: {
+      title: {}, price: {}, published: {}, cover: { files: [] }, removeCover: { checked: false },
+      replaceSongs: { checked: false },
+      songs: { files: [], listeners: {}, addEventListener(event, callback) { this.listeners[event] = callback; } }
+    },
+    addEventListener(event, callback) { this.listeners[event] = callback; },
+    querySelectorAll() { return []; },
+    replaceChildren(...children) { this.children = children; },
+    append(...children) { this.children.push(...children); },
+    reset() { this.elements.replaceSongs.checked = false; this.elements.cover.files = []; },
+    scrollIntoView() {}
+  });
+  const document = {
+    querySelector(selector) {
+      if (!nodes.has(selector)) nodes.set(selector, element());
+      return nodes.get(selector);
+    },
+    createElement: element
+  };
+  const file = (name) => new File([name], name, { type: "audio/mpeg" });
+  let archive = await zip.makeAlbumZip([file("Existing.mp3")]);
+  let album = { title: "Album", songTitles: ["Existing"], priceCents: 500, published: true,
+    archivePath: "musicAlbums/album/old/album.zip", createdAt: "created", createdBy: "admin" };
+  let uploaded;
+  let authListener;
+  const source = fs.readFileSync(path.join(__dirname, "..", "music-admin.js"), "utf8")
+    .replace(/^import .*;\r?\n/gm, "");
+  await vm.runInNewContext(`(async () => {\n${source}\n})()`, {
+    document, location: { protocol: "https:", hostname: "example.com" },
+    firebaseClient: async () => ({}), fetch: async () => ({ ok: true, json: async () => ({ storageBucket: "bucket" }) }),
+    getAuth: () => ({ currentUser: { uid: "admin" } }), getFirestore: () => ({}), getStorage: () => ({}),
+    onAuthStateChanged: (auth, listener) => { authListener = listener; },
+    collection: (db, name) => name,
+    getDocs: async (name) => ({ docs: name === "musicAlbums" ? [{ id: "album", data: () => album }] : [] }),
+    doc: (db, name, id) => ({ id }),
+    ref: (storage, path) => path,
+    getBlob: async () => archive,
+    uploadBytesResumable: (path, blob) => {
+      uploaded = blob;
+      return { on: (event, progress, reject, resolve) => resolve() };
+    },
+    setDoc: async (target, data) => { album = data; archive = uploaded; },
+    serverTimestamp: () => "updated",
+    crypto: { randomUUID: () => "new" }, URL,
+    ...zip
+  });
+  await authListener({ getIdTokenResult: async () => ({ claims: { admin: true } }) });
+  const form = nodes.get("#album-form");
+  const edit = () => nodes.get("#admin-albums").children[0].children[3].children[0].listeners.click();
+  const select = (...files) => {
+    form.elements.songs.files = files;
+    form.elements.songs.listeners.change();
+  };
+  edit();
+  for (let i = 1; i <= 5; i++) select(file(`Song ${i}.mp3`));
+  assert.match(nodes.get("#album-selected-files").textContent, /5 new files selected \(5 songs\)/);
+  await form.listeners.submit({ preventDefault() {} });
+  assert.deepEqual(Array.from(album.songTitles), ["Existing", "Song 1", "Song 2", "Song 3", "Song 4", "Song 5"]);
+  assert.deepEqual(Array.from(await zip.readAlbumZip(archive), (item) => item.name),
+    ["Existing.mp3", "Song 1.mp3", "Song 2.mp3", "Song 3.mp3", "Song 4.mp3", "Song 5.mp3"]);
+
+  edit();
+  select(...Array.from({ length: 15 }, (_, i) => file(`Extra ${i}.mp3`)));
+  await form.listeners.submit({ preventDefault() {} });
+  assert.match(nodes.get("#admin-status").textContent, /20 songs/);
+  assert.equal(album.songTitles.length, 6);
+  assert.equal((await zip.readAlbumZip(archive)).length, 6);
+
+  nodes.get("#album-new").listeners.click();
+  edit();
+  select(...Array.from({ length: 14 }, (_, i) => file(`Extra ${i}.mp3`)));
+  await form.listeners.submit({ preventDefault() {} });
+  assert.equal(album.songTitles.length, 20);
+  assert.equal((await zip.readAlbumZip(archive)).length, 20);
+
+  edit();
+  select(file("Existing.mp3"));
+  await form.listeners.submit({ preventDefault() {} });
+  assert.match(nodes.get("#admin-status").textContent, /Duplicate MP3/);
+  assert.equal(album.songTitles.length, 20);
+
+  form.elements.replaceSongs.checked = true;
+  await form.listeners.submit({ preventDefault() {} });
+  assert.deepEqual(Array.from(album.songTitles), ["Existing"]);
+  assert.deepEqual(Array.from(await zip.readAlbumZip(archive), (item) => item.name), ["Existing.mp3"]);
+
+  nodes.get("#album-new").listeners.click();
+  assert.match(nodes.get("#album-selected-files").textContent, /No new song files/);
 });
 
 test("album listing renders uploaded cover artwork", async () => {
