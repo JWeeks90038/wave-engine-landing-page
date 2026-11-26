@@ -82,7 +82,7 @@ async function loadInventory() {
 }
 
 try {
-  auth = getAuth(await firebaseClient(apiBase));
+  auth = getAuth(await firebaseClient(apiBase, "admin"));
   login.addEventListener("submit", async (event) => {
     event.preventDefault();
     try {

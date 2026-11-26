@@ -252,7 +252,7 @@ document.querySelector("#artist-admin-refresh").addEventListener("click", async 
 document.querySelector("#artist-admin-logout").addEventListener("click", () => signOut(auth));
 
 try {
-  const app = await firebaseClient(apiBase);
+  const app =   await firebaseClient(apiBase, "admin");
   auth = getAuth(app);
   onAuthStateChanged(auth, async (user) => {
     reviewLoad++;
