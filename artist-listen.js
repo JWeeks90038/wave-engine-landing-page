@@ -146,7 +146,7 @@ function trackPlayer(track) {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "cta-button artist-download";
-    button.textContent = `Download ${track.format || "MP3"} - $${(track.downloadPriceCents / 100).toFixed(2)}`;
+    button.textContent = `Download ${track.format || "MP3"}`;
     button.addEventListener("click", async () => {
       button.disabled = true;
       try {
