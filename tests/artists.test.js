@@ -314,7 +314,7 @@ test("track publication requires rights and review, pins audio, and supports tak
   assert.equal((await request(admin, "POST", "/api/artist-admin", { action: "approve-release", id })).statusCode, 200);
   const publicAfter = JSON.parse((await visitor("/api/artist-releases?action=public")).body());
   const northStar = publicAfter.artists.find((entry) => entry.slug === "north-star");
-  assert.deepEqual(northStar.tracks, [{ id, title: "First Light", genre: "Rock", downloadPriceCents: null }]);
+  assert.deepEqual(northStar.tracks, [{ id, title: "First Light", genre: "Rock", downloadPriceCents: null, format: "MP3" }]);
   assert.doesNotMatch(JSON.stringify(publicAfter), /artistUploads|artistUid|audioGeneration/);
   const partial = await visitor(`/api/artist-releases?action=stream&id=${id}`, { range: "bytes=1-3" });
   assert.equal(partial.statusCode, 206);
