@@ -19,9 +19,12 @@
     <link rel="icon" type="image/png" href="../Images/optimized/headphones_favicon.png" />
     <link rel="preconnect" href="https://wave-engine-landing-page.vercel.app" crossorigin />
     <link rel="stylesheet" href="../style.css" />
+    <link rel="stylesheet" href="../mobile-nav.css" />
+    <script defer src="../mobile-nav.js"></script>
     <link rel="stylesheet" href="../music.css" />
     <script type="module" src="../artist.js"></script>
     <script type="module" src="../artist-listen.js"></script>
+    <script type="module" src="../artist-studio-link.js"></script>
   </head>
   <body>
     <div class="page-shell">
@@ -29,7 +32,7 @@
         <a class="brand-link" href="/">Wave Engine Music</a>
         <div class="nav-links">
           <a href="/music">Music</a>
-          <a href="/artist-dashboard">Become an Artist</a>
+          <a id="storefront-studio-link" href="/artist-dashboard" hidden>Artist Studio</a>
         </div>
       </nav>
       <main class="content-section artist-storefront">

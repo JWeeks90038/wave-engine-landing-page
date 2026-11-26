@@ -7,12 +7,14 @@
     <meta name="apparel-api-base" content="https://wave-engine-landing-page.vercel.app" data-local-api-base="http://127.0.0.1:8787" />
     <title>Inventory | Wave Engine Studio</title>
     <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="mobile-nav.css" />
+    <script defer src="mobile-nav.js"></script>
     <link rel="stylesheet" href="apparel.css" />
     <script type="module" src="apparel-admin.js"></script>
   </head>
   <body class="apparel-page">
     <div class="page-shell">
-      <nav class="topbar site-nav" aria-label="Primary"><a class="brand-link" href="./">Wave Engine</a><a href="apparel">Apparel</a></nav>
+      <nav class="topbar site-nav" aria-label="Primary"><a class="brand-link" href="./">Wave Engine</a><div class="nav-links"><a href="apparel">Apparel</a></div></nav>
       <main class="collection">
         <p class="apparel-kicker">Administrator</p><h1>Apparel inventory</h1>
         <p id="admin-status" role="status" aria-live="polite">Loading authentication...</p>

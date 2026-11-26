@@ -1624,6 +1624,8 @@ test("approved storefront renders with metadata from the page", async () => {
     "#storefront-bio", "#storefront-socials", "#artist-support-status"
   ];
   const elements = Object.fromEntries(selectors.map((selector) => [selector, { hidden: true, append() {} }]));
+  const links = [];
+  elements["#storefront-socials"].append = (link) => links.push(link);
   elements["#artist-support-form"] = { querySelector: () => ({}), addEventListener() {} };
   for (const [attribute, name] of [
     ["property", "og:title"], ["property", "og:description"],
@@ -1636,17 +1638,31 @@ test("approved storefront renders with metadata from the page", async () => {
     createElement: () => ({}),
     head: { append() {} }
   };
-  await vm.runInNewContext(`(async () => {\n${source}\n})()`, {
+  const context = {
     document,
     location: { protocol: "https:", hostname: "example.com", origin: "https://example.com", pathname: "/artist/north-star", search: "" },
     fetch: async () => ({ ok: true, json: async () => ({
-      profile: { artistName: "North Star", slug: "north-star", biography: "Independent music.", socialLinks: {} }
+      profile: {
+        artistName: "North Star", slug: "north-star", biography: "Independent music.",
+        socialLinks: { website: "https://example.com/music", instagram: "https://instagram.com/artist" }
+      }
     }) }),
     URL, URLSearchParams
-  });
+  };
+  await vm.runInNewContext(`(async () => {\n${source}\nglobalThis.testAddSocialLink = addSocialLink;\n})()`, context);
   assert.equal(elements["#storefront-profile"].hidden, false);
   assert.equal(elements["#storefront-status"].textContent, "");
   assert.equal(elements['meta[name="twitter:title"]'].content, "North Star | Wave Engine Music");
+  assert.equal(links[0].textContent, "Visit Artist Website");
+  assert.equal(links[0].className, "artist-website-link");
+  assert.equal(links[0].href, "https://example.com/music");
+  assert.equal(links[0].target, "_blank");
+  assert.equal(links[0].rel, "noopener noreferrer");
+  assert.equal(links[1].textContent, "Instagram");
+  for (const invalid of ["", "http://example.com", "javascript:alert(1)", "https://user:pass@example.com"]) {
+    context.testAddSocialLink(elements["#storefront-socials"], "Visit Artist Website", invalid, "artist-website-link");
+  }
+  assert.equal(links.length, 2);
 });
 
 test("artist support form validates amounts, opens checkout and verifies the return", async () => {
@@ -1720,13 +1736,14 @@ test("artist support form validates amounts, opens checkout and verifies the ret
   assert.match(cancelled.element("#artist-support-status").textContent, /cancelled/i);
 });
 
-test("storefront button reflects profile status and resets when switching accounts", async () => {
+test("verification updates automatically and storefront state resets when switching accounts", async () => {
   const source = fs.readFileSync(path.join(__dirname, "..", "artist-dashboard.js"), "utf8")
     .replace(/^import[\s\S]*?from "[^"]+";\r?\n/gm, "");
   const elements = new Map();
   function element(selector) {
     if (!elements.has(selector)) elements.set(selector, {
-      hidden: false, textContent: "", addEventListener() {}, replaceChildren() {},
+      hidden: false, textContent: "", listeners: {},
+      addEventListener(name, callback) { this.listeners[name] = callback; }, replaceChildren() {},
       querySelectorAll: () => [], contains: () => false, reset() {}
     });
     return elements.get(selector);
@@ -1755,13 +1772,21 @@ test("storefront button reflects profile status and resets when switching accoun
     cover: { files: [], addEventListener() {} },
     downloadPrice: { value: "" }
   };
-  const document = { querySelector: element, createElement: () => ({}) };
+  const document = {
+    querySelector: element, createElement: () => ({}), visibilityState: "visible", listeners: {},
+    addEventListener(name, callback) { this.listeners[name] = callback; }
+  };
+  const auth = { currentUser: null };
+  const timers = new Map();
+  let nextTimer = 0;
   let onAuth;
   await vm.runInNewContext(`(async () => {\n${source}\n})()`, {
     document,
     location: { protocol: "https:", hostname: "example.com" },
-    firebaseClient: async () => ({}), getAuth: () => ({}), getStorage: () => ({}),
+    firebaseClient: async () => ({}), getAuth: () => auth, getStorage: () => ({}),
     onAuthStateChanged: (_auth, callback) => { onAuth = callback; },
+    setInterval: (callback, delay) => { assert.equal(delay, 15000); timers.set(++nextTimer, callback); return nextTimer; },
+    clearInterval: (id) => timers.delete(id),
     createCoverPreviews: () => ({ clear() {}, add() {}, addLocal() {} }),
     fetch: async (url) => {
       if (url.includes("action=config")) return { ok: true, json: async () => ({ storageBucket: "bucket" }) };
@@ -1776,17 +1801,82 @@ test("storefront button reflects profile status and resets when switching accoun
     URL, URLSearchParams
   });
   let currentAccount = "rejected";
+  const setUser = async (value) => { auth.currentUser = value; await onAuth(value); };
+  let verified = false;
+  let reloads = 0;
+  let tokenRefreshes = 0;
+  const unverified = {
+    email: "pending@example.com", emailVerified: false,
+    async reload() { reloads++; this.emailVerified = verified; },
+    async getIdToken(force) { if (force) tokenRefreshes++; return "token"; }
+  };
+  await setUser(unverified);
+  assert.equal(element("#artist-verify").hidden, false);
+  assert.equal(timers.size, 1);
+  document.visibilityState = "hidden";
+  await Array.from(timers.values())[0]();
+  assert.equal(reloads, 0);
+  document.visibilityState = "visible";
+  await element("#artist-verify").listeners.click();
+  assert.equal(element("#artist-verify").hidden, false);
+  assert.equal(reloads, 1);
+  verified = true;
+  await document.listeners.visibilitychange();
+  assert.equal(element("#artist-verify").hidden, true);
+  assert.equal(tokenRefreshes, 1);
+  assert.equal(timers.size, 0);
+
+  verified = false;
+  unverified.emailVerified = false;
+  await setUser(unverified);
+  verified = true;
+  await Array.from(timers.values())[0]();
+  assert.equal(element("#artist-verify").hidden, true);
+  assert.equal(timers.size, 0);
+
   const user = { email: "artist@example.com", emailVerified: true, getIdToken: async () => "token" };
-  await onAuth(user);
+  unverified.emailVerified = false;
+  unverified.reload = async () => { throw new Error("Network unavailable"); };
+  await setUser(unverified);
+  await document.listeners.visibilitychange();
+  assert.match(element("#artist-status").textContent, /Network unavailable/);
+  assert.equal(element("#artist-verify").hidden, false);
+  assert.equal(timers.size, 1);
+  unverified.reload = async () => { unverified.emailVerified = true; };
+  unverified.getIdToken = async () => { throw new Error("Token refresh failed"); };
+  await document.listeners.visibilitychange();
+  assert.match(element("#artist-status").textContent, /Token refresh failed/);
+  assert.equal(element("#artist-verify").hidden, false);
+  unverified.getIdToken = async () => "token";
+  await document.listeners.visibilitychange();
+  assert.equal(element("#artist-verify").hidden, true);
+
+  unverified.emailVerified = false;
+  await setUser(unverified);
+  let finishReload;
+  unverified.reload = () => new Promise((resolve) => { finishReload = resolve; });
+  const pendingCheck = document.listeners.visibilitychange();
+  const secondCheck = element("#artist-verify").listeners.click();
+  await setUser(user);
+  unverified.emailVerified = true;
+  finishReload();
+  await pendingCheck;
+  await secondCheck;
+  assert.equal(element("#artist-email").textContent, user.email);
+  assert.equal(element("#artist-verify").hidden, true);
+  assert.equal(timers.size, 0);
+
+  await setUser(user);
+  assert.equal(element("#artist-verify").hidden, true);
   assert.ok(controls.every((control) => control.disabled));
   assert.match(element("#artist-storefront-notice").textContent, /inactive/);
   currentAccount = "pending";
-  await onAuth(user);
+  await setUser(user);
   assert.equal(element("#artist-storefront-link").hidden, true);
   assert.equal(element("#artist-storefront-unavailable").hidden, false);
   assert.match(element("#artist-storefront-notice").textContent, /awaiting review/);
   currentAccount = "approved";
-  await onAuth(user);
+  await setUser(user);
   assert.equal(element("#artist-storefront-link").hidden, false);
   assert.equal(element("#artist-storefront-link").href, "/artist/artist");
   assert.equal(element("#artist-storefront-unavailable").hidden, true);
@@ -1795,12 +1885,12 @@ test("storefront button reflects profile status and resets when switching accoun
   controls.featuredMessage.value = "Private message";
   controls.backgroundImages.files = [{ name: "private.png" }];
   currentAccount = "new";
-  await onAuth({ ...user, uid: "other" });
+  await setUser({ ...user, uid: "other" });
   assert.equal(controls.artistName.value, "");
   assert.equal(controls.featuredMessage.value, "");
   assert.deepEqual(controls.backgroundImages.files, []);
-  await onAuth(null);
-  await onAuth(user);
+  await setUser(null);
+  await setUser(user);
   assert.ok(controls.every((control) => !control.disabled));
   assert.equal(element("#artist-profile-link").hidden, true);
 });
@@ -1866,7 +1956,7 @@ test("editing drafts preserves metadata and supports both album and song prices"
   const submitted = [];
   let releaseList = [];
   const previewManagers = [];
-  const document = { querySelector: element, createElement: () => ({
+  const document = { querySelector: element, addEventListener() {}, createElement: () => ({
     dataset: {}, children: [], append(...children) { this.children.push(...children); }, addEventListener() {}
   }) };
   const context = {
@@ -1994,7 +2084,7 @@ test("profile editor saves image sets and safely handles uncertain saves and acc
   let mode = "success";
   let id = 0;
   const context = {
-    document: { querySelector: element, createElement: () => ({}) },
+    document: { querySelector: element, addEventListener() {}, createElement: () => ({}) },
     location: { protocol: "https:", hostname: "example.com" },
     firebaseClient: async () => ({}), getAuth: () => ({}), getStorage: () => ({}), onAuthStateChanged() {},
     createCoverPreviews: () => ({ clear() {}, add() {}, addProfile() {}, addLocal() {} }),

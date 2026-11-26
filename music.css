@@ -1,36 +1,3 @@
-.music-hero {
-  display: grid;
-  gap: 1.5rem;
-  justify-items: start;
-  text-align: left;
-  margin-bottom: 1.2rem;
-  padding: clamp(1.4rem, 4vw, 2.5rem);
-  background: linear-gradient(135deg, rgba(85, 35, 38, 0.92), rgba(8, 13, 26, 0.96));
-}
-.music-hero-art {
-  width: min(100%, 240px);
-  height: auto;
-  border-radius: 14px;
-  box-shadow: 0 18px 36px rgba(0, 0, 0, 0.4);
-}
-.music-hero-copy { display: grid; justify-items: start; gap: 0.8rem; min-width: 0; }
-.music-hero-label {
-  margin: 0;
-  color: #f3c5bf;
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-.music-hero h1 {
-  max-width: none;
-  text-align: left;
-  font-family: "Archivo", sans-serif;
-  font-size: clamp(2.4rem, 6vw, 4.7rem);
-  letter-spacing: -0.04em;
-  line-height: 1;
-}
-.music-hero .page-intro { max-width: 38rem; color: #e2dce0; }
 .music-library {
   background:
     radial-gradient(circle at top right, rgba(49, 102, 178, 0.18), transparent 45%),
@@ -41,7 +8,7 @@
   padding-inline: 0.5rem;
   letter-spacing: 0;
 }
-.music-library-intro h2 {
+.music-library-intro h1 {
   margin: 0.6rem 0;
   font-family: "Archivo", sans-serif;
   font-size: clamp(1.7rem, 4vw, 2.7rem);
@@ -362,6 +329,7 @@
 }
 .artist-auth-toggle { justify-content: flex-start; }
 .artist-account-bar p { overflow-wrap: anywhere; }
+#artist-verify[hidden] { display: none; }
 .artist-dashboard .music-admin-form h2,
 .artist-dashboard .music-admin-form h3,
 .artist-dashboard section h2 { margin: 0; }
@@ -417,6 +385,28 @@ body.artist-custom-theme {
 .artist-gallery-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(150px, 100%), 1fr)); gap: 0.75rem; }
 .artist-gallery-grid img { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 12px; }
 .artist-socials a { color: #9dc5ff; text-decoration: underline; text-underline-offset: 0.2em; }
+.artist-socials .artist-website-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem;
+  min-height: 48px;
+  padding: 0.7rem 1rem;
+  border: 1px solid #83b5f5;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #275d9e, #152e55);
+  color: #fff;
+  font-weight: 700;
+  text-decoration: none;
+  box-shadow: 0 8px 22px rgba(32, 90, 163, 0.28);
+}
+.artist-website-link::after { content: "\2197"; }
+.artist-socials .artist-website-link:hover,
+.artist-socials .artist-website-link:focus-visible {
+  border-color: #d3e6ff;
+  background: linear-gradient(135deg, #326bb1, #204478);
+}
+.artist-socials .artist-website-link:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
 .artist-album-track {
   display: grid;
   gap: 0.75rem;
@@ -460,7 +450,8 @@ body.artist-custom-theme {
 .artist-storefront-header > div { min-width: 0; }
 .artist-storefront-header .eyebrow { margin: 0 0 0.6rem; }
 .artist-storefront-header #storefront-bio { max-width: 55rem; color: #c4d2e8; line-height: 1.7; white-space: pre-wrap; }
-.artist-socials { display: flex; flex-wrap: wrap; gap: 0.8rem 1.2rem; }
+#storefront-studio-link[hidden] { display: none; }
+.artist-socials { display: flex; flex-wrap: wrap; align-items: center; gap: 0.8rem 1.2rem; }
 .artist-support {
   margin-top: 1.4rem;
   padding: 1.25rem;
@@ -478,7 +469,6 @@ body.artist-custom-theme {
 }
 .artist-releases-public p { color: var(--muted); line-height: 1.6; }
 @media (min-width: 650px) {
-  .music-hero { grid-template-columns: minmax(0, 240px) minmax(0, 1fr); align-items: end; gap: 2rem; }
   .music-card.has-cover { grid-template-columns: auto minmax(0, 1fr); }
   .music-cover { width: 180px; }
 }

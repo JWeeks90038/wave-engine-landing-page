@@ -50,6 +50,10 @@ Search and AI search crawlers remain permitted by the wildcard robots rule;
 robots.txt is not an access-control mechanism. Submit the sitemap in search
 engine webmaster tools and monitor indexing; inclusion is not guaranteed.
 
+On small screens, primary navigation opens as an overlay. It can be dismissed
+with the menu button, the backdrop, or Escape; without JavaScript, the links
+remain available.
+
 ## Digital music library setup
 
 `music.html` displays published tracks from Firestore. `music-admin.html` uses the
@@ -133,11 +137,18 @@ profile awaits review. Only
 tracks approved by an administrator can be streamed publicly; draft and
 submitted tracks remain private. Artist sales are disabled until configured. Existing
 `musicTracks` records and Stripe checkout are unchanged.
+While waiting for email verification, Artist Studio checks periodically while
+visible and when the tab becomes visible. Once verification is confirmed, it
+refreshes the sign-in token and opens the artist workflow automatically; the
+manual check remains available in the meantime.
 On the music page, selecting or hovering over an artist's circle displays their
 approved tracks and a profile link; selecting another artist stops the previous
 artist's playback. Close the preview with its button or Escape; closing it also
-stops playback. Song prices appear in Stripe Checkout; album prices appear beside
+stops playback. On artist profiles, a supplied website appears as a "Visit Artist
+Website" button. Song prices appear in Stripe Checkout; album prices appear beside
 the album download button.
+On an artist storefront, the Artist Studio navigation link appears only when
+the signed-in, email-verified owner is viewing their own profile.
 Artist Studio also previews custom accent and background colors, a featured
 message, up to five background images, and up to six gallery photos. Images
 must be PNG, JPEG, or WebP and at most 10 MiB each. Selecting new files replaces

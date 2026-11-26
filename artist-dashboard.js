@@ -42,6 +42,9 @@ let editingRelease = null;
 let albumTracks = [];
 let busy = false;
 let releaseLoad = 0;
+let verificationTimer;
+let verificationCheck = null;
+let verificationGeneration = 0;
 const releaseCovers = createCoverPreviews(apiBase, "owner", () => currentUser);
 const formCover = createCoverPreviews(apiBase, "owner", () => currentUser);
 const backgroundPreviews = createCoverPreviews(apiBase, "owner", () => currentUser);
@@ -560,6 +563,10 @@ async function initializeAccount(user) {
   document.querySelector("#artist-email").textContent = user.email || "";
   const verifyButton = document.querySelector("#artist-verify");
   verifyButton.hidden = Boolean(user.emailVerified);
+  clearInterval(verificationTimer);
+  verificationTimer = user.emailVerified ? undefined : setInterval(() => {
+    if (document.visibilityState === "visible") return checkEmailVerification();
+  }, 15000);
   profileSection.hidden = true;
   releaseSection.hidden = true;
 
@@ -588,6 +595,37 @@ async function initializeAccount(user) {
     show(error.message);
   }
 }
+
+async function checkEmailVerification() {
+  const user = currentUser;
+  if (!user || document.querySelector("#artist-verify").hidden) return;
+  if (verificationCheck && verificationCheck.user === user) return verificationCheck.promise;
+  const generation = verificationGeneration;
+  const check = { user, promise: null };
+  verificationCheck = check;
+  check.promise = (async () => {
+    try {
+      if (!user.emailVerified) await user.reload();
+      if (generation !== verificationGeneration || user !== currentUser || user !== auth.currentUser) return;
+      if (!user.emailVerified) {
+        show("Verify your email address to create an artist profile or upload drafts.");
+        return;
+      }
+      await user.getIdToken(true);
+      if (generation !== verificationGeneration || user !== currentUser || user !== auth.currentUser) return;
+      await initializeAccount(user);
+    } catch (error) {
+      if (generation === verificationGeneration && user === currentUser) show(`Email verification could not be checked: ${error.message}`);
+    } finally {
+      if (verificationCheck === check) verificationCheck = null;
+    }
+  })();
+  return check.promise;
+}
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") return checkEmailVerification();
+});
 
 document.querySelector("#show-signin").addEventListener("click", () => {
   signin.hidden = false;
@@ -618,16 +656,7 @@ signup.addEventListener("submit", async (event) => {
   }
 });
 document.querySelector("#artist-signout").addEventListener("click", () => signOut(auth));
-document.querySelector("#artist-verify").addEventListener("click", async () => {
-  try {
-    await currentUser.reload();
-    currentUser = auth.currentUser;
-    await currentUser.getIdToken(true);
-    await initializeAccount(currentUser);
-  } catch (error) {
-    show(`Email verification could not be checked: ${error.message}`);
-  }
-});
+document.querySelector("#artist-verify").addEventListener("click", checkEmailVerification);
 
 profileForm.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -882,6 +911,10 @@ try {
   auth = getAuth(app);
   storage = getStorage(app, `gs://${config.storageBucket}`);
   onAuthStateChanged(auth, async (user) => {
+    verificationGeneration++;
+    verificationCheck = null;
+    clearInterval(verificationTimer);
+    verificationTimer = undefined;
     releaseLoad++;
     releaseCovers.clear();
     formCover.clear();

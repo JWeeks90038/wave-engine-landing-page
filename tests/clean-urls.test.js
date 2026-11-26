@@ -95,3 +95,10 @@ test("artist support follows the music section", () => {
   const artist = fs.readFileSync(path.join(root, "artist.html"), "utf8");
   assert.match(artist, /<section class="artist-releases-public">[\s\S]*?<\/section>\s*<section class="artist-support"/);
 });
+
+test("music page starts with the digital music library after navigation", () => {
+  const music = fs.readFileSync(path.join(root, "music.html"), "utf8");
+  assert.match(music, /<\/nav>\s*<\/header>\s*<main class="page-main">\s*<section class="content-section music-library-intro"/);
+  assert.match(music, /<h1 id="library-title">Digital Music Library<\/h1>/);
+  assert.doesNotMatch(music, /Turn up the Music/i);
+});

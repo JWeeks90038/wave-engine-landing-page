@@ -10,7 +10,7 @@ function slugFromLocation() {
   return pathSlug || new URLSearchParams(location.search).get("slug") || "";
 }
 
-function addSocialLink(container, label, href) {
+function addSocialLink(container, label, href, className = "") {
   if (!href) return;
   let url;
   try { url = new URL(href); }
@@ -19,6 +19,7 @@ function addSocialLink(container, label, href) {
   const link = document.createElement("a");
   link.href = url.href;
   link.textContent = label;
+  if (className) link.className = className;
   link.target = "_blank";
   link.rel = "noopener noreferrer";
   container.append(link);
@@ -180,7 +181,8 @@ try {
     banner.style.backgroundPosition = `center ${positionY}%`;
   }
   const socials = document.querySelector("#storefront-socials");
-  for (const [key, label] of [["website", "Website"], ["instagram", "Instagram"], ["youtube", "YouTube"], ["tiktok", "TikTok"]]) {
+  addSocialLink(socials, "Visit Artist Website", profile.socialLinks && profile.socialLinks.website, "artist-website-link");
+  for (const [key, label] of [["instagram", "Instagram"], ["youtube", "YouTube"], ["tiktok", "TikTok"]]) {
     addSocialLink(socials, label, profile.socialLinks && profile.socialLinks[key]);
   }
   for (const selector of ['meta[property="og:title"]', 'meta[name="twitter:title"]']) {
