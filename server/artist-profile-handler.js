@@ -133,7 +133,7 @@ function createHandler({
       const artistRef = db.collection("artists").doc(user.uid);
 
       if (action === "create") {
-        if (body.backgroundPaths !== undefined || body.galleryPaths !== undefined) {
+        if (body.backgroundPaths !== undefined || body.galleryPaths !== undefined || body.addGalleryPaths !== undefined) {
           throw marketplace.statusError("Save the profile before uploading customization images.", 400);
         }
         const artistName = marketplace.validateArtistName(body.artistName);
@@ -175,9 +175,15 @@ function createHandler({
       const appearance = marketplace.validateAppearance(body.appearance);
       const backgroundPaths = marketplace.validateProfileImagePaths(user.uid, "background", body.backgroundPaths);
       const galleryPaths = marketplace.validateProfileImagePaths(user.uid, "gallery", body.galleryPaths);
+      const addGalleryPaths = marketplace.validateProfileImagePaths(user.uid, "gallery", body.addGalleryPaths);
+      if (galleryPaths !== undefined && addGalleryPaths !== undefined) {
+        throw marketplace.statusError("Choose either adding or replacing gallery images.", 400);
+      }
       if (avatarPath) await verifyProfileImage(bucket, avatarPath);
       if (bannerPath) await verifyProfileImage(bucket, bannerPath);
-      for (const path of [...(backgroundPaths || []), ...(galleryPaths || [])]) await verifyProfileImage(bucket, path);
+      for (const path of [...(backgroundPaths || []), ...(galleryPaths || []), ...(addGalleryPaths || [])]) {
+        await verifyProfileImage(bucket, path);
+      }
       let updatedProfile;
       let cleanupPaths = [];
       await db.runTransaction(async (transaction) => {
@@ -189,11 +195,13 @@ function createHandler({
         }
         const keptPosition = body.bannerPositionY === undefined && Number.isInteger(current.bannerPositionY)
           ? current.bannerPositionY : bannerPositionY;
+        const nextGalleryPaths = addGalleryPaths === undefined ? galleryPaths :
+          marketplace.validateProfileImagePaths(user.uid, "gallery", [...(current.galleryPaths || []), ...addGalleryPaths]);
         updatedProfile = {
           ...current, artistName, biography, socialLinks, bannerPositionY: keptPosition,
           ...(appearance === undefined ? {} : { appearance }),
           ...(backgroundPaths === undefined ? {} : { backgroundPaths }),
-          ...(galleryPaths === undefined ? {} : { galleryPaths }),
+          ...(nextGalleryPaths === undefined ? {} : { galleryPaths: nextGalleryPaths }),
           avatarPath: avatarPath || current.avatarPath || "",
           bannerPath: bannerPath || current.bannerPath || ""
         };
@@ -201,13 +209,13 @@ function createHandler({
           avatarPath && current.avatarPath && avatarPath !== current.avatarPath ? current.avatarPath : "",
           bannerPath && current.bannerPath && bannerPath !== current.bannerPath ? current.bannerPath : "",
           ...(backgroundPaths === undefined ? [] : (current.backgroundPaths || []).filter((path) => !backgroundPaths.includes(path))),
-          ...(galleryPaths === undefined ? [] : (current.galleryPaths || []).filter((path) => !galleryPaths.includes(path)))
+          ...(nextGalleryPaths === undefined ? [] : (current.galleryPaths || []).filter((path) => !nextGalleryPaths.includes(path)))
         ].filter(Boolean);
         transaction.update(artistRef, {
           artistName, biography, socialLinks, bannerPositionY: keptPosition,
           ...(appearance === undefined ? {} : { appearance }),
           ...(backgroundPaths === undefined ? {} : { backgroundPaths }),
-          ...(galleryPaths === undefined ? {} : { galleryPaths }),
+          ...(nextGalleryPaths === undefined ? {} : { galleryPaths: nextGalleryPaths }),
           ...(avatarPath ? { avatarPath } : {}),
           ...(bannerPath ? { bannerPath } : {}),
           updatedAt: marketplace.FieldValue.serverTimestamp()

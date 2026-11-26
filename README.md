@@ -197,8 +197,9 @@ On an artist storefront, the Artist Studio navigation link appears only when
 the signed-in, email-verified owner is viewing their own profile.
 Artist Studio also previews custom accent and background colors, a featured
 message, up to five background images, and up to six gallery photos. Images
-must be PNG, JPEG, or WebP and at most 10 MiB each. Selecting new files replaces
-the entire set; each set can also be removed. Approved profiles publish changes
+must be PNG, JPEG, or WebP and at most 10 MiB each. Selecting background files
+replaces the background set; gallery photos can be added in batches until the
+six-photo limit is reached. Each set can also be removed. Approved profiles publish changes
 immediately, while pending profiles and their images remain private. Background
 slideshows can be paused and do not start automatically with reduced motion.
 Administrators can preview pending profile images and featured messages during

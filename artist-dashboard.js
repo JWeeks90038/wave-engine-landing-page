@@ -38,6 +38,7 @@ let auth;
 let storage;
 let currentUser = null;
 let currentProfile = null;
+let galleryFiles = [];
 let editingRelease = null;
 let albumTracks = [];
 let busy = false;
@@ -205,9 +206,9 @@ function refreshProfileImages(kind) {
   config.manager.clear();
   container.replaceChildren();
   if (kind === "background") backgroundPreviewUrl = "";
-  const files = Array.from(profileForm.elements[config.input].files);
+  const files = kind === "gallery" ? galleryFiles : Array.from(profileForm.elements[config.input].files);
   if (!profileForm.elements[config.clear].checked) {
-    if (files.length) {
+    if (files.length && kind !== "gallery") {
       if (files.length > config.limit) show(`Choose up to ${config.limit} ${kind} images.`);
       for (const [index, file] of files.slice(0, config.limit).entries()) {
         const url = config.manager.addLocal(container, file, `${kind} image ${index + 1}`, "preview");
@@ -223,9 +224,39 @@ function refreshProfileImages(kind) {
           }
         });
       });
+      if (kind === "gallery") {
+        for (const [index, file] of files.entries()) {
+          config.manager.addLocal(container, file, `${kind} image ${saved.length + index + 1}`, "preview");
+        }
+      }
     }
   }
   updateStylePreview();
+}
+
+function renderGallerySelection() {
+  const list = document.querySelector("#artist-gallery-selection-list");
+  list.replaceChildren();
+  document.querySelector("#artist-gallery-selection").textContent = galleryFiles.length
+    ? `${galleryFiles.length} new gallery photo${galleryFiles.length === 1 ? "" : "s"} selected.`
+    : "No new gallery photos selected.";
+  for (const [index, file] of galleryFiles.entries()) {
+    const row = document.createElement("div");
+    const name = document.createElement("span");
+    const remove = document.createElement("button");
+    name.textContent = file.name;
+    remove.type = "button";
+    remove.textContent = "Remove";
+    remove.disabled = busy || Boolean(currentProfile && ["rejected", "suspended"].includes(currentProfile.status));
+    remove.addEventListener("click", () => {
+      if (busy) return;
+      galleryFiles.splice(index, 1);
+      renderGallerySelection();
+      refreshProfileImages("gallery");
+    });
+    row.append(name, remove);
+    list.append(row);
+  }
 }
 
 for (const name of ["accentColor", "backgroundColor", "featuredMessage"]) {
@@ -233,11 +264,31 @@ for (const name of ["accentColor", "backgroundColor", "featuredMessage"]) {
 }
 for (const [kind, config] of Object.entries(imagePreviews)) {
   profileForm.elements[config.input].addEventListener("change", () => {
+    if (kind === "gallery") {
+      const selected = Array.from(profileForm.elements[config.input].files);
+      profileForm.elements[config.input].value = "";
+      if (!selected.length) return;
+      try {
+        const savedCount = currentProfile && currentProfile.galleryImages ? currentProfile.galleryImages.length : 0;
+        if (savedCount + galleryFiles.length + selected.length > config.limit) {
+          throw new Error(`Choose up to ${config.limit} gallery images in total.`);
+        }
+        for (const file of selected) {
+          validateUpload(file, kind);
+          uploadName(kind, file);
+        }
+        galleryFiles.push(...selected);
+        renderGallerySelection();
+      } catch (error) { show(error.message); return; }
+    }
     profileForm.elements[config.clear].checked = false;
     refreshProfileImages(kind);
   });
   profileForm.elements[config.clear].addEventListener("change", () => {
-    if (profileForm.elements[config.clear].checked) profileForm.elements[config.input].value = "";
+    if (profileForm.elements[config.clear].checked) {
+      profileForm.elements[config.input].value = "";
+      if (kind === "gallery") { galleryFiles = []; renderGallerySelection(); }
+    }
     refreshProfileImages(kind);
   });
 }
@@ -672,7 +723,7 @@ profileForm.addEventListener("submit", async (event) => {
     banner: profileForm.elements.banner.files[0]
   };
   const customFiles = Object.fromEntries(Object.entries(imagePreviews).map(([kind, config]) =>
-    [kind, Array.from(profileForm.elements[config.input].files)]));
+    [kind, kind === "gallery" ? [...galleryFiles] : Array.from(profileForm.elements[config.input].files)]));
   setBusy(true);
   try {
     for (const [kind, file] of Object.entries(files)) validateUpload(file, kind);
@@ -714,7 +765,7 @@ profileForm.addEventListener("submit", async (event) => {
         paths.push(path);
         uploaded.push(path);
       }
-      assetPaths[`${kind}Paths`] = paths;
+      assetPaths[kind === "gallery" && selected.length ? "addGalleryPaths" : `${kind}Paths`] = paths;
     }
 
     let result = { profile: currentProfile, cleanupPaths: [] };
@@ -732,6 +783,8 @@ profileForm.addEventListener("submit", async (event) => {
         profileForm.elements[config.input].value = "";
         profileForm.elements[config.clear].checked = false;
       }
+      galleryFiles = [];
+      renderGallerySelection();
       renderProfile(result.profile);
     }
     assetsSaved = true;
@@ -929,6 +982,8 @@ try {
     if (currentUser !== user) {
       currentProfile = null;
       profileForm.reset();
+      galleryFiles = [];
+      renderGallerySelection();
       if (bannerPreviewObjectUrl) URL.revokeObjectURL(bannerPreviewObjectUrl);
       bannerPreviewObjectUrl = "";
       updateBannerPreview("");

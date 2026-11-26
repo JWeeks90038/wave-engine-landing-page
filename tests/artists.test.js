@@ -1303,6 +1303,37 @@ test("profile customization saves validated image sets and protects unpublished 
   }
 });
 
+test("gallery additions preserve saved photos and enforce the six-photo limit", async () => {
+  const uid = "artist-1";
+  const photo = (number) => `artistUploads/${uid}/profile-${number}2345678-1234-1234-1234-123456789012/gallery.png`;
+  const db = new FakeDatabase();
+  db.records.set("artists", new Map([[uid, {
+    status: "approved", slug: "artist", artistName: "Artist", biography: "", socialLinks: {}, galleryPaths: [photo(1)]
+  }]]));
+  const handler = profileHandler({
+    database: () => db, authenticate: fakeAuth(),
+    bucket: () => ({ file: () => ({ getMetadata: async () => [{ contentType: "image/png", size: 3 }] }) })
+  });
+  const base = { action: "update", artistName: "Artist", biography: "", socialLinks: {} };
+  const add = await request(handler, "POST", "/api/artist-profile", { ...base, addGalleryPaths: [photo(2), photo(3)] });
+  assert.equal(add.statusCode, 200);
+  assert.deepEqual(db.records.get("artists").get(uid).galleryPaths, [photo(1), photo(2), photo(3)]);
+  assert.deepEqual(JSON.parse(add.body()).cleanupPaths, []);
+  assert.equal(JSON.parse(add.body()).profile.galleryImages.length, 3);
+  const six = await request(handler, "POST", "/api/artist-profile", { ...base, addGalleryPaths: [photo(4), photo(5), photo(6)] });
+  assert.equal(six.statusCode, 200);
+  assert.equal(db.records.get("artists").get(uid).galleryPaths.length, 6);
+  for (const invalid of [
+    { addGalleryPaths: [photo(7)] },
+    { addGalleryPaths: [photo(1)] },
+    { addGalleryPaths: [photo(7).replace(uid, "other")] },
+    { galleryPaths: [], addGalleryPaths: [photo(7)] }
+  ]) {
+    assert.equal((await request(handler, "POST", "/api/artist-profile", { ...base, ...invalid })).statusCode, 400);
+    assert.equal(db.records.get("artists").get(uid).galleryPaths.length, 6);
+  }
+});
+
 test("artist images are served only for approved profiles", async () => {
   const path = "artistUploads/artist-1/profile-12345678-1234-1234-1234-123456789012/avatar.png";
   const db = new FakeDatabase();
@@ -2063,7 +2094,8 @@ test("profile editor saves image sets and safely handles uncertain saves and acc
     let files = [];
     controls[name] = {
       get files() { return files; }, set files(value) { files = value; },
-      set value(value) { if (!value) files = []; }, addEventListener() {}
+      set value(value) { if (!value) files = []; }, listeners: {},
+      addEventListener(name, callback) { this.listeners[name] = callback; }
     };
   }
   for (const name of ["clearBackgroundImages", "clearGalleryImages"]) controls[name] = { checked: false, addEventListener() {} };
@@ -2077,17 +2109,21 @@ test("profile editor saves image sets and safely handles uncertain saves and acc
   };
   const user = { uid: "artist-1", getIdToken: async () => "token" };
   const other = { uid: "other", getIdToken: async () => "other-token" };
-  const profile = { status: "approved", artistName: "Artist", slug: "artist", socialLinks: {} };
+  const profile = { status: "approved", artistName: "Artist", slug: "artist", socialLinks: {},
+    galleryImages: [{ url: "/existing" }] };
   const submitted = [];
   const deleted = [];
   let uploadedPaths = [];
   let mode = "success";
   let id = 0;
   const context = {
-    document: { querySelector: element, addEventListener() {}, createElement: () => ({}) },
+    document: { querySelector: element, addEventListener() {}, createElement: () => ({
+      children: [], listeners: {}, append(...children) { this.children.push(...children); },
+      addEventListener(name, callback) { this.listeners[name] = callback; }
+    }) },
     location: { protocol: "https:", hostname: "example.com" },
     firebaseClient: async () => ({}), getAuth: () => ({}), getStorage: () => ({}), onAuthStateChanged() {},
-    createCoverPreviews: () => ({ clear() {}, add() {}, addProfile() {}, addLocal() {} }),
+    createCoverPreviews: () => ({ clear() {}, add() {}, addProfile: async () => {}, addLocal() {} }),
     FormData: class { get(name) { return controls[name].value; } },
     crypto: { randomUUID: () => `uuid-${++id}` },
     ref: (_storage, path) => path,
@@ -2100,8 +2136,11 @@ test("profile editor saves image sets and safely handles uncertain saves and acc
     fetch: async (url, options = {}) => {
       if (url.includes("action=config")) return { ok: true, json: async () => ({ storageBucket: "bucket" }) };
       if (options.method === "POST") {
-        submitted.push(JSON.parse(options.body));
+        const body = JSON.parse(options.body);
+        submitted.push(body);
         if (mode !== "success") throw new Error("Connection lost");
+        if (body.addGalleryPaths) profile.galleryImages.push(...body.addGalleryPaths.map((path) => ({ url: path })));
+        if (body.galleryPaths) profile.galleryImages = body.galleryPaths.map((path) => ({ url: path }));
         return { ok: true, json: async () => ({ profile, cleanupPaths: ["old-image"] }) };
       }
       if (url.includes("me=1")) {
@@ -2112,28 +2151,46 @@ test("profile editor saves image sets and safely handles uncertain saves and acc
     },
     URL, URLSearchParams
   };
-  await vm.runInNewContext(`(async () => {\n${source}\nglobalThis.testSetUser = (user) => { currentUser = user; currentProfile = { status: "approved" }; };\n})()`, context);
+  context.testProfile = profile;
+  await vm.runInNewContext(`(async () => {\n${source}\nglobalThis.testSetUser = (user) => { currentUser = user; currentProfile = testProfile; };\n})()`, context);
   const image = (name) => ({ name: `${name}.png`, type: "image/png", size: 10 });
   const submit = () => form.listeners.submit({ preventDefault() {} });
   context.testSetUser(user);
   controls.backgroundImages.files = [image("one"), image("two")];
-  controls.galleryImages.files = [image("three")];
+  for (const name of ["three", "four", "five"]) {
+    controls.galleryImages.files = [image(name)];
+    controls.galleryImages.listeners.change();
+  }
+  assert.match(element("#artist-gallery-selection").textContent, /3 new gallery photos/);
   await submit();
   assert.equal(submitted[0].appearance.accentColor, "#123456");
   assert.equal(submitted[0].appearance.backgroundColor, "#abcdef");
   assert.equal(submitted[0].appearance.featuredMessage, "Hello");
   assert.equal(submitted[0].backgroundPaths.length, 2);
-  assert.equal(submitted[0].galleryPaths.length, 1);
+  assert.equal(submitted[0].addGalleryPaths.length, 3);
   assert.deepEqual(deleted, ["old-image"]);
+  assert.equal(profile.galleryImages.length, 4);
+
+  controls.galleryImages.files = [image("six")];
+  controls.galleryImages.listeners.change();
+  controls.galleryImages.files = [image("seven")];
+  controls.galleryImages.listeners.change();
+  await submit();
+  assert.equal(submitted[1].addGalleryPaths.length, 2);
+  assert.equal(profile.galleryImages.length, 6);
+  controls.galleryImages.files = [image("over-limit")];
+  controls.galleryImages.listeners.change();
+  assert.match(element("#artist-status").textContent, /up to 6/);
+  assert.match(element("#artist-gallery-selection").textContent, /No new gallery photos/);
 
   controls.clearGalleryImages.checked = true;
   await submit();
-  assert.deepEqual(submitted[1].galleryPaths, []);
-  assert.equal("backgroundPaths" in submitted[1], false);
+  assert.deepEqual(submitted[2].galleryPaths, []);
+  assert.equal("backgroundPaths" in submitted[2], false);
   controls.backgroundImages.files = Array.from({ length: 6 }, (_, index) => image(`excess-${index}`));
   await submit();
   assert.match(element("#artist-status").textContent, /up to 5/);
-  assert.equal(submitted.length, 2);
+  assert.equal(submitted.length, 3);
 
   for (const nextMode of ["saved", "verify-fails", "not-saved", "switch"]) {
     context.testSetUser(user);
