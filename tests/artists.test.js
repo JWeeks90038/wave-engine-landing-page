@@ -688,7 +688,7 @@ test("track publication requires rights and review, pins audio, and supports tak
   assert.equal((await visitor(`/api/artist-releases?action=stream&id=${id}`)).statusCode, 404);
 });
 
-test("artist storefront and previews display prices separately from purchase buttons", async () => {
+test("artist storefront and previews omit song prices while retaining purchase options", async () => {
   class Element {
     constructor(tag) {
       this.tagName = tag.toUpperCase();
@@ -753,7 +753,7 @@ test("artist storefront and previews display prices separately from purchase but
     assert.deepEqual(buttons.map((button) => button.textContent), ["Download WAV", "Download album", "Download MP3"]);
     assert.deepEqual(container.querySelectorAll("p")
       .filter((paragraph) => paragraph.className === "artist-download-notice")
-      .map((paragraph) => paragraph.textContent), ["Download price: $1.49", "Album download price: $5.00", "Download price: $1.25"]);
+      .map((paragraph) => paragraph.textContent), ["Album download price: $5.00"]);
     return buttons;
   }
   const storefront = await loadPage(true);

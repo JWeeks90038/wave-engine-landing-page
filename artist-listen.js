@@ -170,7 +170,6 @@ function trackPlayer(track) {
   actions.append(listen);
   panel.append(element("p", "Wave Engine Studio / Audio Player", "music-player-label"), controls, options, audio);
   if (Number.isSafeInteger(track.downloadPriceCents)) {
-    details.append(element("p", `Download price: $${(track.downloadPriceCents / 100).toFixed(2)}`, "artist-download-notice"));
     actions.append(purchaseButton(`Download ${track.format || "MP3"}`, track.id, track.trackId));
   } else if (!track.trackId) {
     const unavailable = element("button", "Download coming soon", "cta-button artist-download");

@@ -123,7 +123,8 @@ submitted tracks remain private. Artist sales are disabled until configured. Exi
 On the music page, selecting or hovering over an artist's circle displays their
 approved tracks and a profile link; selecting another artist stops the previous
 artist's playback. Close the preview with its button or Escape; closing it also
-stops playback. Artist-set download prices appear beside the download buttons.
+stops playback. Song prices appear in Stripe Checkout; album prices appear beside
+the album download button.
 Artist Studio also previews custom accent and background colors, a featured
 message, up to five background images, and up to six gallery photos. Images
 must be PNG, JPEG, or WebP and at most 10 MiB each. Selecting new files replaces
