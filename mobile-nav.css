@@ -3,6 +3,9 @@
 
 @media (max-width: 900px) {
   .site-nav.mobile-nav-ready { justify-content: space-between; }
+  .home-topbar.mobile-nav-ready { flex-wrap: nowrap; }
+  .home-topbar.mobile-nav-ready .home-welcome { flex: 1; min-width: 0; }
+  .home-topbar.mobile-nav-ready .mobile-nav-toggle { flex: 0 0 48px; }
   .site-nav.mobile-nav-open { position: relative; z-index: 1000; }
   .mobile-nav-ready .mobile-nav-toggle {
     position: relative;
