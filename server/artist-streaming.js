@@ -20,7 +20,10 @@ async function publicArtists(db) {
     const price = release.salesRightsConfirmed === true && Number.isSafeInteger(release.downloadPriceCents) &&
       release.downloadPriceCents >= 50 && release.downloadPriceCents <= 10000
       ? release.downloadPriceCents : null;
-    tracksByArtist.get(release.artistUid).push({ id: entry.id, title: release.title, genre: release.genre, downloadPriceCents: price });
+    tracksByArtist.get(release.artistUid).push({
+      id: entry.id, title: release.title, genre: release.genre, downloadPriceCents: price,
+      format: typeof release.audioPath === "string" && release.audioPath.endsWith(".wav") ? "WAV" : "MP3"
+    });
   }
   const artists = [];
   for (const doc of profiles.docs) {
