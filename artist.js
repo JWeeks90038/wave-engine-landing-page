@@ -78,6 +78,80 @@ function setupContributions(slug) {
   }
 }
 
+function readableAccentText(color) {
+  const channels = [1, 3, 5].map((offset) => {
+    const channel = parseInt(color.slice(offset, offset + 2), 16) / 255;
+    return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2] > 0.179 ? "#000000" : "#ffffff";
+}
+
+function profileImageUrl(image) {
+  const url = new URL(image.url, apiBase);
+  if (url.origin !== new URL(apiBase).origin || url.pathname !== "/api/artist-media") {
+    throw new Error("Artist image URL is invalid.");
+  }
+  return url.href;
+}
+
+function applyAppearance(profile) {
+  const appearance = profile.appearance;
+  const backgrounds = (profile.backgroundImages || []).map(profileImageUrl);
+  const gallery = profile.galleryImages || [];
+  if (appearance) {
+    if (!/^#[0-9a-f]{6}$/i.test(appearance.accentColor) ||
+        !/^#[0-9a-f]{6}$/i.test(appearance.backgroundColor) ||
+        typeof appearance.featuredMessage !== "string") {
+      throw new Error("Artist page appearance is invalid.");
+    }
+    document.body.style.setProperty("--artist-accent", appearance.accentColor);
+    document.body.style.setProperty("--artist-accent-text", readableAccentText(appearance.accentColor));
+    document.body.style.setProperty("--artist-page-color", appearance.backgroundColor);
+    const featured = document.querySelector("#artist-featured-message");
+    featured.querySelector("p").textContent = appearance.featuredMessage;
+    featured.hidden = !appearance.featuredMessage;
+  }
+  if (appearance || backgrounds.length) document.body.classList.add("artist-custom-theme");
+  if (backgrounds.length) {
+    let position = 0;
+    const showBackground = () => document.body.style.setProperty("--artist-page-image", `url(${JSON.stringify(backgrounds[position])})`);
+    showBackground();
+    if (backgrounds.length > 1) {
+      const toggle = document.querySelector("#artist-background-toggle");
+      const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+      let timer;
+      function stop() {
+        if (timer) clearInterval(timer);
+        timer = undefined;
+        toggle.textContent = "Play background slideshow";
+      }
+      function start() {
+        if (timer) return;
+        timer = setInterval(() => {
+          position = (position + 1) % backgrounds.length;
+          showBackground();
+        }, 8000);
+        toggle.textContent = "Pause background slideshow";
+      }
+      toggle.hidden = false;
+      toggle.addEventListener("click", () => { if (timer) stop(); else start(); });
+      reducedMotion.addEventListener("change", (event) => { if (event.matches) stop(); });
+      if (reducedMotion.matches) stop(); else start();
+    }
+  }
+  if (gallery.length) {
+    const container = document.querySelector("#artist-gallery-images");
+    gallery.forEach((photo, index) => {
+      const image = document.createElement("img");
+      image.src = profileImageUrl(photo);
+      image.alt = `${profile.artistName} gallery image ${index + 1}`;
+      image.loading = "lazy";
+      container.append(image);
+    });
+    document.querySelector("#artist-gallery").hidden = false;
+  }
+}
+
 try {
   const slug = slugFromLocation();
   if (!/^[a-z0-9](?:[a-z0-9-]{1,28}[a-z0-9])$/.test(slug)) {
@@ -88,6 +162,7 @@ try {
   if (!response.ok) throw new Error(data.error || "Artist profile not found.");
 
   const profile = data.profile;
+  applyAppearance(profile);
   document.title = `${profile.artistName} | Wave Engine Music`;
   document.querySelector("#storefront-name").textContent = profile.artistName;
   document.querySelector("#storefront-bio").textContent = profile.biography || "";

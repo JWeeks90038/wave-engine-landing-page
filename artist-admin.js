@@ -15,6 +15,7 @@ let currentUser;
 let reviewUrls = [];
 let reviewLoad = 0;
 const reviewCovers = createCoverPreviews(apiBase, "review", () => currentUser);
+const reviewProfiles = createCoverPreviews(apiBase, "review", () => currentUser);
 
 function show(message) {
   status.textContent = message;
@@ -71,6 +72,7 @@ async function loadReviewAudio(id, trackId, user) {
 }
 
 function renderApplications(artists) {
+  reviewProfiles.clear();
   applications.replaceChildren();
   for (const artist of artists) {
     const card = document.createElement("article");
@@ -82,6 +84,19 @@ function renderApplications(artists) {
     biography.textContent = artist.biography || "No biography provided.";
     const created = document.createElement("p");
     created.textContent = artist.createdAt ? `Submitted ${new Date(artist.createdAt).toLocaleString()}` : "Submission date unavailable.";
+    card.append(heading, link, biography, created);
+    if (artist.appearance && artist.appearance.featuredMessage) {
+      const message = document.createElement("p");
+      message.textContent = `Featured message: ${artist.appearance.featuredMessage}`;
+      card.append(message);
+    }
+    const images = [
+      ...(artist.avatarUrl ? [{ url: artist.avatarUrl, label: "Profile" }] : []),
+      ...(artist.bannerUrl ? [{ url: artist.bannerUrl, label: "Banner" }] : []),
+      ...(artist.backgroundImages || []).map((image) => ({ ...image, label: "Background" })),
+      ...(artist.galleryImages || []).map((image) => ({ ...image, label: "Gallery" }))
+    ];
+    for (const image of images) reviewProfiles.addProfile(card, image, image.label);
     const actions = document.createElement("div");
     actions.className = "music-actions";
     for (const actionName of ["approve", "reject"]) {
@@ -103,7 +118,7 @@ function renderApplications(artists) {
       });
       actions.append(button);
     }
-    card.append(heading, link, biography, created, actions);
+    card.append(actions);
     applications.append(card);
   }
   if (!artists.length) applications.textContent = "No artist applications are waiting for review.";
@@ -242,6 +257,7 @@ try {
   onAuthStateChanged(auth, async (user) => {
     reviewLoad++;
     reviewCovers.clear();
+    reviewProfiles.clear();
     for (const url of reviewUrls) URL.revokeObjectURL(url);
     reviewUrls = [];
     applications.replaceChildren();

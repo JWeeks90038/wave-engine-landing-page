@@ -110,15 +110,44 @@ function validateBannerPosition(value) {
   return value;
 }
 
+function validateAppearance(value) {
+  if (value === undefined) return undefined;
+  if (!value || typeof value !== "object" || Array.isArray(value) ||
+      typeof value.accentColor !== "string" || !/^#[0-9a-f]{6}$/i.test(value.accentColor) ||
+      typeof value.backgroundColor !== "string" || !/^#[0-9a-f]{6}$/i.test(value.backgroundColor) ||
+      typeof value.featuredMessage !== "string" || value.featuredMessage.length > 280) {
+    throw statusError("Choose valid colors and a featured message of at most 280 characters.", 400);
+  }
+  return {
+    accentColor: value.accentColor.toLowerCase(),
+    backgroundColor: value.backgroundColor.toLowerCase(),
+    featuredMessage: value.featuredMessage.trim()
+  };
+}
+
 function validateProfileAssetPath(uid, asset, value) {
   if (value === undefined || value === "") return "";
   if (typeof value !== "string") throw statusError("Invalid profile image.", 400);
-  const allowedNames = asset === "avatar" ? "avatar" : "banner";
+  if (!["avatar", "banner", "background", "gallery"].includes(asset)) throw new Error("Invalid profile image type.");
   const pattern = new RegExp(
-    `^artistUploads/${escapeRegExp(uid)}/profile-${UUID_PATTERN}/${allowedNames}\\.(?:jpg|jpeg|png|webp)$`
+    `^artistUploads/${escapeRegExp(uid)}/profile-${UUID_PATTERN}/${asset}\\.(?:jpg|jpeg|png|webp)$`
   );
   if (!pattern.test(value)) throw statusError("Invalid profile image.", 400);
   return value;
+}
+
+function validateProfileImagePaths(uid, asset, value) {
+  if (value === undefined) return undefined;
+  const limit = asset === "background" ? 5 : 6;
+  if (!Array.isArray(value) || value.length > limit || new Set(value).size !== value.length ||
+      value.some((path) => typeof path !== "string" || !path)) {
+    throw statusError(`Choose up to ${limit} unique ${asset} images.`, 400);
+  }
+  return value.map((path) => validateProfileAssetPath(uid, asset, path));
+}
+
+function profileImageId(path) {
+  return crypto.createHash("sha256").update(path).digest("hex");
 }
 
 function validateReleaseInput(uid, releaseId, body) {
@@ -227,6 +256,9 @@ function profileResponse(profile) {
   const assetUrl = (asset, path) => path
     ? `/api/artist-media?slug=${encodeURIComponent(profile.slug)}&asset=${asset}&v=${crypto.createHash("sha256").update(path).digest("hex").slice(0, 12)}`
     : "";
+  const imageUrls = (asset, paths) => (Array.isArray(paths) ? paths : []).map((path) => ({
+    url: `/api/artist-media?slug=${encodeURIComponent(profile.slug)}&asset=${asset}&id=${profileImageId(path)}`
+  }));
   return {
     artistName: profile.artistName,
     slug: profile.slug,
@@ -235,7 +267,10 @@ function profileResponse(profile) {
     status: profile.status,
     avatarUrl: assetUrl("avatar", profile.avatarPath),
     bannerUrl: assetUrl("banner", profile.bannerPath),
-    bannerPositionY: Number.isInteger(profile.bannerPositionY) ? profile.bannerPositionY : 50
+    bannerPositionY: Number.isInteger(profile.bannerPositionY) ? profile.bannerPositionY : 50,
+    appearance: profile.appearance || null,
+    backgroundImages: imageUrls("background", profile.backgroundPaths),
+    galleryImages: imageUrls("gallery", profile.galleryPaths)
   };
 }
 
@@ -246,14 +281,17 @@ module.exports = {
   bucket,
   database,
   profileResponse,
+  profileImageId,
   releaseAudio,
   releaseHasSales,
   setArtistUploadClaim,
   statusError,
   validateArtistName,
   validateBiography,
+  validateAppearance,
   validateBannerPosition,
   validateProfileAssetPath,
+  validateProfileImagePaths,
   validateReleaseInput,
   validateSlug,
   validateSocialLinks

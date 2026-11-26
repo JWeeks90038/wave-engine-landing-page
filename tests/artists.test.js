@@ -105,6 +105,19 @@ function fakeAuth(user = { uid: "artist-1", email_verified: true }) {
   };
 }
 
+function addCustomizationControls(controls, element) {
+  for (const [name, value] of [["accentColor", "#83b5f5"], ["backgroundColor", "#101a2d"], ["featuredMessage", ""]]) {
+    controls[name] = { value, addEventListener() {} };
+  }
+  for (const name of ["backgroundImages", "galleryImages"]) {
+    controls[name] = { files: [], value: "", addEventListener() {} };
+  }
+  for (const name of ["clearBackgroundImages", "clearGalleryImages"]) {
+    controls[name] = { checked: false, addEventListener() {} };
+  }
+  element("#artist-style-preview").style = { setProperty() {} };
+}
+
 test("artist profile creation reserves a unique slug and stays private until approval", async () => {
   const db = new FakeDatabase();
   let user = { uid: "artist-1", email_verified: true };
@@ -136,6 +149,81 @@ test("artist profile creation reserves a unique slug and stays private until app
   const duplicate = profileHandler({ database: () => db, authenticate: fakeAuth(user) });
   const conflict = await request(duplicate, "POST", "/api/artist-profile", { ...input, artistName: "Another Artist" });
   assert.equal(conflict.statusCode, 409);
+});
+
+test("artist sitemap includes only approved canonical profiles and reflects status changes", async () => {
+  const db = new FakeDatabase();
+  db.records.set("artists", new Map([
+    ["one", { status: "approved", slug: "north-star" }],
+    ["two", { status: "pending", slug: "pending-star" }],
+    ["three", { status: "approved", slug: "unapproved-slug" }],
+    ["four", { status: "approved", slug: "wrong-owner" }],
+    ["five", { status: "suspended", slug: "suspended-star" }]
+  ]));
+  db.records.set("artistSlugs", new Map([
+    ["north-star", { status: "approved", artistUid: "one" }],
+    ["pending-star", { status: "approved", artistUid: "two" }],
+    ["unapproved-slug", { status: "pending", artistUid: "three" }],
+    ["wrong-owner", { status: "approved", artistUid: "different" }],
+    ["suspended-star", { status: "approved", artistUid: "five" }]
+  ]));
+  const handler = profileHandler({ database: () => db });
+  const index = await request(handler, "GET", "/api/artist-profile?sitemap=index");
+  assert.equal(index.statusCode, 200);
+  assert.match(index.headers["content-type"], /^application\/xml/);
+  assert.match(index.body(), /<loc>https:\/\/waveenginemusic\.com\/sitemap\.xml<\/loc>/);
+  assert.match(index.body(), /<loc>https:\/\/waveenginemusic\.com\/sitemap-artists-1\.xml<\/loc>/);
+  const page = await request(handler, "GET", "/api/artist-profile?sitemap=1");
+  assert.equal(page.statusCode, 200);
+  assert.deepEqual([...page.body().matchAll(/<loc>(.*?)<\/loc>/g)].map((match) => match[1]),
+    ["https://waveenginemusic.com/artist/north-star"]);
+  const head = await request(handler, "HEAD", "/api/artist-profile?sitemap=1");
+  assert.equal(head.statusCode, 200);
+  assert.equal(head.body(), "");
+  assert.equal(head.headers["content-length"], String(Buffer.byteLength(page.body())));
+  const previousSite = process.env.MUSIC_SITE_URL;
+  process.env.MUSIC_SITE_URL = "https://staging.example.com/";
+  try {
+    const staging = await request(handler, "GET", "/api/artist-profile?sitemap=1");
+    assert.match(staging.body(), /<loc>https:\/\/staging\.example\.com\/artist\/north-star<\/loc>/);
+  } finally {
+    if (previousSite === undefined) delete process.env.MUSIC_SITE_URL;
+    else process.env.MUSIC_SITE_URL = previousSite;
+  }
+
+  db.records.get("artists").get("one").status = "suspended";
+  const emptyIndex = await request(handler, "GET", "/api/artist-profile?sitemap=index");
+  assert.doesNotMatch(emptyIndex.body(), /sitemap-artists-1\.xml/);
+  assert.equal((await request(handler, "GET", "/api/artist-profile?sitemap=1")).statusCode, 404);
+  assert.equal((await request(handler, "GET", "/api/artist-profile?sitemap=0")).statusCode, 404);
+  assert.equal((await request(handler, "POST", "/api/artist-profile?sitemap=index")).statusCode, 405);
+  const unavailable = profileHandler({ database: () => { throw new Error("Database unavailable"); } });
+  assert.equal((await request(unavailable, "GET", "/api/artist-profile?sitemap=0")).statusCode, 404);
+  assert.equal((await request(unavailable, "GET", "/api/artist-profile?sitemap=index")).statusCode, 503);
+});
+
+test("artist sitemap splits profiles into bounded pages", async () => {
+  const db = new FakeDatabase();
+  const artists = new Map();
+  const slugs = new Map();
+  for (let i = 0; i < 10001; i++) {
+    const slug = `artist-${String(i).padStart(5, "0")}`;
+    artists.set(`uid-${i}`, { status: "approved", slug });
+    slugs.set(slug, { status: "approved", artistUid: `uid-${i}` });
+  }
+  db.records.set("artists", artists);
+  db.records.set("artistSlugs", slugs);
+  const handler = profileHandler({ database: () => db });
+  const index = await request(handler, "GET", "/api/artist-profile?sitemap=index");
+  assert.match(index.body(), /sitemap-artists-1\.xml/);
+  assert.match(index.body(), /sitemap-artists-2\.xml/);
+  assert.doesNotMatch(index.body(), /sitemap-artists-3\.xml/);
+  const first = await request(handler, "GET", "/api/artist-profile?sitemap=1");
+  const second = await request(handler, "GET", "/api/artist-profile?sitemap=2");
+  assert.equal([...first.body().matchAll(/<url>/g)].length, 10000);
+  assert.equal([...second.body().matchAll(/<url>/g)].length, 1);
+  assert.match(first.body(), /\/artist\/artist-09999<\/loc>/);
+  assert.match(second.body(), /\/artist\/artist-10000<\/loc>/);
 });
 
 test("artist share pages render approved profile metadata and public avatar without JavaScript", async () => {
@@ -566,7 +654,7 @@ test("track publication requires rights and review, pins audio, and supports tak
   assert.equal((await visitor(`/api/artist-releases?action=stream&id=${id}`)).statusCode, 404);
 });
 
-test("artist circles expose both purchase options and stop previous playback", async () => {
+test("artist storefront and previews display prices separately from purchase buttons", async () => {
   class Element {
     constructor(tag) {
       this.tagName = tag.toUpperCase();
@@ -581,45 +669,64 @@ test("artist circles expose both purchase options and stop previous playback", a
     replaceChildren(...children) { this.children = children; }
     setAttribute(name, value) { this.attributes[name] = value; }
     addEventListener(name, callback) { this.events[name] = callback; }
+    focus() { if (this.events.focus) this.events.focus(); }
     querySelectorAll(tag) {
       return this.children.flatMap((child) =>
         [...(child.tagName === tag.toUpperCase() ? [child] : []), ...child.querySelectorAll(tag)]);
     }
     pause() { this.paused = true; }
   }
-  const status = new Element("p");
-  const list = new Element("div");
-  const selection = new Element("div");
-  selection.hidden = true;
-  const elements = {
-    "#artist-discovery-status": status,
-    "#artist-discovery-list": list,
-    "#artist-discovery-selection": selection
-  };
-  const document = {
-    querySelector: (selector) => elements[selector] || null,
-    createElement: (tag) => new Element(tag),
-    addEventListener() {}
-  };
   const source = fs.readFileSync(path.join(__dirname, "..", "artist-listen.js"), "utf8");
   const checkouts = [];
-  await vm.runInNewContext(`(async () => {\n${source}\n})()`, {
-    document, location: { protocol: "https:", hostname: "example.com" },
-    fetch: async (url, options) => {
-      if (url.includes("action=checkout")) {
-        checkouts.push(JSON.parse(options.body));
-        return { ok: false, json: async () => ({ error: "Checkout unavailable" }) };
-      }
-      return { ok: true, json: async () => ({ artists: [
-        { artistName: "North Star", slug: "north-star", tracks: [{ id: "track-1", title: "First Light" }],
-          albums: [{ id: "album-1", title: "Album", downloadPriceCents: 500, tracks: [
+  async function loadPage(profile) {
+    const status = new Element("p");
+    const list = new Element("div");
+    const selection = new Element("div");
+    selection.hidden = true;
+    const elements = {
+      "#artist-discovery-status": status,
+      "#artist-discovery-list": list,
+      "#artist-discovery-selection": selection,
+      "#storefront-profile": profile ? new Element("main") : null
+    };
+    const document = {
+      querySelector: (selector) => elements[selector] || null,
+      createElement: (tag) => new Element(tag),
+      addEventListener() {}
+    };
+    await vm.runInNewContext(`(async () => {\n${source}\n})()`, {
+      document, location: { protocol: "https:", hostname: "example.com", pathname: "/artist/north-star" },
+      fetch: async (url, options) => {
+        if (url.includes("action=checkout")) {
+          checkouts.push(JSON.parse(options.body));
+          return { ok: false, json: async () => ({ error: "Checkout unavailable" }) };
+        }
+        return { ok: true, json: async () => ({ artists: [
+          { artistName: "North Star", slug: "north-star", tracks: [
+            { id: "track-1", title: "First Light", downloadPriceCents: 149, format: "WAV" }
+          ], albums: [{ id: "album-1", title: "Album", downloadPriceCents: 500, tracks: [
             { id: "album-1", trackId: "song-1", title: "Song", downloadPriceCents: 125, format: "MP3" }
           ] }] },
-        { artistName: "South Star", slug: "south-star", tracks: [] }
-      ] }) };
-    },
-    URL, URLSearchParams
-  });
+          { artistName: "South Star", slug: "south-star", tracks: [] }
+        ] }) };
+      },
+      URL, URLSearchParams
+    });
+    return { status, list, selection };
+  }
+  function checkPrices(container) {
+    const buttons = container.querySelectorAll("button").filter((button) => button.className.includes("artist-download"));
+    assert.deepEqual(buttons.map((button) => button.textContent), ["Download WAV", "Download album", "Download MP3"]);
+    assert.deepEqual(container.querySelectorAll("p")
+      .filter((paragraph) => paragraph.className === "artist-download-notice")
+      .map((paragraph) => paragraph.textContent), ["Download price: $1.49", "Album download price: $5.00", "Download price: $1.25"]);
+    return buttons;
+  }
+  const storefront = await loadPage(true);
+  const storefrontButtons = checkPrices(storefront.list);
+  await storefrontButtons[0].events.click();
+
+  const { list, selection } = await loadPage(false);
   const first = list.children[0].children[0];
   const second = list.children[1].children[0];
   first.events.pointerenter({ pointerType: "mouse" });
@@ -628,19 +735,41 @@ test("artist circles expose both purchase options and stop previous playback", a
   assert.equal(selection.children[1].href, "/artist/north-star");
   const audio = selection.querySelectorAll("audio")[0];
   assert.match(audio.src, /action=stream&id=track-1/);
-  const album = selection.children[3];
-  const albumButton = album.children[0].children[0].children[2];
-  const trackButton = album.children[1].children[0].children[1].children[1];
-  assert.equal(albumButton.textContent, "Download album · $5.00");
-  assert.equal(trackButton.textContent, "Download MP3 · $1.25");
-  await albumButton.events.click();
-  await trackButton.events.click();
-  assert.deepEqual(checkouts, [{ id: "album-1" }, { id: "album-1", trackId: "song-1" }]);
-  second.events.focus();
+  const buttons = checkPrices(selection);
+  await buttons[1].events.click();
+  await buttons[2].events.click();
+  assert.deepEqual(checkouts, [{ id: "track-1" }, { id: "album-1" }, { id: "album-1", trackId: "song-1" }]);
+  const close = selection.children[0].children[1];
+  assert.equal(close.attributes["aria-label"], "Close North Star preview");
+  close.events.click();
   assert.equal(audio.paused, true);
+  assert.equal(selection.hidden, true);
+  assert.equal(selection.children.length, 0);
+  assert.equal(first.attributes["aria-expanded"], "false");
+  first.events.pointerenter({ pointerType: "touch" });
+  assert.equal(selection.hidden, true);
+  first.events.click();
+  assert.equal(selection.hidden, false);
+  assert.equal(first.attributes["aria-expanded"], "true");
+  const reopenedAudio = selection.querySelectorAll("audio")[0];
+  second.events.focus();
+  assert.equal(reopenedAudio.paused, true);
   assert.equal(first.attributes["aria-expanded"], "false");
   assert.equal(second.attributes["aria-expanded"], "true");
   assert.equal(selection.children[2].textContent, "No tracks available yet.");
+  let prevented = false;
+  selection.events.keydown({ key: "Escape", preventDefault() { prevented = true; } });
+  assert.equal(prevented, true);
+  assert.equal(selection.hidden, true);
+  assert.equal(second.attributes["aria-expanded"], "false");
+  first.events.pointerenter({ pointerType: "mouse" });
+  assert.equal(selection.hidden, false);
+  assert.equal(first.attributes["aria-expanded"], "true");
+  first.events.keydown({ key: "Escape", preventDefault() {} });
+  assert.equal(selection.hidden, true);
+  assert.equal(first.attributes["aria-expanded"], "false");
+  first.events.focus();
+  assert.equal(selection.hidden, false);
 });
 
 test("artist checkout uses connected account pricing and verifies paid downloads", async () => {
@@ -1006,6 +1135,77 @@ test("artist draft download prices must be whole cents within the permitted rang
   }
 });
 
+test("profile customization saves validated image sets and protects unpublished images", async () => {
+  const uid = "artist-1";
+  const imagePath = (id, kind) => `artistUploads/${uid}/profile-${id}/${kind}.png`;
+  const first = imagePath("12345678-1234-1234-1234-123456789012", "background");
+  const second = imagePath("22345678-1234-1234-1234-123456789012", "background");
+  const photo = imagePath("32345678-1234-1234-1234-123456789012", "gallery");
+  const db = new FakeDatabase();
+  db.records.set("artists", new Map([[uid, {
+    status: "pending", slug: "north-star", artistName: "North Star", biography: "", socialLinks: {}
+  }]]));
+  db.records.set("artistSlugs", new Map([["north-star", { artistUid: uid, status: "pending" }]]));
+  const bucket = () => ({ file: () => ({
+    getMetadata: async () => [{ contentType: "image/png", size: 3 }],
+    createReadStream: () => Readable.from([Buffer.from("img")])
+  }) });
+  const handler = profileHandler({ database: () => db, bucket, authenticate: fakeAuth() });
+  const base = { action: "update", artistName: "North Star", biography: "", socialLinks: {} };
+  const appearance = { accentColor: "#FFFFFF", backgroundColor: "#234567", featuredMessage: "Welcome!" };
+  const saved = await request(handler, "POST", "/api/artist-profile", {
+    ...base, appearance, backgroundPaths: [first, second], galleryPaths: [photo]
+  });
+  assert.equal(saved.statusCode, 200);
+  const profile = JSON.parse(saved.body()).profile;
+  assert.equal(profile.appearance.accentColor, "#ffffff");
+  assert.equal(profile.backgroundImages.length, 2);
+  assert.equal(profile.galleryImages.length, 1);
+  assert.doesNotMatch(JSON.stringify(profile), /artistUploads/);
+  const media = mediaHandler({ database: () => db, bucket, authenticate: fakeAuth() });
+  const background = profile.backgroundImages[0].url;
+  assert.equal((await request(media, "GET", background, undefined, "")).statusCode, 404);
+  const owner = await request(media, "GET", `${background}&preview=owner`);
+  assert.equal(owner.statusCode, 200);
+  assert.equal(owner.headers["cache-control"], "private, no-store");
+  const other = mediaHandler({ database: () => db, bucket, authenticate: fakeAuth({ uid: "other", email_verified: true }) });
+  assert.equal((await request(other, "GET", `${background}&preview=owner`)).statusCode, 404);
+  const review = mediaHandler({ database: () => db, bucket, authenticate: async (req, adminOnly) => {
+    if (adminOnly && req.headers.authorization !== "Bearer admin") throw marketplace.statusError("Administrator access is required.", 403);
+    return { uid, email_verified: true };
+  } });
+  assert.equal((await request(review, "GET", `${background}&preview=review`)).statusCode, 403);
+  assert.equal((await request(review, "GET", `${background}&preview=review`, undefined, "Bearer admin")).statusCode, 200);
+
+  db.records.get("artists").get(uid).status = "approved";
+  db.records.get("artistSlugs").get("north-star").status = "approved";
+  assert.equal((await request(media, "GET", background, undefined, "")).statusCode, 200);
+  const legacyUpdate = await request(handler, "POST", "/api/artist-profile", base);
+  assert.equal(JSON.parse(legacyUpdate.body()).profile.backgroundImages.length, 2);
+  const replaced = await request(handler, "POST", "/api/artist-profile", {
+    ...base, backgroundPaths: [second], galleryPaths: []
+  });
+  assert.deepEqual(JSON.parse(replaced.body()).cleanupPaths, [first, photo]);
+  assert.equal((await request(media, "GET", background, undefined, "")).statusCode, 404);
+  for (const invalid of [
+    { appearance: { ...appearance, accentColor: "red" } },
+    { appearance: { ...appearance, featuredMessage: "x".repeat(281) } },
+    { backgroundPaths: [first, first] },
+    { backgroundPaths: Array(6).fill(first) },
+    { galleryPaths: [first] },
+    { galleryPaths: [photo.replace(uid, "another-artist")] }
+  ]) {
+    assert.equal((await request(handler, "POST", "/api/artist-profile", { ...base, ...invalid })).statusCode, 400);
+  }
+  for (const size of [0, "invalid", 10 * 1024 * 1024 + 1]) {
+    const invalidFile = profileHandler({
+      database: () => db, authenticate: fakeAuth(),
+      bucket: () => ({ file: () => ({ getMetadata: async () => [{ contentType: "image/png", size }] }) })
+    });
+    assert.equal((await request(invalidFile, "POST", "/api/artist-profile", { ...base, galleryPaths: [photo] })).statusCode, 400);
+  }
+});
+
 test("artist images are served only for approved profiles", async () => {
   const path = "artistUploads/artist-1/profile-12345678-1234-1234-1234-123456789012/avatar.png";
   const db = new FakeDatabase();
@@ -1268,6 +1468,57 @@ test("artist profile reads reconcile stale upload claims", async () => {
   assert.deepEqual(claimChanges, [["artist-1", true]]);
 });
 
+test("storefront displays personalized colors, message, gallery, and controllable backgrounds", async () => {
+  const source = fs.readFileSync(path.join(__dirname, "..", "artist.js"), "utf8");
+  const elements = new Map();
+  function element(selector) {
+    if (!elements.has(selector)) elements.set(selector, {
+      hidden: true, textContent: "", children: [], events: {},
+      append(...children) { this.children.push(...children); },
+      addEventListener(name, callback) { this.events[name] = callback; },
+      querySelector() { return element(`${selector} p`); }
+    });
+    return elements.get(selector);
+  }
+  const properties = {};
+  const body = { style: { setProperty(name, value) { properties[name] = value; } },
+    classList: { add(name) { this.name = name; } } };
+  let interval;
+  const mediaQuery = { matches: true, addEventListener(_name, callback) { this.change = callback; } };
+  const images = (asset, ids) => ids.map((id) => ({ url: `/api/artist-media?slug=north-star&asset=${asset}&id=${id}` }));
+  const profile = {
+    artistName: "North Star", slug: "north-star", socialLinks: {},
+    appearance: { accentColor: "#ffffff", backgroundColor: "#112233", featuredMessage: "<Welcome>" },
+    backgroundImages: images("background", ["first", "second"]), galleryImages: images("gallery", ["photo"])
+  };
+  await vm.runInNewContext(`(async () => {\n${source}\n})()`, {
+    document: { body, querySelector: element, createElement: () => ({}), head: { append() {} } },
+    location: { protocol: "https:", hostname: "example.com", origin: "https://example.com", pathname: "/artist/north-star", search: "" },
+    window: { matchMedia: () => mediaQuery }, URL, URLSearchParams,
+    setInterval(callback) { interval = callback; return 1; },
+    clearInterval() { interval = null; },
+    fetch: async () => ({ ok: true, json: async () => ({ profile }) })
+  });
+  assert.equal(body.classList.name, "artist-custom-theme");
+  assert.equal(properties["--artist-accent-text"], "#000000");
+  assert.equal(properties["--artist-page-color"], "#112233");
+  assert.match(properties["--artist-page-image"], /id=first/);
+  assert.equal(element("#artist-featured-message p").textContent, "<Welcome>");
+  assert.equal(element("#artist-featured-message").hidden, false);
+  assert.equal(element("#artist-gallery-images").children[0].alt, "North Star gallery image 1");
+  assert.equal(element("#artist-gallery").hidden, false);
+  const toggle = element("#artist-background-toggle");
+  assert.equal(toggle.textContent, "Play background slideshow");
+  assert.equal(interval, undefined);
+  toggle.events.click();
+  assert.equal(toggle.textContent, "Pause background slideshow");
+  interval();
+  assert.match(properties["--artist-page-image"], /id=second/);
+  mediaQuery.change({ matches: true });
+  assert.equal(interval, null);
+  assert.equal(toggle.textContent, "Play background slideshow");
+});
+
 test("approved storefront renders with metadata from the page", async () => {
   const html = fs.readFileSync(path.join(__dirname, "..", "artist.html"), "utf8");
   const source = fs.readFileSync(path.join(__dirname, "..", "artist.js"), "utf8");
@@ -1391,8 +1642,14 @@ test("storefront button reflects profile status and resets when switching accoun
   const profileControls = { value: "50", addEventListener() {} };
   controls.bannerPositionY = profileControls;
   controls.banner = { files: [], addEventListener() {} };
+  addCustomizationControls(controls, element);
   element("#banner-preview").style = {};
   element("#artist-profile-form").elements = controls;
+  element("#artist-profile-form").reset = () => {
+    controls.artistName.value = "";
+    controls.featuredMessage.value = "";
+    controls.backgroundImages.files = [];
+  };
   element("#artist-release-form").elements = {
     genre: { querySelector: () => null, querySelectorAll: () => [], options: [], addEventListener() {} },
     releaseType: { value: "single", addEventListener() {} },
@@ -1437,8 +1694,15 @@ test("storefront button reflects profile status and resets when switching accoun
   assert.equal(element("#artist-storefront-link").href, "/artist/artist");
   assert.equal(element("#artist-storefront-unavailable").hidden, true);
   assert.equal(element("#artist-storefront-notice").textContent, "");
-  await onAuth(null);
+  controls.artistName.value = "Previous artist";
+  controls.featuredMessage.value = "Private message";
+  controls.backgroundImages.files = [{ name: "private.png" }];
   currentAccount = "new";
+  await onAuth({ ...user, uid: "other" });
+  assert.equal(controls.artistName.value, "");
+  assert.equal(controls.featuredMessage.value, "");
+  assert.deepEqual(controls.backgroundImages.files, []);
+  await onAuth(null);
   await onAuth(user);
   assert.ok(controls.every((control) => !control.disabled));
   assert.equal(element("#artist-profile-link").hidden, true);
@@ -1500,6 +1764,7 @@ test("editing drafts preserves metadata and supports both album and song prices"
   element("#artist-profile-form").elements = [];
   element("#artist-profile-form").elements.bannerPositionY = { value: "50", addEventListener() {} };
   element("#artist-profile-form").elements.banner = { files: [], addEventListener() {} };
+  addCustomizationControls(element("#artist-profile-form").elements, element);
   element("#banner-preview").style = {};
   const submitted = [];
   let releaseList = [];
@@ -1587,7 +1852,117 @@ test("editing drafts preserves metadata and supports both album and song prices"
   assert.deepEqual(previewManagers[0].added.map((release) => release.status), ["draft", "submitted", "published"]);
 });
 
-test("admin release review displays shared covers and notes missing artwork", async () => {
+test("profile editor saves image sets and safely handles uncertain saves and account changes", async () => {
+  const source = fs.readFileSync(path.join(__dirname, "..", "artist-dashboard.js"), "utf8")
+    .replace(/^import[\s\S]*?from "[^"]+";\r?\n/gm, "");
+  const elements = new Map();
+  function element(selector) {
+    if (!elements.has(selector)) elements.set(selector, {
+      listeners: {}, children: [], style: { setProperty() {} },
+      addEventListener(name, callback) { this.listeners[name] = callback; },
+      replaceChildren(...children) { this.children = children; },
+      append(...children) { this.children.push(...children); },
+      querySelectorAll: () => [], contains: () => false, reset() {}
+    });
+    return elements.get(selector);
+  }
+  const form = element("#artist-profile-form");
+  const controls = [];
+  for (const [name, value] of Object.entries({
+    artistName: "Artist", slug: "artist", biography: "Bio", website: "", instagram: "", youtube: "", tiktok: "",
+    bannerPositionY: "50", accentColor: "#123456", backgroundColor: "#abcdef", featuredMessage: " Hello "
+  })) controls[name] = { value, addEventListener() {} };
+  for (const name of ["avatar", "banner", "backgroundImages", "galleryImages"]) {
+    let files = [];
+    controls[name] = {
+      get files() { return files; }, set files(value) { files = value; },
+      set value(value) { if (!value) files = []; }, addEventListener() {}
+    };
+  }
+  for (const name of ["clearBackgroundImages", "clearGalleryImages"]) controls[name] = { checked: false, addEventListener() {} };
+  form.elements = controls;
+  const releaseForm = element("#artist-release-form");
+  releaseForm.elements = {
+    genre: { querySelector: () => null, querySelectorAll: () => [], options: [], addEventListener() {} },
+    releaseType: { value: "single", addEventListener() {} }, saleMode: { value: "none", addEventListener() {} },
+    albumAudio: { files: [], addEventListener() {} }, cover: { files: [], addEventListener() {} },
+    downloadPrice: { value: "" }
+  };
+  const user = { uid: "artist-1", getIdToken: async () => "token" };
+  const other = { uid: "other", getIdToken: async () => "other-token" };
+  const profile = { status: "approved", artistName: "Artist", slug: "artist", socialLinks: {} };
+  const submitted = [];
+  const deleted = [];
+  let uploadedPaths = [];
+  let mode = "success";
+  let id = 0;
+  const context = {
+    document: { querySelector: element, createElement: () => ({}) },
+    location: { protocol: "https:", hostname: "example.com" },
+    firebaseClient: async () => ({}), getAuth: () => ({}), getStorage: () => ({}), onAuthStateChanged() {},
+    createCoverPreviews: () => ({ clear() {}, add() {}, addProfile() {}, addLocal() {} }),
+    FormData: class { get(name) { return controls[name].value; } },
+    crypto: { randomUUID: () => `uuid-${++id}` },
+    ref: (_storage, path) => path,
+    uploadBytesResumable: (path) => ({ on(_event, _progress, _error, done) {
+      uploadedPaths.push(path);
+      if (mode === "switch") context.testSetUser(other);
+      done();
+    } }),
+    deleteObject: async (path) => { deleted.push(path); },
+    fetch: async (url, options = {}) => {
+      if (url.includes("action=config")) return { ok: true, json: async () => ({ storageBucket: "bucket" }) };
+      if (options.method === "POST") {
+        submitted.push(JSON.parse(options.body));
+        if (mode !== "success") throw new Error("Connection lost");
+        return { ok: true, json: async () => ({ profile, cleanupPaths: ["old-image"] }) };
+      }
+      if (url.includes("me=1")) {
+        if (mode === "verify-fails") throw new Error("Verification unavailable");
+        return { ok: true, json: async () => ({ assetPaths: mode === "saved" ? uploadedPaths : [] }) };
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    },
+    URL, URLSearchParams
+  };
+  await vm.runInNewContext(`(async () => {\n${source}\nglobalThis.testSetUser = (user) => { currentUser = user; currentProfile = { status: "approved" }; };\n})()`, context);
+  const image = (name) => ({ name: `${name}.png`, type: "image/png", size: 10 });
+  const submit = () => form.listeners.submit({ preventDefault() {} });
+  context.testSetUser(user);
+  controls.backgroundImages.files = [image("one"), image("two")];
+  controls.galleryImages.files = [image("three")];
+  await submit();
+  assert.equal(submitted[0].appearance.accentColor, "#123456");
+  assert.equal(submitted[0].appearance.backgroundColor, "#abcdef");
+  assert.equal(submitted[0].appearance.featuredMessage, "Hello");
+  assert.equal(submitted[0].backgroundPaths.length, 2);
+  assert.equal(submitted[0].galleryPaths.length, 1);
+  assert.deepEqual(deleted, ["old-image"]);
+
+  controls.clearGalleryImages.checked = true;
+  await submit();
+  assert.deepEqual(submitted[1].galleryPaths, []);
+  assert.equal("backgroundPaths" in submitted[1], false);
+  controls.backgroundImages.files = Array.from({ length: 6 }, (_, index) => image(`excess-${index}`));
+  await submit();
+  assert.match(element("#artist-status").textContent, /up to 5/);
+  assert.equal(submitted.length, 2);
+
+  for (const nextMode of ["saved", "verify-fails", "not-saved", "switch"]) {
+    context.testSetUser(user);
+    mode = nextMode;
+    uploadedPaths = [];
+    controls.backgroundImages.files = [image("next")];
+    deleted.length = 0;
+    await submit();
+    if (nextMode === "not-saved") assert.deepEqual(deleted, uploadedPaths);
+    else assert.deepEqual(deleted, []);
+    if (nextMode === "verify-fails") assert.match(element("#artist-status").textContent, /retained/);
+    if (nextMode === "switch") assert.match(element("#artist-status").textContent, /account changed/);
+  }
+});
+
+test("admin review displays release covers and pending profile customization", async () => {
   const source = fs.readFileSync(path.join(__dirname, "..", "artist-admin.js"), "utf8")
     .replace(/^import[\s\S]*?from "[^"]+";\r?\n/gm, "");
   const elements = new Map();
@@ -1599,6 +1974,7 @@ test("admin release review displays shared covers and notes missing artwork", as
     return elements.get(selector);
   }
   const added = [];
+  const profileImages = [];
   let cleared = 0;
   let onAuth;
   const context = {
@@ -1610,11 +1986,12 @@ test("admin release review displays shared covers and notes missing artwork", as
     onAuthStateChanged: (_auth, callback) => { onAuth = callback; },
     createCoverPreviews: (_api, mode) => {
       assert.equal(mode, "review");
-      return { clear() { cleared++; }, add(_card, release) { added.push(release.id); } };
+      return { clear() { cleared++; }, add(_card, release) { added.push(release.id); },
+        addProfile(_card, image, title) { profileImages.push({ image, title }); } };
     },
     URL
   };
-  await vm.runInNewContext(`(async () => {\n${source}\nglobalThis.testRenderReleases = renderReleases;\n})()`, context);
+  await vm.runInNewContext(`(async () => {\n${source}\nglobalThis.testRenderReleases = renderReleases;\nglobalThis.testRenderApplications = renderApplications;\n})()`, context);
   context.testRenderReleases([
     { id: "album", title: "Album", artistName: "Artist", status: "submitted", releaseType: "album", tracks: [], hasCover: true },
     { id: "single", title: "Single", artistName: "Artist", status: "published", hasCover: true },
@@ -1623,7 +2000,13 @@ test("admin release review displays shared covers and notes missing artwork", as
   assert.deepEqual(added, ["album", "single"]);
   assert.ok(element("#artist-release-reviews").children[2].children.some((child) =>
     child.textContent === "No cover artwork uploaded."));
+  context.testRenderApplications([{ artistName: "Artist", slug: "artist",
+    appearance: { featuredMessage: "Welcome" }, backgroundImages: [{ url: "/background" }],
+    galleryImages: [{ url: "/gallery" }] }]);
+  assert.deepEqual(profileImages.map((image) => image.title), ["Background", "Gallery"]);
+  assert.ok(element("#artist-applications").children[0].children.some((child) =>
+    child.textContent === "Featured message: Welcome"));
   await onAuth(null);
   assert.equal(element("#artist-release-reviews").children.length, 0);
-  assert.equal(cleared, 2);
+  assert.equal(cleared, 4);
 });

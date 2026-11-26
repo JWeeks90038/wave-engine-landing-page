@@ -83,6 +83,28 @@
                 <input name="bannerPositionY" type="range" min="0" max="100" step="1" value="50" />
               </label>
               <div id="banner-preview" class="artist-banner" aria-label="Banner preview"></div>
+              <h3>Personalize your storefront</h3>
+              <p>Changes appear immediately once your profile is approved. Choose accessible colors and images you have permission to use.</p>
+              <label>Accent color <input name="accentColor" type="color" value="#83b5f5" /></label>
+              <label>Background color <input name="backgroundColor" type="color" value="#101a2d" /></label>
+              <label>Featured message <textarea name="featuredMessage" maxlength="280" rows="3" placeholder="Share a message with your listeners"></textarea></label>
+              <label>Background images (up to 5; PNG, JPEG or WebP; 10 MiB each)
+                <input name="backgroundImages" type="file" multiple accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp" />
+              </label>
+              <p>Choosing files replaces the entire background set. Multiple images rotate; reduced-motion visitors see the first image.</p>
+              <label><input name="clearBackgroundImages" type="checkbox" /> Remove all background images</label>
+              <label>Gallery photos (up to 6; PNG, JPEG or WebP; 10 MiB each)
+                <input name="galleryImages" type="file" multiple accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp" />
+              </label>
+              <p>Choosing files replaces the entire gallery.</p>
+              <label><input name="clearGalleryImages" type="checkbox" /> Remove all gallery photos</label>
+              <div id="artist-style-preview" class="artist-style-preview">
+                <p>Storefront preview</p>
+                <strong>Your artist page</strong>
+                <p id="artist-message-preview"></p>
+                <div id="artist-background-preview" class="artist-image-previews" aria-label="Background image previews"></div>
+                <div id="artist-gallery-preview" class="artist-image-previews" aria-label="Gallery photo previews"></div>
+              </div>
               <button class="cta-button cta-primary" type="submit">Save artist profile</button>
             </form>
           </section>

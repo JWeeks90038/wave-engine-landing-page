@@ -30,7 +30,7 @@ match /artistUploads/{artistUid}/{uploadId}/{fileName} {
         && request.resource.contentType == 'audio/mpeg') ||
       (fileName == 'audio.wav' && request.resource.size <= 100 * 1024 * 1024
         && request.resource.contentType in ['audio/wav', 'audio/x-wav']) ||
-      (fileName.matches('^(avatar|banner|cover)\\.(jpg|jpeg|png|webp)$')
+      (fileName.matches('^(avatar|banner|cover|background|gallery)\\.(jpg|jpeg|png|webp)$')
         && request.resource.size <= 10 * 1024 * 1024
         && request.resource.contentType in ['image/jpeg', 'image/png', 'image/webp'])
     );

@@ -29,6 +29,8 @@ const genreSearchStatus = document.querySelector("#artist-genre-search-status");
 const uploadSpecs = {
   avatar: { types: ["image/jpeg", "image/png", "image/webp"], max: 10 * 1024 * 1024 },
   banner: { types: ["image/jpeg", "image/png", "image/webp"], max: 10 * 1024 * 1024 },
+  background: { types: ["image/jpeg", "image/png", "image/webp"], max: 10 * 1024 * 1024 },
+  gallery: { types: ["image/jpeg", "image/png", "image/webp"], max: 10 * 1024 * 1024 },
   audio: { types: ["audio/mpeg", "audio/wav", "audio/x-wav"], max: 100 * 1024 * 1024 },
   cover: { types: ["image/jpeg", "image/png", "image/webp"], max: 10 * 1024 * 1024 }
 };
@@ -42,6 +44,8 @@ let busy = false;
 let releaseLoad = 0;
 const releaseCovers = createCoverPreviews(apiBase, "owner", () => currentUser);
 const formCover = createCoverPreviews(apiBase, "owner", () => currentUser);
+const backgroundPreviews = createCoverPreviews(apiBase, "owner", () => currentUser);
+const galleryPreviews = createCoverPreviews(apiBase, "owner", () => currentUser);
 
 function sellsAlbum(mode) {
   return mode === "album" || mode === "both";
@@ -124,9 +128,13 @@ async function uploadPrivateAsset(file, kind, ownerId, groupId) {
   return upload(path, file, kind);
 }
 
-async function cleanupUploads(paths) {
+async function cleanupUploads(paths, owner = null) {
   const errors = [];
   for (const path of paths) {
+    if (owner && owner !== currentUser) {
+      errors.push(path);
+      continue;
+    }
     try { await deleteObject(ref(storage, path)); }
     catch (error) {
       if (error.code !== "storage/object-not-found") errors.push(path);
@@ -147,7 +155,12 @@ function profileFormData() {
       youtube: String(values.get("youtube") || "").trim(),
       tiktok: String(values.get("tiktok") || "").trim()
     },
-    bannerPositionY: Number(values.get("bannerPositionY"))
+    bannerPositionY: Number(values.get("bannerPositionY")),
+    appearance: {
+      accentColor: String(values.get("accentColor") || ""),
+      backgroundColor: String(values.get("backgroundColor") || ""),
+      featuredMessage: String(values.get("featuredMessage") || "").trim()
+    }
   };
 }
 
@@ -166,6 +179,65 @@ profileForm.elements.banner.addEventListener("change", () => {
   bannerPreviewObjectUrl = file ? URL.createObjectURL(file) : "";
   if (file) updateBannerPreview(bannerPreviewObjectUrl);
 });
+
+const stylePreview = document.querySelector("#artist-style-preview");
+const imagePreviews = {
+  background: { input: "backgroundImages", clear: "clearBackgroundImages", container: "#artist-background-preview", manager: backgroundPreviews, limit: 5 },
+  gallery: { input: "galleryImages", clear: "clearGalleryImages", container: "#artist-gallery-preview", manager: galleryPreviews, limit: 6 }
+};
+let backgroundPreviewUrl = "";
+const imagePreviewVersion = { background: 0, gallery: 0 };
+
+function updateStylePreview() {
+  stylePreview.style.setProperty("--preview-accent", profileForm.elements.accentColor.value);
+  stylePreview.style.setProperty("--preview-color", profileForm.elements.backgroundColor.value);
+  stylePreview.style.setProperty("--preview-image", backgroundPreviewUrl ? `url(${JSON.stringify(backgroundPreviewUrl)})` : "none");
+  document.querySelector("#artist-message-preview").textContent = profileForm.elements.featuredMessage.value;
+}
+
+function refreshProfileImages(kind) {
+  const config = imagePreviews[kind];
+  const container = document.querySelector(config.container);
+  const version = ++imagePreviewVersion[kind];
+  config.manager.clear();
+  container.replaceChildren();
+  if (kind === "background") backgroundPreviewUrl = "";
+  const files = Array.from(profileForm.elements[config.input].files);
+  if (!profileForm.elements[config.clear].checked) {
+    if (files.length) {
+      if (files.length > config.limit) show(`Choose up to ${config.limit} ${kind} images.`);
+      for (const [index, file] of files.slice(0, config.limit).entries()) {
+        const url = config.manager.addLocal(container, file, `${kind} image ${index + 1}`, "preview");
+        if (kind === "background" && index === 0) backgroundPreviewUrl = url;
+      }
+    } else {
+      const saved = currentProfile && currentProfile[config.input] || [];
+      saved.forEach((image, index) => {
+        config.manager.addProfile(container, image, `${kind} image ${index + 1}`).then((url) => {
+          if (kind === "background" && index === 0 && version === imagePreviewVersion[kind] && url) {
+            backgroundPreviewUrl = url;
+            updateStylePreview();
+          }
+        });
+      });
+    }
+  }
+  updateStylePreview();
+}
+
+for (const name of ["accentColor", "backgroundColor", "featuredMessage"]) {
+  profileForm.elements[name].addEventListener("input", updateStylePreview);
+}
+for (const [kind, config] of Object.entries(imagePreviews)) {
+  profileForm.elements[config.input].addEventListener("change", () => {
+    profileForm.elements[config.clear].checked = false;
+    refreshProfileImages(kind);
+  });
+  profileForm.elements[config.clear].addEventListener("change", () => {
+    if (profileForm.elements[config.clear].checked) profileForm.elements[config.input].value = "";
+    refreshProfileImages(kind);
+  });
+}
 
 function renderProfile(profile) {
   currentProfile = profile;
@@ -187,6 +259,11 @@ function renderProfile(profile) {
     profileForm.elements[field].value = profile.socialLinks && profile.socialLinks[field] || "";
   }
   profileForm.elements.bannerPositionY.value = Number.isInteger(profile.bannerPositionY) ? profile.bannerPositionY : 50;
+  profileForm.elements.accentColor.value = profile.appearance ? profile.appearance.accentColor : "#83b5f5";
+  profileForm.elements.backgroundColor.value = profile.appearance ? profile.appearance.backgroundColor : "#101a2d";
+  profileForm.elements.featuredMessage.value = profile.appearance ? profile.appearance.featuredMessage : "";
+  refreshProfileImages("background");
+  refreshProfileImages("gallery");
   if (!bannerPreviewObjectUrl) updateBannerPreview(profile.bannerUrl || "");
   else updateBannerPreview();
   for (const control of profileForm.elements) control.disabled = blocked || busy;
@@ -558,49 +635,98 @@ profileForm.addEventListener("submit", async (event) => {
   const uploaded = [];
   const creatingProfile = !currentProfile;
   let assetsSaved = false;
+  let updateAttempted = false;
+  const user = currentUser;
   const data = profileFormData();
   const files = {
     avatar: profileForm.elements.avatar.files[0],
     banner: profileForm.elements.banner.files[0]
   };
+  const customFiles = Object.fromEntries(Object.entries(imagePreviews).map(([kind, config]) =>
+    [kind, Array.from(profileForm.elements[config.input].files)]));
   setBusy(true);
   try {
     for (const [kind, file] of Object.entries(files)) validateUpload(file, kind);
+    for (const [kind, selected] of Object.entries(customFiles)) {
+      const config = imagePreviews[kind];
+      if (selected.length > config.limit) throw new Error(`Choose up to ${config.limit} ${kind} images.`);
+      if (selected.length && profileForm.elements[config.clear].checked) {
+        throw new Error(`Choose new ${kind} images or remove the existing set, not both.`);
+      }
+      for (const file of selected) validateUpload(file, kind);
+    }
 
     if (creatingProfile) {
       const created = await apiRequest("/api/artist-profile", {
         method: "POST",
-        body: { action: "create", ...data }
+        body: { action: "create", ...data },
+        user
       });
+      if (user !== currentUser) throw new Error("Your account changed. Sign in again before editing your profile.");
       currentProfile = created.profile;
       renderProfile(created.profile);
-      if (created.tokenRefreshRequired) await currentUser.getIdToken(true);
+      if (created.tokenRefreshRequired) await user.getIdToken(true);
     }
 
     const assetPaths = {};
     for (const [kind, file] of Object.entries(files)) {
       if (!file) continue;
-      assetPaths[`${kind}Path`] = await uploadPrivateAsset(file, kind, currentUser.uid, "profile");
+      if (user !== currentUser) throw new Error("Your account changed. Sign in again before editing your profile.");
+      assetPaths[`${kind}Path`] = await uploadPrivateAsset(file, kind, user.uid, "profile");
       uploaded.push(assetPaths[`${kind}Path`]);
+    }
+    for (const [kind, selected] of Object.entries(customFiles)) {
+      const config = imagePreviews[kind];
+      if (!selected.length && !profileForm.elements[config.clear].checked) continue;
+      const paths = [];
+      for (const file of selected) {
+        if (user !== currentUser) throw new Error("Your account changed. Sign in again before editing your profile.");
+        const path = await uploadPrivateAsset(file, kind, user.uid, "profile");
+        paths.push(path);
+        uploaded.push(path);
+      }
+      assetPaths[`${kind}Paths`] = paths;
     }
 
     let result = { profile: currentProfile, cleanupPaths: [] };
-    if (!creatingProfile || uploaded.length) {
+    if (!creatingProfile || Object.keys(assetPaths).length) {
+      if (user !== currentUser) throw new Error("Your account changed. Sign in again before editing your profile.");
+      updateAttempted = true;
       result = await apiRequest("/api/artist-profile", {
         method: "POST",
-        body: { action: "update", ...data, ...assetPaths }
+        body: { action: "update", ...data, ...assetPaths },
+        user
       });
+      assetsSaved = true;
+      if (user !== currentUser) throw new Error("Your profile was saved, but your account changed. Sign in again to continue.");
+      for (const config of Object.values(imagePreviews)) {
+        profileForm.elements[config.input].value = "";
+        profileForm.elements[config.clear].checked = false;
+      }
       renderProfile(result.profile);
     }
     assetsSaved = true;
     if (creatingProfile) await loadReleases();
-    const cleanupFailures = await cleanupUploads(result.cleanupPaths || []);
+    const cleanupFailures = await cleanupUploads(result.cleanupPaths || [], user);
     show(cleanupFailures.length
       ? `Profile saved, but old images could not be removed: ${cleanupFailures.join(", ")}`
       : result.profile.status === "approved" ? "Artist profile saved." : "Profile saved and awaiting review.");
   } catch (error) {
-    const failures = assetsSaved ? [] : await cleanupUploads(uploaded);
-    show(`${error.message}${failures.length ? ` Upload cleanup failed for ${failures.join(", ")}.` : ""}`);
+    let preserveUploads = assetsSaved;
+    let verificationError = "";
+    if (!assetsSaved && updateAttempted && uploaded.length) {
+      try {
+        const saved = await apiRequest("/api/artist-profile?me=1", { user });
+        if (!Array.isArray(saved.assetPaths)) throw new Error("The saved image paths were unavailable.");
+        preserveUploads = uploaded.some((path) => saved.assetPaths.includes(path));
+      } catch (failure) {
+        preserveUploads = true;
+        verificationError = ` Could not verify whether the profile saved; uploaded files were retained: ${failure.message}`;
+      }
+    }
+    const failures = preserveUploads ? [] : await cleanupUploads(uploaded, user);
+    show(`${error.message}${verificationError}${preserveUploads && !assetsSaved && !verificationError
+      ? " Some uploaded files are referenced by the saved profile; refresh before retrying." : ""}${failures.length ? ` Upload cleanup failed for ${failures.join(", ")}.` : ""}`);
   } finally {
     setBusy(false);
   }
@@ -759,9 +885,23 @@ try {
     releaseLoad++;
     releaseCovers.clear();
     formCover.clear();
+    for (const [kind, config] of Object.entries(imagePreviews)) {
+      imagePreviewVersion[kind]++;
+      config.manager.clear();
+      document.querySelector(config.container).replaceChildren();
+    }
+    backgroundPreviewUrl = "";
     coverPreview.replaceChildren();
     releasesList.replaceChildren();
-    if (currentUser !== user) resetReleaseForm();
+    if (currentUser !== user) {
+      currentProfile = null;
+      profileForm.reset();
+      if (bannerPreviewObjectUrl) URL.revokeObjectURL(bannerPreviewObjectUrl);
+      bannerPreviewObjectUrl = "";
+      updateBannerPreview("");
+      updateStylePreview();
+      resetReleaseForm();
+    }
     currentUser = user;
     account.hidden = !user;
     authPanel.hidden = Boolean(user);

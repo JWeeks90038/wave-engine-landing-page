@@ -169,18 +169,17 @@ function trackPlayer(track) {
   listen.addEventListener("click", play);
   actions.append(listen);
   panel.append(element("p", "Wave Engine Studio / Audio Player", "music-player-label"), controls, options, audio);
-  details.append(actions, panel);
-  container.append(details);
-
   if (Number.isSafeInteger(track.downloadPriceCents)) {
-    actions.append(purchaseButton(`Download ${track.format || "MP3"} · $${(track.downloadPriceCents / 100).toFixed(2)}`,
-      track.id, track.trackId));
+    details.append(element("p", `Download price: $${(track.downloadPriceCents / 100).toFixed(2)}`, "artist-download-notice"));
+    actions.append(purchaseButton(`Download ${track.format || "MP3"}`, track.id, track.trackId));
   } else if (!track.trackId) {
     const unavailable = element("button", "Download coming soon", "cta-button artist-download");
     unavailable.type = "button";
     unavailable.disabled = true;
     actions.append(unavailable);
   }
+  details.append(actions, panel);
+  container.append(details);
   return container;
 }
 
@@ -199,7 +198,8 @@ function albumPlayer(album) {
   details.append(element("h3", album.title));
   details.append(element("p", `Album · ${album.tracks.length} ${album.tracks.length === 1 ? "song" : "songs"}`, "music-meta"));
   if (Number.isSafeInteger(album.downloadPriceCents)) {
-    details.append(purchaseButton(`Download album · $${(album.downloadPriceCents / 100).toFixed(2)}`, album.id));
+    details.append(element("p", `Album download price: $${(album.downloadPriceCents / 100).toFixed(2)}`, "artist-download-notice"));
+    details.append(purchaseButton("Download album", album.id));
   }
   heading.append(details);
   container.append(heading, ...album.tracks.map(trackPlayer));
@@ -225,6 +225,28 @@ try {
     status.textContent = artist && (artist.tracks.length || (artist.albums || []).length) ? "" : "No tracks are currently available.";
   } else {
     let activeButton;
+    let restoringFocus = false;
+    function closePreview() {
+      if (!activeButton) return;
+      const button = activeButton;
+      for (const audio of selection.querySelectorAll("audio")) audio.pause();
+      button.setAttribute("aria-expanded", "false");
+      activeButton = undefined;
+      selection.hidden = true;
+      selection.replaceChildren();
+      restoringFocus = true;
+      button.focus({ preventScroll: true });
+      restoringFocus = false;
+    }
+
+    function handlePreviewKeydown(event) {
+      if (event.key === "Escape" && activeButton) {
+        event.preventDefault();
+        closePreview();
+      }
+    }
+    selection.addEventListener("keydown", handlePreviewKeydown);
+
     function selectArtist(artist, button) {
       if (activeButton === button) return;
       if (activeButton) activeButton.setAttribute("aria-expanded", "false");
@@ -232,12 +254,18 @@ try {
       button.setAttribute("aria-expanded", "true");
       const heading = document.createElement("h3");
       heading.textContent = artist.artistName;
+      const close = element("button", "Close preview", "cta-button artist-selection-close");
+      close.type = "button";
+      close.setAttribute("aria-label", `Close ${artist.artistName} preview`);
+      close.addEventListener("click", closePreview);
+      const header = element("div", "", "artist-selection-header");
+      header.append(heading, close);
       const profile = document.createElement("a");
       profile.className = "artist-selection-link";
       profile.href = `/artist/${encodeURIComponent(artist.slug)}`;
       profile.textContent = "View artist profile";
       for (const audio of selection.querySelectorAll("audio")) audio.pause();
-      selection.replaceChildren(heading, profile);
+      selection.replaceChildren(header, profile);
       if (artist.tracks.length || (artist.albums || []).length) {
         selection.append(...artist.tracks.slice(0, 3).map(trackPlayer));
         selection.append(...(artist.albums || []).slice(0, 1).map(albumPlayer));
@@ -278,7 +306,8 @@ try {
       button.addEventListener("pointerenter", (event) => {
         if (event.pointerType === "mouse") selectArtist(artist, button);
       });
-      button.addEventListener("focus", () => selectArtist(artist, button));
+      button.addEventListener("focus", () => { if (!restoringFocus) selectArtist(artist, button); });
+      button.addEventListener("keydown", handlePreviewKeydown);
       button.addEventListener("click", () => selectArtist(artist, button));
       card.append(button);
       list.append(card);

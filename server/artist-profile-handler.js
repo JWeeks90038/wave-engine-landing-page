@@ -2,6 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const { readJsonBody, sendJson, setCorsHeaders } = require("./api-utils");
 const marketplace = require("./artist-marketplace");
+const { sendArtistSitemap } = require("./artist-sitemap");
 
 function escapeHtml(value) {
   return String(value).replace(/[&<>"']/g, (character) => ({
@@ -66,6 +67,16 @@ function createHandler({
     const params = new URL(request.url, "http://localhost").searchParams;
     const page = params.get("page") === "1";
     const head = request.method === "HEAD";
+    if (params.has("sitemap")) {
+      if (request.method !== "GET" && !head) return sendJson(response, 405, { error: "Method not allowed." });
+      response.setHeader("Cache-Control", "no-store");
+      try {
+        return await sendArtistSitemap(response, database, siteOrigin(), params.get("sitemap"), head);
+      } catch (error) {
+        console.error("Artist sitemap error:", error.message);
+        return sendJson(response, 503, { error: "The artist sitemap is temporarily unavailable." });
+      }
+    }
     if (request.method === "OPTIONS") {
       setCorsHeaders(response);
       response.writeHead(204);
@@ -89,6 +100,8 @@ function createHandler({
           if (tokenRefreshRequired) await setArtistUploadClaim(user.uid, shouldHaveClaim);
           return sendJson(response, 200, {
             profile: profileResponse(profile),
+            assetPaths: [profile.avatarPath, profile.bannerPath,
+              ...(profile.backgroundPaths || []), ...(profile.galleryPaths || [])].filter(Boolean),
             tokenRefreshRequired
           });
         }
@@ -120,6 +133,9 @@ function createHandler({
       const artistRef = db.collection("artists").doc(user.uid);
 
       if (action === "create") {
+        if (body.backgroundPaths !== undefined || body.galleryPaths !== undefined) {
+          throw marketplace.statusError("Save the profile before uploading customization images.", 400);
+        }
         const artistName = marketplace.validateArtistName(body.artistName);
         const slug = marketplace.validateSlug(body.slug);
         const biography = marketplace.validateBiography(body.biography || "");
@@ -127,6 +143,7 @@ function createHandler({
         const avatarPath = marketplace.validateProfileAssetPath(user.uid, "avatar", body.avatarPath);
         const bannerPath = marketplace.validateProfileAssetPath(user.uid, "banner", body.bannerPath);
         const bannerPositionY = marketplace.validateBannerPosition(body.bannerPositionY);
+        const appearance = marketplace.validateAppearance(body.appearance);
         if (avatarPath) await verifyProfileImage(bucket, avatarPath);
         if (bannerPath) await verifyProfileImage(bucket, bannerPath);
         const slugRef = db.collection("artistSlugs").doc(slug);
@@ -137,6 +154,7 @@ function createHandler({
           if (existingSlug.exists) throw marketplace.statusError("That artist URL is already in use.", 409);
           transaction.create(artistRef, {
             artistName, slug, biography, socialLinks, avatarPath, bannerPath, bannerPositionY,
+            ...(appearance ? { appearance } : {}),
             status: "pending", createdAt: marketplace.FieldValue.serverTimestamp(),
             updatedAt: marketplace.FieldValue.serverTimestamp()
           });
@@ -144,7 +162,7 @@ function createHandler({
         });
         await setArtistUploadClaim(user.uid, true);
         return sendJson(response, 201, { profile: profileResponse({
-          artistName, slug, biography, socialLinks, avatarPath, bannerPath, bannerPositionY, status: "pending"
+          artistName, slug, biography, socialLinks, avatarPath, bannerPath, bannerPositionY, appearance, status: "pending"
         }), tokenRefreshRequired: true });
       }
 
@@ -154,8 +172,12 @@ function createHandler({
       const avatarPath = marketplace.validateProfileAssetPath(user.uid, "avatar", body.avatarPath);
       const bannerPath = marketplace.validateProfileAssetPath(user.uid, "banner", body.bannerPath);
       const bannerPositionY = marketplace.validateBannerPosition(body.bannerPositionY);
+      const appearance = marketplace.validateAppearance(body.appearance);
+      const backgroundPaths = marketplace.validateProfileImagePaths(user.uid, "background", body.backgroundPaths);
+      const galleryPaths = marketplace.validateProfileImagePaths(user.uid, "gallery", body.galleryPaths);
       if (avatarPath) await verifyProfileImage(bucket, avatarPath);
       if (bannerPath) await verifyProfileImage(bucket, bannerPath);
+      for (const path of [...(backgroundPaths || []), ...(galleryPaths || [])]) await verifyProfileImage(bucket, path);
       let updatedProfile;
       let cleanupPaths = [];
       await db.runTransaction(async (transaction) => {
@@ -169,15 +191,23 @@ function createHandler({
           ? current.bannerPositionY : bannerPositionY;
         updatedProfile = {
           ...current, artistName, biography, socialLinks, bannerPositionY: keptPosition,
+          ...(appearance === undefined ? {} : { appearance }),
+          ...(backgroundPaths === undefined ? {} : { backgroundPaths }),
+          ...(galleryPaths === undefined ? {} : { galleryPaths }),
           avatarPath: avatarPath || current.avatarPath || "",
           bannerPath: bannerPath || current.bannerPath || ""
         };
         cleanupPaths = [
           avatarPath && current.avatarPath && avatarPath !== current.avatarPath ? current.avatarPath : "",
-          bannerPath && current.bannerPath && bannerPath !== current.bannerPath ? current.bannerPath : ""
+          bannerPath && current.bannerPath && bannerPath !== current.bannerPath ? current.bannerPath : "",
+          ...(backgroundPaths === undefined ? [] : (current.backgroundPaths || []).filter((path) => !backgroundPaths.includes(path))),
+          ...(galleryPaths === undefined ? [] : (current.galleryPaths || []).filter((path) => !galleryPaths.includes(path)))
         ].filter(Boolean);
         transaction.update(artistRef, {
           artistName, biography, socialLinks, bannerPositionY: keptPosition,
+          ...(appearance === undefined ? {} : { appearance }),
+          ...(backgroundPaths === undefined ? {} : { backgroundPaths }),
+          ...(galleryPaths === undefined ? {} : { galleryPaths }),
           ...(avatarPath ? { avatarPath } : {}),
           ...(bannerPath ? { bannerPath } : {}),
           updatedAt: marketplace.FieldValue.serverTimestamp()
@@ -210,8 +240,9 @@ async function verifyProfileImage(bucketFactory, path) {
     }
     throw error;
   }
+  const size = Number(metadata.size);
   if (!["image/jpeg", "image/png", "image/webp"].includes(metadata.contentType) ||
-      Number(metadata.size) <= 0 || Number(metadata.size) > 10 * 1024 * 1024) {
+      !Number.isSafeInteger(size) || size <= 0 || size > 10 * 1024 * 1024) {
     throw marketplace.statusError("The uploaded profile image is invalid.", 400);
   }
 }

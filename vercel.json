@@ -8,6 +8,14 @@
   },
   "rewrites": [
     {
+      "source": "/sitemap-artists.xml",
+      "destination": "/api/artist-profile?sitemap=index"
+    },
+    {
+      "source": "/sitemap-artists-:part(\\d+).xml",
+      "destination": "/api/artist-profile?sitemap=:part"
+    },
+    {
       "source": "/artist/:slug",
       "destination": "/api/artist-profile?page=1&slug=:slug"
     }

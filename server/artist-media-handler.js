@@ -17,11 +17,11 @@ function createHandler({
 
     try {
       const asset = params.get("asset");
-      if (!["avatar", "banner", "cover"].includes(asset)) {
+      if (!["avatar", "banner", "background", "gallery", "cover"].includes(asset)) {
         return sendJson(response, 400, { error: "Invalid artist image request." });
       }
       const preview = params.get("preview");
-      if (preview !== null && (asset !== "cover" || !["owner", "review"].includes(preview))) {
+      if (preview !== null && !["owner", "review"].includes(preview)) {
         return sendJson(response, 400, { error: "Invalid artist image request." });
       }
       if (preview) response.setHeader("Cache-Control", "private, no-store");
@@ -71,21 +71,51 @@ function createHandler({
         );
       } else {
         const slug = marketplace.validateSlug(params.get("slug"));
-        const slugDoc = await db.collection("artistSlugs").doc(slug).get();
-        if (!slugDoc.exists || slugDoc.data().status !== "approved") {
-          return sendJson(response, 404, { error: "Artist image not found." });
-        }
-        const artistSnapshot = await db.collection("artists").doc(slugDoc.data().artistUid).get();
-        if (!artistSnapshot.exists || artistSnapshot.data().status !== "approved") {
-          return sendJson(response, 404, { error: "Artist image not found." });
+        let artistSnapshot;
+        if (preview === "owner") {
+          artistSnapshot = await db.collection("artists").doc(user.uid).get();
+          if (!artistSnapshot.exists || !["pending", "approved"].includes(artistSnapshot.data().status)) {
+            return sendJson(response, 404, { error: "Artist image not found." });
+          }
+        } else if (preview === "review") {
+          const slugDoc = await db.collection("artistSlugs").doc(slug).get();
+          if (!slugDoc.exists || slugDoc.data().status !== "pending") {
+            return sendJson(response, 404, { error: "Artist image not found." });
+          }
+          artistSnapshot = await db.collection("artists").doc(slugDoc.data().artistUid).get();
+          if (!artistSnapshot.exists || artistSnapshot.data().status !== "pending") {
+            return sendJson(response, 404, { error: "Artist image not found." });
+          }
+        } else {
+          const slugDoc = await db.collection("artistSlugs").doc(slug).get();
+          if (!slugDoc.exists || slugDoc.data().status !== "approved") {
+            return sendJson(response, 404, { error: "Artist image not found." });
+          }
+          artistSnapshot = await db.collection("artists").doc(slugDoc.data().artistUid).get();
+          if (!artistSnapshot.exists || artistSnapshot.data().status !== "approved") {
+            return sendJson(response, 404, { error: "Artist image not found." });
+          }
         }
         const artist = artistSnapshot.data();
-        path = asset === "avatar" ? artist.avatarPath : artist.bannerPath;
-        pathPattern = new RegExp(
-          `^artistUploads/${artistSnapshot.id}/profile-${uuid}/${asset}\\.(?:jpg|jpeg|png|webp)$`
-        );
+        if (artist.slug !== slug) {
+          return sendJson(response, 404, { error: "Artist image not found." });
+        }
+        if (asset === "background" || asset === "gallery") {
+          const imageId = params.get("id");
+          const paths = asset === "background" ? artist.backgroundPaths : artist.galleryPaths;
+          path = Array.isArray(paths) && /^[a-f0-9]{64}$/.test(imageId || "")
+            ? paths.find((entry) => typeof entry === "string" && marketplace.profileImageId(entry) === imageId) : "";
+        } else {
+          path = asset === "avatar" ? artist.avatarPath : artist.bannerPath;
+        }
+        try {
+          marketplace.validateProfileAssetPath(artistSnapshot.id, asset, path);
+        } catch (error) {
+          if (error.statusCode === 400) return sendJson(response, 404, { error: "Artist image not found." });
+          throw error;
+        }
       }
-      if (typeof path !== "string" || !pathPattern.test(path)) {
+      if (typeof path !== "string" || !path || (pathPattern && !pathPattern.test(path))) {
         return sendJson(response, 404, { error: "Artist image not found." });
       }
 

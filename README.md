@@ -37,10 +37,18 @@ High-conversion, mobile-first landing page for Wave Engine built with plain HTML
 
 ## Sitemap maintenance
 
-List public, indexable canonical pages in `sitemap.xml`. Add new pages when
-they are published, and omit administrative, checkout, and `noindex` pages.
-Use `lastmod` only when the date of the page's last significant change is
-known; otherwise omit it. `robots.txt` advertises the sitemap to crawlers.
+List public, indexable static canonical pages in `sitemap.xml`. Add new pages
+when they are published, and omit administrative, checkout, and `noindex`
+pages. Use `lastmod` only when the date of the page's last significant change
+is known; otherwise omit it. The public policies page is indexable, including
+the operator identification in its Terms. `robots.txt` advertises the static
+sitemap and the dynamic sitemap index at `/sitemap-artists.xml`. The index includes
+`sitemap.xml` and paginated sitemaps for approved artist profiles whose slugs
+are also approved. It uses the same `MUSIC_SITE_URL` origin as artist profile
+canonical URLs, and removes profiles from the sitemap when approval is revoked.
+Search and AI search crawlers remain permitted by the wildcard robots rule;
+robots.txt is not an access-control mechanism. Submit the sitemap in search
+engine webmaster tools and monitor indexing; inclusion is not guaranteed.
 
 ## Digital music library setup
 
@@ -108,7 +116,18 @@ submitted tracks remain private. Artist sales are disabled until configured. Exi
 `musicTracks` records and Stripe checkout are unchanged.
 On the music page, selecting or hovering over an artist's circle displays their
 approved tracks and a profile link; selecting another artist stops the previous
-artist's playback.
+artist's playback. Close the preview with its button or Escape; closing it also
+stops playback. Artist-set download prices appear beside the download buttons.
+Artist Studio also previews custom accent and background colors, a featured
+message, up to five background images, and up to six gallery photos. Images
+must be PNG, JPEG, or WebP and at most 10 MiB each. Selecting new files replaces
+the entire set; each set can also be removed. Approved profiles publish changes
+immediately, while pending profiles and their images remain private. Background
+slideshows can be paused and do not start automatically with reduced motion.
+Administrators can preview pending profile images and featured messages during
+the initial profile review.
+Before enabling these uploads, merge and deploy the updated artist image rules
+in `music-storage.rules`; existing deployed Storage rules must be preserved.
 Artists can search and select one optional genre for each draft; existing custom
 genre and mood data is retained when an older draft is edited.
 An album contains 1–20 MP3 or WAV songs (up to 100 MiB each) and one shared

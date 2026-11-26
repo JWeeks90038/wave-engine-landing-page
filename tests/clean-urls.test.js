@@ -49,6 +49,35 @@ test("sitemap URLs match the pages' clean canonical URLs", () => {
     assert.ok(html.includes(`rel="canonical" href="${url.href}"`), url.href);
     assert.doesNotMatch(html, /<meta\s+name=["']robots["']\s+content=["'][^"']*\bnoindex\b/i, url.href);
   }
+  for (const file of pages) {
+    const html = fs.readFileSync(path.join(root, file), "utf8");
+    const canonical = /rel="canonical" href="([^"]+)"/.exec(html);
+    if (canonical && !/<meta\s+name=["']robots["']\s+content=["'][^"']*\bnoindex\b/i.test(html)) {
+      assert.ok(seen.has(canonical[1]), `${file} is missing from the sitemap`);
+    }
+  }
+});
+
+test("robots advertises both sitemaps and permits search crawlers", () => {
+  const robots = fs.readFileSync(path.join(root, "robots.txt"), "utf8");
+  assert.match(robots, /User-agent:\s*\*\s*\r?\nAllow:\s*\/\s*(?:\r?\n|$)/i);
+  assert.doesNotMatch(robots, /^Disallow:/im);
+  assert.match(robots, /^Sitemap: https:\/\/waveenginemusic\.com\/sitemap\.xml$/im);
+  assert.match(robots, /^Sitemap: https:\/\/waveenginemusic\.com\/sitemap-artists\.xml$/im);
+  const config = JSON.parse(fs.readFileSync(path.join(root, "vercel.json"), "utf8"));
+  assert.ok(config.rewrites.some((route) =>
+    route.source === "/sitemap-artists.xml" && route.destination === "/api/artist-profile?sitemap=index"));
+  assert.ok(config.rewrites.some((route) =>
+    route.source === "/sitemap-artists-:part(\\d+).xml" && route.destination === "/api/artist-profile?sitemap=:part"));
+});
+
+test("the indexable policy page identifies the operator in its terms", () => {
+  const policy = fs.readFileSync(path.join(root, "legal", "policies.html"), "utf8");
+  const sitemap = fs.readFileSync(path.join(root, "sitemap.xml"), "utf8");
+  assert.match(policy, /<section id="terms">[\s\S]*?Jonas Weeks, operating under the Wave Engine Studio\s+brand/);
+  assert.doesNotMatch(policy, /<meta\s+name=["']robots["']\s+content=["'][^"']*\bnoindex\b/i);
+  assert.match(policy, /rel="canonical" href="https:\/\/waveenginemusic\.com\/legal\/policies"/);
+  assert.match(sitemap, /<loc>https:\/\/waveenginemusic\.com\/legal\/policies<\/loc>/);
 });
 
 test("artist support links to the fee terms without displaying them in the support section", () => {

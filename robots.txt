@@ -1,4 +1,7 @@
+# All crawlers, including search and AI search crawlers, may access public resources.
 User-agent: *
 Allow: /
 
+# The artist sitemap index also includes the static sitemap.
 Sitemap: https://waveenginemusic.com/sitemap.xml
+Sitemap: https://waveenginemusic.com/sitemap-artists.xml
