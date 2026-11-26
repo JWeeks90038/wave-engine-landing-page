@@ -39,8 +39,13 @@ function createHandler({
               artistName: artist.exists ? artist.data().artistName : "Artist unavailable",
               artistApproved: artist.exists && artist.data().status === "approved",
               rightsConfirmed: release.rightsConfirmed === true,
+              hasCover: Boolean(release.coverPath),
               downloadPriceCents: release.downloadPriceCents,
               salesRightsConfirmed: release.salesRightsConfirmed === true,
+              releaseType: release.releaseType,
+              saleMode: release.saleMode,
+              tracks: release.releaseType === "album" && Array.isArray(release.tracks)
+                ? release.tracks.map(({ id, title, downloadPriceCents }) => ({ id, title, downloadPriceCents })) : [],
               submittedAt: timestampString(release.submittedAt)
             });
           }
@@ -66,16 +71,22 @@ function createHandler({
           return sendJson(response, 409, { error: "This track is no longer awaiting that action." });
         }
         if (body.action === "approve-release") {
-          if (!validId(release.artistUid) || release.rightsConfirmed !== true ||
-              typeof release.audioGeneration !== "string" || !/^\d+$/.test(release.audioGeneration)) {
+          if (!validId(release.artistUid) || release.rightsConfirmed !== true) {
             return sendJson(response, 409, { error: "This submission is missing required rights or audio information." });
           }
-          if (release.downloadPriceCents != null && release.salesRightsConfirmed !== true) {
+          const fields = marketplace.validateReleaseInput(release.artistUid, body.id, release);
+          if (marketplace.releaseHasSales(fields) && release.salesRightsConfirmed !== true) {
             return sendJson(response, 409, { error: "This submission is missing sales rights confirmation." });
           }
-          marketplace.validateReleaseInput(release.artistUid, body.id, release);
-          if (!release.audioPath) return sendJson(response, 409, { error: "This submission has no audio." });
-          await bucket().file(release.audioPath, { generation: release.audioGeneration }).getMetadata();
+          const tracks = marketplace.releaseAudio(release);
+          if (!tracks.length || tracks.some((track) => !track.audioPath ||
+              typeof track.audioGeneration !== "string" || !/^\d+$/.test(track.audioGeneration)) ||
+              (release.releaseType === "album" && !release.coverPath)) {
+            return sendJson(response, 409, { error: "This submission is missing required audio or artwork." });
+          }
+          await Promise.all(tracks.map((track) =>
+            bucket().file(track.audioPath, { generation: track.audioGeneration }).getMetadata()));
+          if (release.releaseType === "album") await bucket().file(release.coverPath).getMetadata();
         }
         await db.runTransaction(async (transaction) => {
           const current = await transaction.get(releaseRef);
@@ -84,6 +95,11 @@ function createHandler({
               current.data().audioPath !== release.audioPath ||
               current.data().audioGeneration !== release.audioGeneration ||
               current.data().downloadPriceCents !== release.downloadPriceCents ||
+              JSON.stringify(current.data().tracks) !== JSON.stringify(release.tracks) ||
+              JSON.stringify(current.data().trackGenerations) !== JSON.stringify(release.trackGenerations) ||
+              current.data().coverPath !== release.coverPath ||
+              current.data().saleMode !== release.saleMode ||
+              current.data().releaseType !== release.releaseType ||
               current.data().salesRightsConfirmed !== release.salesRightsConfirmed ||
               (body.action === "approve-release" && current.data().rightsConfirmed !== true)) {
             throw marketplace.statusError("This track changed. Refresh and try again.", 409);

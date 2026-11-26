@@ -3,7 +3,8 @@ const marketplace = require("./artist-marketplace");
 
 function createHandler({
   database = marketplace.database,
-  bucket = marketplace.bucket
+  bucket = marketplace.bucket,
+  authenticate = marketplace.authenticate
 } = {}) {
   return async (request, response) => {
     if (request.method === "OPTIONS") {
@@ -19,6 +20,12 @@ function createHandler({
       if (!["avatar", "banner", "cover"].includes(asset)) {
         return sendJson(response, 400, { error: "Invalid artist image request." });
       }
+      const preview = params.get("preview");
+      if (preview !== null && (asset !== "cover" || !["owner", "review"].includes(preview))) {
+        return sendJson(response, 400, { error: "Invalid artist image request." });
+      }
+      if (preview) response.setHeader("Cache-Control", "private, no-store");
+      const user = preview ? await authenticate(request, preview === "review") : null;
       const db = database();
       const uuid = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
       let path;
@@ -30,22 +37,37 @@ function createHandler({
         }
         const releaseSnapshot = await db.collection("artistReleases").doc(id).get();
         const release = releaseSnapshot.exists && releaseSnapshot.data();
-        if (!release || release.status !== "published" || release.rightsConfirmed !== true ||
-            typeof release.artistUid !== "string") {
+        if (!release || typeof release.artistUid !== "string") {
           return sendJson(response, 404, { error: "Artist image not found." });
         }
-        const owner = await db.collection("artists").doc(release.artistUid).get();
-        if (!owner.exists || owner.data().status !== "approved") {
-          return sendJson(response, 404, { error: "Artist image not found." });
-        }
-        const ownerSlug = await db.collection("artistSlugs").doc(owner.data().slug).get();
-        if (!ownerSlug.exists || ownerSlug.data().status !== "approved" ||
-            ownerSlug.data().artistUid !== release.artistUid) {
-          return sendJson(response, 404, { error: "Artist image not found." });
+        if (preview === "review") {
+          if (!["submitted", "published"].includes(release.status)) {
+            return sendJson(response, 404, { error: "Artist image not found." });
+          }
+        } else {
+          const owner = await db.collection("artists").doc(release.artistUid).get();
+          if (preview === "owner") {
+            if (user.uid !== release.artistUid || !owner.exists ||
+                !["pending", "approved"].includes(owner.data().status) ||
+                !["draft", "submitted", "published"].includes(release.status)) {
+              return sendJson(response, 404, { error: "Artist image not found." });
+            }
+          } else {
+            if (release.status !== "published" || release.rightsConfirmed !== true ||
+                !owner.exists || owner.data().status !== "approved") {
+              return sendJson(response, 404, { error: "Artist image not found." });
+            }
+            const ownerSlug = await db.collection("artistSlugs").doc(owner.data().slug).get();
+            if (!ownerSlug.exists || ownerSlug.data().status !== "approved" ||
+                ownerSlug.data().artistUid !== release.artistUid) {
+              return sendJson(response, 404, { error: "Artist image not found." });
+            }
+          }
         }
         path = release.coverPath;
+        const ownerPattern = release.artistUid.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
         pathPattern = new RegExp(
-          `^artistUploads/${release.artistUid}/${id}-${uuid}/cover\\.(?:jpg|jpeg|png|webp)$`
+          `^artistUploads/${ownerPattern}/${id}-${uuid}/cover\\.(?:jpg|jpeg|png|webp)$`
         );
       } else {
         const slug = marketplace.validateSlug(params.get("slug"));
@@ -74,7 +96,8 @@ function createHandler({
           Number(metadata.size) > 10 * 1024 * 1024) {
         throw new Error("Invalid artist image metadata.");
       }
-      response.setHeader("Cache-Control", "public, max-age=300");
+      setCorsHeaders(response);
+      response.setHeader("Cache-Control", preview ? "private, no-store" : "public, max-age=300");
       response.setHeader("Content-Type", metadata.contentType);
       response.setHeader("Content-Length", String(metadata.size));
       response.setHeader("X-Content-Type-Options", "nosniff");

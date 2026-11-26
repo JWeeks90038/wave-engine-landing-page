@@ -62,25 +62,35 @@ function createHandler({
           if (release.status !== "draft" || artistSnapshot.data().status !== "approved") {
             return sendJson(response, 409, { error: "Only drafts from approved artists can be submitted." });
           }
-          marketplace.validateReleaseInput(user.uid, body.id, release);
-          if (release.downloadPriceCents != null && body.salesRightsConfirmed !== true) {
-            return sendJson(response, 400, { error: "Confirm your rights to sell downloads of this track." });
+          const fields = marketplace.validateReleaseInput(user.uid, body.id, release);
+          const hasSales = marketplace.releaseHasSales(fields);
+          if (hasSales && body.salesRightsConfirmed !== true) {
+            return sendJson(response, 400, { error: "Confirm your rights to sell downloads of this release." });
           }
-          if (!release.audioPath) return sendJson(response, 400, { error: "Upload audio before submitting this track." });
-          const generation = await verifyAudio(bucket, release.audioPath);
+          const tracks = marketplace.releaseAudio(fields);
+          if (!tracks.length || tracks.some((track) => !track.audioPath)) {
+            return sendJson(response, 400, { error: "Upload audio before submitting this release." });
+          }
+          if (fields.releaseType === "album") {
+            if (!fields.coverPath) return sendJson(response, 400, { error: "Upload album cover artwork before submitting." });
+            await verifyCover(bucket, fields.coverPath);
+          }
+          const generations = await Promise.all(tracks.map((track) => verifyAudio(bucket, track.audioPath)));
           await db.runTransaction(async (transaction) => {
             const current = await transaction.get(releaseRef);
             const artist = await transaction.get(artistRef);
             if (!current.exists || current.data().artistUid !== user.uid ||
-                current.data().status !== "draft" || current.data().audioPath !== release.audioPath ||
-                current.data().downloadPriceCents !== release.downloadPriceCents ||
+                current.data().status !== "draft" ||
+                JSON.stringify(marketplace.validateReleaseInput(user.uid, body.id, current.data())) !== JSON.stringify(fields) ||
                 !artist.exists || artist.data().status !== "approved") {
               throw marketplace.statusError("The draft or artist status changed. Refresh and try again.", 409);
             }
             transaction.update(releaseRef, {
               status: "submitted", rightsConfirmed: true,
-              salesRightsConfirmed: release.downloadPriceCents != null && body.salesRightsConfirmed === true,
-              audioGeneration: generation,
+              salesRightsConfirmed: hasSales && body.salesRightsConfirmed === true,
+              ...(fields.releaseType === "album"
+                ? { trackGenerations: Object.fromEntries(tracks.map((track, index) => [track.id, generations[index]])) }
+                : { audioGeneration: generations[0] }),
               submittedAt: marketplace.FieldValue.serverTimestamp(),
               updatedAt: marketplace.FieldValue.serverTimestamp()
             });
@@ -112,7 +122,8 @@ function createHandler({
         );
       if (releaseRef.id === "_invalid") return sendJson(response, 400, { error: "Invalid draft identifier." });
       const fields = marketplace.validateReleaseInput(user.uid, releaseRef.id, body);
-      if (fields.audioPath) await verifyAudio(bucket, fields.audioPath);
+      await Promise.all(marketplace.releaseAudio(fields).filter((track) => track.audioPath)
+        .map((track) => verifyAudio(bucket, track.audioPath)));
       if (fields.coverPath) await verifyCover(bucket, fields.coverPath);
 
       if (body.action === "create") {
@@ -164,7 +175,8 @@ async function verifyAudio(bucketFactory, path) {
   const validContentType = spec && (Array.isArray(spec[0])
     ? spec[0].includes(metadata.contentType)
     : metadata.contentType === spec[0]);
-  if (!spec || !validContentType || Number(metadata.size) <= 0 || Number(metadata.size) > spec[1]) {
+  const size = Number(metadata.size);
+  if (!spec || !validContentType || !Number.isSafeInteger(size) || size <= 0 || size > spec[1]) {
     throw marketplace.statusError("The uploaded audio file is invalid.", 400);
   }
   if (typeof metadata.generation !== "string" || !/^\d+$/.test(metadata.generation)) {
@@ -182,8 +194,9 @@ async function verifyCover(bucketFactory, path) {
     "cover.webp": "image/webp"
   };
   const contentType = allowed[path.split("/").pop()];
-  if (!contentType || metadata.contentType !== contentType || Number(metadata.size) <= 0 ||
-      Number(metadata.size) > 10 * 1024 * 1024) {
+  const size = Number(metadata.size);
+  if (!contentType || metadata.contentType !== contentType || !Number.isSafeInteger(size) || size <= 0 ||
+      size > 10 * 1024 * 1024) {
     throw marketplace.statusError("The uploaded cover artwork is invalid.", 400);
   }
 }

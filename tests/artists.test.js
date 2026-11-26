@@ -138,6 +138,76 @@ test("artist profile creation reserves a unique slug and stays private until app
   assert.equal(conflict.statusCode, 409);
 });
 
+test("artist share pages render approved profile metadata and public avatar without JavaScript", async () => {
+  const previousSite = process.env.MUSIC_SITE_URL;
+  process.env.MUSIC_SITE_URL = "https://staging.example.com/";
+  try {
+    const uid = "artist-1";
+    const slug = "north-star";
+    const avatarPath = `artistUploads/${uid}/profile-12345678-1234-1234-1234-123456789012/avatar.png`;
+    const profile = {
+      status: "approved", slug, artistName: 'North "Star" <script>', biography: 'Music & "light" <script>',
+      socialLinks: {}, avatarPath, bannerPath: ""
+    };
+    const db = new FakeDatabase();
+    db.records.set("artists", new Map([[uid, profile]]));
+    db.records.set("artistSlugs", new Map([[slug, { artistUid: uid, status: "approved" }]]));
+    const handler = profileHandler({ database: () => db });
+    const response = await request(handler, "GET", `/api/artist-profile?page=1&slug=${slug}`, undefined, "",
+      { host: "attacker.example" });
+    assert.equal(response.statusCode, 200);
+    assert.match(response.headers["content-type"], /^text\/html/);
+    assert.equal(response.headers["cache-control"], "no-store");
+    const html = response.body();
+    assert.match(html, /<title>North &quot;Star&quot; &lt;script&gt; \| Wave Engine Music<\/title>/);
+    assert.match(html, /content="Music &amp; &quot;light&quot; &lt;script&gt;"/);
+    assert.doesNotMatch(html, /North "Star" <script>/);
+    assert.match(html, /<meta name="twitter:card" content="summary"/);
+    assert.match(html, /<link rel="canonical" href="https:\/\/staging\.example\.com\/artist\/north-star"/);
+    const image = /<meta property="og:image" content="([^"]+)"/.exec(html)[1].replace(/&amp;/g, "&");
+    assert.match(image, /^https:\/\/staging\.example\.com\/api\/artist-media\?slug=north-star&asset=avatar&v=/);
+    assert.ok(html.includes(`<meta name="twitter:image" content="${image.replace(/&/g, "&amp;")}"`));
+    assert.doesNotMatch(html, /attacker\.example/);
+    const head = await request(handler, "HEAD", `/api/artist-profile?page=1&slug=${slug}`);
+    assert.equal(head.statusCode, 200);
+    assert.equal(head.body(), "");
+    assert.equal(Number(head.headers["content-length"]), Buffer.byteLength(html));
+
+    const media = mediaHandler({
+      database: () => db,
+      bucket: () => ({ file: (filePath) => ({
+        getMetadata: async () => {
+          assert.equal(filePath, avatarPath);
+          return [{ contentType: "image/png", size: 5 }];
+        },
+        createReadStream: () => Readable.from([Buffer.from("image")])
+      }) })
+    });
+    const imageUrl = new URL(image);
+    const imageResponse = await request(media, "GET", `${imageUrl.pathname}${imageUrl.search}`);
+    assert.equal(imageResponse.statusCode, 200);
+    assert.equal(imageResponse.headers["content-type"], "image/png");
+    assert.equal(imageResponse.body(), "image");
+
+    profile.avatarPath = `artistUploads/${uid}/profile-87654321-1234-1234-1234-123456789012/avatar.png`;
+    const updatedAvatar = await request(handler, "GET", `/api/artist-profile?page=1&slug=${slug}`);
+    const updatedImage = /<meta property="og:image" content="([^"]+)"/.exec(updatedAvatar.body())[1].replace(/&amp;/g, "&");
+    assert.notEqual(updatedImage, image);
+    profile.avatarPath = "";
+    const noAvatar = await request(handler, "GET", `/api/artist-profile?page=1&slug=${slug}`);
+    assert.match(noAvatar.body(), /og:image" content="https:\/\/staging\.example\.com\/Images\/wave-engine-social-card-4k-v1\.png"/);
+    profile.status = "pending";
+    const privatePage = await request(handler, "GET", `/api/artist-profile?page=1&slug=${slug}&me=1`);
+    assert.equal(privatePage.statusCode, 404);
+    assert.match(privatePage.body(), /name="robots" content="noindex"/);
+    assert.doesNotMatch(privatePage.body(), /North|light/);
+    assert.equal((await request(handler, "GET", "/api/artist-profile?page=1&slug=bad%21")).statusCode, 404);
+  } finally {
+    if (previousSite === undefined) delete process.env.MUSIC_SITE_URL;
+    else process.env.MUSIC_SITE_URL = previousSite;
+  }
+});
+
 test("artist admin approval is privileged and makes the storefront public", async () => {
   const db = new FakeDatabase();
   db.records.set("artists", new Map([["artist-1", {
@@ -246,6 +316,154 @@ test("artist drafts are owner-scoped and reject storage paths outside the artist
   assert.equal(crossAccount.statusCode, 404);
 });
 
+test("album validation enforces 20 unique tracks, shared ownership and pricing mode", () => {
+  const uid = "artist-1";
+  const id = "release-1";
+  const track = (n) => ({
+    id: `${String(n).padStart(8, "0")}-1234-1234-1234-123456789012`,
+    title: `Song ${n}`,
+    audioPath: `artistUploads/${uid}/${id}-${String(n).padStart(8, "0")}-1234-1234-1234-123456789012/audio.mp3`,
+    downloadPriceCents: 150
+  });
+  const album = {
+    title: "Album", description: "", genre: "", releaseType: "album", moods: [],
+    audioPath: "", coverPath: "", saleMode: "tracks", downloadPriceCents: null,
+    tracks: Array.from({ length: 20 }, (_, i) => track(i + 1))
+  };
+  assert.equal(marketplace.validateReleaseInput(uid, id, album).tracks.length, 20);
+  assert.throws(() => marketplace.validateReleaseInput(uid, id, { ...album, tracks: [...album.tracks, track(21)] }), /20 tracks/);
+  assert.throws(() => marketplace.validateReleaseInput(uid, id, { ...album, tracks: [track(1), track(1)] }), /unique/);
+  assert.throws(() => marketplace.validateReleaseInput(uid, id, {
+    ...album, tracks: [{ ...track(1), audioPath: track(1).audioPath.replace(uid, "other") }]
+  }), /uploaded audio/);
+  assert.throws(() => marketplace.validateReleaseInput(uid, id, {
+    ...album, tracks: [{ ...track(1), downloadPriceCents: null }]
+  }), /price for every/);
+  assert.throws(() => marketplace.validateReleaseInput(uid, id, {
+    ...album, saleMode: "album", tracks: [], downloadPriceCents: null
+  }), /price for the album/);
+  const both = { ...album, saleMode: "both", downloadPriceCents: 500 };
+  assert.equal(marketplace.validateReleaseInput(uid, id, both).tracks.length, 20);
+  assert.throws(() => marketplace.validateReleaseInput(uid, id, { ...both, downloadPriceCents: null }), /price for the album/);
+  assert.throws(() => marketplace.validateReleaseInput(uid, id, {
+    ...both, tracks: [{ ...track(1), downloadPriceCents: null }]
+  }), /price for every/);
+});
+
+test("album drafts verify every uploaded song and retain all 20 in order", async () => {
+  const db = new FakeDatabase();
+  db.records.set("artists", new Map([["artist-1", { status: "pending" }]]));
+  const checked = [];
+  let badPath = "";
+  const bucket = () => ({ file: (filePath) => ({
+    getMetadata: async () => {
+      checked.push(filePath);
+      return [{ contentType: filePath === badPath ? "text/plain" : "audio/mpeg", size: 5, generation: "101" }];
+    }
+  }) });
+  const handler = releaseHandler({ database: () => db, authenticate: fakeAuth(), bucket });
+  const fields = {
+    title: "Album", description: "", genre: "", releaseType: "album", moods: [],
+    audioPath: "", coverPath: "", saleMode: "none", downloadPriceCents: null, tracks: []
+  };
+  const created = await request(handler, "POST", "/api/artist-releases", { action: "create", ...fields });
+  assert.equal(created.statusCode, 201);
+  const id = JSON.parse(created.body()).release.id;
+  const tracks = Array.from({ length: 20 }, (_, i) => {
+    const uuid = `${String(i + 1).padStart(8, "0")}-1234-1234-1234-123456789012`;
+    return { id: uuid, title: `Song ${i + 1}`, audioPath: `artistUploads/artist-1/${id}-${uuid}/audio.mp3`, downloadPriceCents: null };
+  });
+  badPath = tracks[19].audioPath;
+  const invalid = await request(handler, "POST", "/api/artist-releases", { action: "update", id, ...fields, tracks });
+  assert.equal(invalid.statusCode, 400);
+  assert.equal(db.records.get("artistReleases").get(id).tracks.length, 0);
+  checked.length = 0;
+  badPath = "";
+  const updated = await request(handler, "POST", "/api/artist-releases", { action: "update", id, ...fields, tracks });
+  assert.equal(updated.statusCode, 200);
+  assert.equal(checked.length, 20);
+  assert.deepEqual(db.records.get("artistReleases").get(id).tracks.map((entry) => entry.title), tracks.map((entry) => entry.title));
+});
+
+test("album submission reviews and pins every song and publishes one shared cover", async () => {
+  const db = new FakeDatabase();
+  const uid = "artist-1";
+  const id = "release-1";
+  const track = (n) => ({
+    id: `${String(n).padStart(8, "0")}-1234-1234-1234-123456789012`, title: `Song ${n}`,
+    audioPath: `artistUploads/${uid}/${id}-${String(n).padStart(8, "0")}-1234-1234-1234-123456789012/audio.mp3`,
+    downloadPriceCents: 100 + n
+  });
+  const tracks = [track(1), track(2)];
+  const coverPath = `artistUploads/${uid}/${id}-00000003-1234-1234-1234-123456789012/cover.png`;
+  db.records.set("artists", new Map([[uid, { status: "approved", artistName: "Artist", slug: "north-star" }]]));
+  db.records.set("artistSlugs", new Map([["north-star", { status: "approved", artistUid: uid }]]));
+  db.records.set("artistReleases", new Map([[id, {
+    artistUid: uid, status: "draft", title: "Album", description: "", genre: "Rock",
+    releaseType: "album", saleMode: "both", moods: [], tracks, coverPath: "", audioPath: "", downloadPriceCents: 500
+  }]]));
+  const bucket = () => ({ file: (path, options = {}) => ({
+    getMetadata: async () => {
+      if (path === coverPath) return [{ contentType: "image/png", size: 5 }];
+      const index = tracks.findIndex((entry) => entry.audioPath === path);
+      if (index < 0 || (options.generation && options.generation !== String(index + 101))) {
+        const error = new Error("Missing file"); error.code = 404; throw error;
+      }
+      return [{ contentType: "audio/mpeg", size: 5, generation: String(index + 101) }];
+    },
+    createReadStream: ({ start, end }) => Readable.from([Buffer.from(path === tracks[0].audioPath ? "first" : "other").subarray(start, end + 1)])
+  }) });
+  const artist = releaseHandler({ database: () => db, authenticate: fakeAuth(), bucket });
+  const admin = adminHandler({ database: () => db, authenticate: fakeAuth({ uid: "admin", admin: true }), bucket });
+  const review = releaseHandler({ database: () => db, authenticate: fakeAuth({ uid: "admin", admin: true }), bucket });
+  const submit = (extra = {}) => request(artist, "POST", "/api/artist-releases", { action: "submit", id, rightsConfirmed: true, ...extra });
+  db.records.get("artistReleases").get(id).tracks = [];
+  assert.match((await submit({ salesRightsConfirmed: true })).body(), /upload audio/i);
+  db.records.get("artistReleases").get(id).tracks = tracks;
+  assert.equal((await submit()).statusCode, 400);
+  assert.match((await submit({ salesRightsConfirmed: true })).body(), /cover/i);
+  db.records.get("artistReleases").get(id).coverPath = coverPath;
+  assert.equal((await submit({ salesRightsConfirmed: true })).statusCode, 200);
+  assert.deepEqual(db.records.get("artistReleases").get(id).trackGenerations, { [tracks[0].id]: "101", [tracks[1].id]: "102" });
+  const listed = JSON.parse((await request(admin, "GET", "/api/artist-admin?type=releases")).body()).releases[0];
+  assert.deepEqual(listed.tracks.map((entry) => entry.title), ["Song 1", "Song 2"]);
+  assert.equal(listed.hasCover, true);
+  assert.equal("coverPath" in listed, false);
+  assert.equal((await request(review, "GET", `/api/artist-releases?action=review&id=${id}&track=${tracks[1].id}`)).body(), "other");
+  assert.equal((await request(artist, "GET", `/api/artist-releases?action=review&id=${id}&track=${tracks[1].id}`)).statusCode, 403);
+  db.records.get("artistReleases").get(id).trackGenerations[tracks[1].id] = "";
+  assert.equal((await request(admin, "POST", "/api/artist-admin", { action: "approve-release", id })).statusCode, 409);
+  db.records.get("artistReleases").get(id).trackGenerations[tracks[1].id] = "102";
+  assert.equal((await request(admin, "POST", "/api/artist-admin", { action: "approve-release", id })).statusCode, 200);
+  const album = JSON.parse((await request(artist, "GET", "/api/artist-releases?action=public")).body()).artists[0].albums[0];
+  assert.equal(album.tracks.length, 2);
+  assert.match(album.coverUrl, /asset=cover/);
+  assert.doesNotMatch(JSON.stringify(album), /artistUploads|Generation/);
+  const oldSales = process.env.ARTIST_SALES_ENABLED;
+  const oldMode = process.env.MUSIC_STRIPE_MODE;
+  try {
+    process.env.ARTIST_SALES_ENABLED = "true";
+    process.env.MUSIC_STRIPE_MODE = "live";
+    db.records.get("artists").get(uid).stripeConnectLive = "acct_123";
+    const priced = JSON.parse((await request(artist, "GET", "/api/artist-releases?action=public")).body()).artists[0].albums[0];
+    assert.equal(priced.downloadPriceCents, 500);
+    assert.deepEqual(priced.tracks.map((entry) => entry.downloadPriceCents), [101, 102]);
+    process.env.ARTIST_SALES_ENABLED = "false";
+    const disabled = JSON.parse((await request(artist, "GET", "/api/artist-releases?action=public")).body()).artists[0].albums[0];
+    assert.equal(disabled.downloadPriceCents, null);
+    assert.deepEqual(disabled.tracks.map((entry) => entry.downloadPriceCents), [null, null]);
+  } finally {
+    if (oldSales === undefined) delete process.env.ARTIST_SALES_ENABLED;
+    else process.env.ARTIST_SALES_ENABLED = oldSales;
+    if (oldMode === undefined) delete process.env.MUSIC_STRIPE_MODE;
+    else process.env.MUSIC_STRIPE_MODE = oldMode;
+  }
+  assert.equal((await request(artist, "GET", `/api/artist-releases?action=stream&id=${id}&track=${tracks[0].id}`)).body(), "first");
+  assert.equal((await request(artist, "GET", `/api/artist-releases?action=stream&id=${id}`)).statusCode, 404);
+  assert.equal((await request(artist, "POST", "/api/artist-releases", { action: "withdraw", id })).statusCode, 200);
+  assert.equal((await request(artist, "GET", `/api/artist-releases?action=stream&id=${id}&track=${tracks[0].id}`)).statusCode, 404);
+});
+
 test("track publication requires rights and review, pins audio, and supports takedown", async () => {
   const db = new FakeDatabase();
   const uid = "artist-1";
@@ -348,7 +566,7 @@ test("track publication requires rights and review, pins audio, and supports tak
   assert.equal((await visitor(`/api/artist-releases?action=stream&id=${id}`)).statusCode, 404);
 });
 
-test("artist circles show the selected artist's tracks and stop previous playback", async () => {
+test("artist circles expose both purchase options and stop previous playback", async () => {
   class Element {
     constructor(tag) {
       this.tagName = tag.toUpperCase();
@@ -384,12 +602,22 @@ test("artist circles show the selected artist's tracks and stop previous playbac
     addEventListener() {}
   };
   const source = fs.readFileSync(path.join(__dirname, "..", "artist-listen.js"), "utf8");
+  const checkouts = [];
   await vm.runInNewContext(`(async () => {\n${source}\n})()`, {
     document, location: { protocol: "https:", hostname: "example.com" },
-    fetch: async () => ({ ok: true, json: async () => ({ artists: [
-      { artistName: "North Star", slug: "north-star", tracks: [{ id: "track-1", title: "First Light" }] },
-      { artistName: "South Star", slug: "south-star", tracks: [] }
-    ] }) }),
+    fetch: async (url, options) => {
+      if (url.includes("action=checkout")) {
+        checkouts.push(JSON.parse(options.body));
+        return { ok: false, json: async () => ({ error: "Checkout unavailable" }) };
+      }
+      return { ok: true, json: async () => ({ artists: [
+        { artistName: "North Star", slug: "north-star", tracks: [{ id: "track-1", title: "First Light" }],
+          albums: [{ id: "album-1", title: "Album", downloadPriceCents: 500, tracks: [
+            { id: "album-1", trackId: "song-1", title: "Song", downloadPriceCents: 125, format: "MP3" }
+          ] }] },
+        { artistName: "South Star", slug: "south-star", tracks: [] }
+      ] }) };
+    },
     URL, URLSearchParams
   });
   const first = list.children[0].children[0];
@@ -400,6 +628,14 @@ test("artist circles show the selected artist's tracks and stop previous playbac
   assert.equal(selection.children[1].href, "/artist/north-star");
   const audio = selection.querySelectorAll("audio")[0];
   assert.match(audio.src, /action=stream&id=track-1/);
+  const album = selection.children[3];
+  const albumButton = album.children[0].children[0].children[2];
+  const trackButton = album.children[1].children[0].children[1].children[1];
+  assert.equal(albumButton.textContent, "Download album · $5.00");
+  assert.equal(trackButton.textContent, "Download MP3 · $1.25");
+  await albumButton.events.click();
+  await trackButton.events.click();
+  assert.deepEqual(checkouts, [{ id: "album-1" }, { id: "album-1", trackId: "song-1" }]);
   second.events.focus();
   assert.equal(audio.paused, true);
   assert.equal(first.attributes["aria-expanded"], "false");
@@ -472,6 +708,235 @@ test("artist checkout uses connected account pricing and verifies paid downloads
   session.payment_intent.latest_charge.refunded = false;
   session.payment_intent.latest_charge.created -= 600;
   assert.equal((await request(handler, "GET", url)).statusCode, 410);
+});
+
+test("contributions charge the approved artist's Stripe account with a 5% fee", async () => {
+  const db = new FakeDatabase();
+  const artist = { status: "approved", slug: "north-star", artistName: "North Star", stripeConnectTest: "acct_artist" };
+  const slugRecord = { status: "approved", artistUid: "artist-1" };
+  db.records.set("artists", new Map([["artist-1", artist]]));
+  db.records.set("artistSlugs", new Map([["north-star", slugRecord]]));
+  let enabled = false;
+  let account = { charges_enabled: true, payouts_enabled: true, controller: { fees: { payer: "account" } } };
+  let checkout;
+  let session;
+  let creations = 0;
+  let accountReads = 0;
+  const stripe = {
+    accounts: { retrieve: async (id) => { accountReads++; assert.equal(id, "acct_artist"); return account; } },
+    checkout: { sessions: {
+      create: async (data, options) => {
+        creations++;
+        checkout = { data, options };
+        const amount = data.line_items[0].price_data.unit_amount;
+        session = {
+          id: "cs_test_123", url: "https://checkout.stripe.com/test", livemode: false,
+          mode: "payment", status: "complete", payment_status: "paid", currency: "usd",
+          amount_total: amount, amount_subtotal: amount, metadata: data.metadata,
+          payment_intent: { status: "succeeded", application_fee_amount: data.payment_intent_data.application_fee_amount,
+            latest_charge: { status: "succeeded", refunded: false, amount_refunded: 0, disputed: false } }
+        };
+        return session;
+      },
+      retrieve: async (id, _options, context) => {
+        assert.equal(id, "cs_test_123");
+        assert.equal(context.stripeAccount, "acct_artist");
+        return session;
+      }
+    } }
+  };
+  const handler = paymentsHandler({
+    database: () => db, authenticate: fakeAuth(), enabled: () => false, contributions: () => enabled,
+    payment: { mode: () => "test", stripeClient: () => stripe, siteUrl: () => new URL("https://example.com/") }
+  });
+  const contribute = (amountCents, slug = "north-star") => request(handler, "POST",
+    "/api/artist-releases?action=contribute", { amountCents, slug }, "");
+  const status = (slug = "north-star", sessionId = "cs_test_123") => request(handler, "GET",
+    `/api/artist-releases?action=contribution-status&slug=${slug}&session_id=${sessionId}`, undefined, "");
+
+  assert.equal((await contribute(1000)).statusCode, 503);
+  assert.equal(creations, 0);
+  enabled = true;
+  const connect = await request(handler, "GET", "/api/artist-releases?action=connect");
+  assert.deepEqual(JSON.parse(connect.body()), { connected: true, ready: true });
+  for (const invalid of [0, 49, 50.1, "100", 100000000, null]) {
+    assert.equal((await contribute(invalid)).statusCode, 400);
+  }
+  assert.equal((await request(handler, "POST", "/api/artist-releases?action=contribute&slug=north-star", null)).statusCode, 400);
+  assert.equal(creations, 0);
+  const readsBeforeInvalidArtist = accountReads;
+  assert.equal((await contribute(500, "missing")).statusCode, 404);
+  slugRecord.status = "pending";
+  assert.equal((await contribute(500)).statusCode, 404);
+  slugRecord.status = "approved";
+  artist.status = "suspended";
+  assert.equal((await contribute(500)).statusCode, 404);
+  artist.status = "approved";
+  artist.slug = "other-artist";
+  assert.equal((await contribute(500)).statusCode, 404);
+  artist.slug = "north-star";
+  assert.equal(accountReads, readsBeforeInvalidArtist);
+  account.controller.fees.payer = "application";
+  assert.equal((await contribute(500)).statusCode, 409);
+  account.controller.fees.payer = "account";
+  account.payouts_enabled = false;
+  assert.equal((await contribute(500)).statusCode, 409);
+  account.payouts_enabled = true;
+  delete artist.stripeConnectTest;
+  assert.equal((await contribute(500)).statusCode, 409);
+  artist.stripeConnectTest = "acct_artist";
+  assert.equal(creations, 0);
+
+  for (const [amount, fee] of [[50, 3], [51, 3], [1010, 51], [1000000, 50000], [99999999, 5000000]]) {
+    const response = await contribute(amount);
+    assert.equal(response.statusCode, 200);
+    assert.equal(JSON.parse(response.body()).url, "https://checkout.stripe.com/test");
+    assert.equal(response.headers["cache-control"], "private, no-store");
+    assert.equal(checkout.options.stripeAccount, "acct_artist");
+    assert.equal(checkout.data.line_items[0].price_data.unit_amount, amount);
+    assert.equal(checkout.data.line_items[0].price_data.currency, "usd");
+    assert.equal(checkout.data.payment_intent_data.application_fee_amount, fee);
+    assert.equal(checkout.data.payment_intent_data.metadata.type, "artist-contribution-v1");
+    assert.equal(checkout.data.metadata.type, "artist-contribution-v1");
+    assert.equal(checkout.data.metadata.artistUid, "artist-1");
+    assert.equal(checkout.data.success_url, "https://example.com/artist/north-star?contribution=success&session_id={CHECKOUT_SESSION_ID}");
+    assert.equal(checkout.data.cancel_url, "https://example.com/artist/north-star?contribution=cancelled");
+  }
+  assert.deepEqual(JSON.parse((await status()).body()), { confirmed: true });
+  enabled = false;
+  assert.equal((await status()).statusCode, 200);
+  assert.equal((await status("north-star", "cs_live_123")).statusCode, 403);
+  session.payment_status = "unpaid";
+  assert.equal((await status()).statusCode, 403);
+  session.payment_status = "paid";
+  session.livemode = true;
+  assert.equal((await status()).statusCode, 403);
+  session.livemode = false;
+  session.metadata.artistUid = "artist-2";
+  assert.equal((await status()).statusCode, 403);
+  session.metadata.artistUid = "artist-1";
+  session.payment_intent.application_fee_amount--;
+  assert.equal((await status()).statusCode, 403);
+  session.payment_intent.application_fee_amount++;
+  session.payment_intent.latest_charge.refunded = true;
+  assert.equal((await status()).statusCode, 403);
+});
+
+test("album and song checkout charge configured prices and deliver only purchased audio", async () => {
+  const db = new FakeDatabase();
+  const uid = "artist-1";
+  const id = "release-1";
+  const tracks = [1, 2].map((n) => ({
+    id: `${String(n).padStart(8, "0")}-1234-1234-1234-123456789012`, title: `Song ${n}`,
+    audioPath: `artistUploads/${uid}/${id}-${String(n).padStart(8, "0")}-1234-1234-1234-123456789012/audio.mp3`,
+    downloadPriceCents: null
+  }));
+  const release = {
+    artistUid: uid, status: "published", rightsConfirmed: true, salesRightsConfirmed: true,
+    title: "Album", description: "", genre: "", moods: [], releaseType: "album",
+    saleMode: "album", downloadPriceCents: 500, tracks, audioPath: "",
+    coverPath: `artistUploads/${uid}/${id}-00000003-1234-1234-1234-123456789012/cover.png`,
+    trackGenerations: { [tracks[0].id]: "101", [tracks[1].id]: "102" }
+  };
+  db.records.set("artists", new Map([[uid, { status: "approved", slug: "artist", stripeConnectLive: "acct_123" }]]));
+  db.records.set("artistSlugs", new Map([["artist", { status: "approved", artistUid: uid }]]));
+  db.records.set("artistReleases", new Map([[id, release]]));
+  const sessions = new Map();
+  const stripe = {
+    accounts: { retrieve: async () => ({ charges_enabled: true, payouts_enabled: true, controller: { fees: { payer: "account" } } }) },
+    checkout: { sessions: {
+      create: async (data) => {
+        const amount = data.line_items[0].price_data.unit_amount;
+        const session = {
+          id: `cs_live_${sessions.size + 1}`, url: "https://checkout.stripe.com/test", livemode: true,
+          mode: "payment", status: "complete", payment_status: "paid", currency: "usd",
+          amount_subtotal: amount, amount_total: amount, metadata: data.metadata,
+          line_items: { data: [{ quantity: 1, price: { currency: "usd", unit_amount: amount } }] },
+          payment_intent: { status: "succeeded", application_fee_amount: Math.round(amount / 10),
+            latest_charge: { status: "succeeded", refunded: false, amount_refunded: 0,
+              disputed: false, created: Math.floor(Date.now() / 1000) } }
+        };
+        sessions.set(session.id, session);
+        return session;
+      },
+      retrieve: async (sessionId) => sessions.get(sessionId)
+    } }
+  };
+  const bucket = () => ({ file: (filePath) => ({
+    getMetadata: async () => [{ size: 5, contentType: "audio/mpeg" }],
+    createReadStream: ({ start, end }) => Readable.from([Buffer.from(filePath === tracks[0].audioPath ? "first" : "other").subarray(start, end + 1)])
+  }) });
+  const handler = paymentsHandler({
+    database: () => db, authenticate: fakeAuth(), bucket, enabled: () => true,
+    payment: { mode: () => "live", stripeClient: () => stripe, siteUrl: () => new URL("https://example.com/") }
+  });
+  const buy = (body) => request(handler, "POST", "/api/artist-releases?action=checkout", { id, ...body });
+  assert.equal((await buy({ trackId: tracks[0].id })).statusCode, 404);
+  assert.equal((await buy({ amount: 1 })).statusCode, 200);
+  const first = sessions.get("cs_live_1");
+  assert.equal(first.amount_total, 500);
+  const albumUrl = `/api/artist-releases?action=purchase&purchase_id=${first.metadata.purchaseId}&session_id=cs_live_1`;
+  const albumPurchase = JSON.parse((await request(handler, "GET", albumUrl)).body());
+  assert.deepEqual(albumPurchase.tracks.map((entry) => entry.title), ["Song 1", "Song 2"]);
+  const downloadUrl = albumUrl.replace("action=purchase", "action=download");
+  assert.equal((await request(handler, "GET", `${downloadUrl}&track=${tracks[1].id}`)).body(), "other");
+  assert.equal((await request(handler, "GET", `${downloadUrl}&track=unowned`)).statusCode, 403);
+  release.trackGenerations[tracks[1].id] = "999";
+  assert.equal((await request(handler, "GET", albumUrl)).statusCode, 404);
+  release.trackGenerations[tracks[1].id] = "102";
+
+  release.saleMode = "tracks";
+  release.downloadPriceCents = null;
+  tracks[0].downloadPriceCents = 125;
+  tracks[1].downloadPriceCents = 175;
+  assert.equal((await buy({})).statusCode, 404);
+  assert.equal((await buy({ trackId: tracks[1].id, amount: 1 })).statusCode, 200);
+  const second = sessions.get("cs_live_2");
+  assert.equal(second.amount_total, 175);
+  const songUrl = `/api/artist-releases?action=download&purchase_id=${second.metadata.purchaseId}&session_id=cs_live_2`;
+  assert.equal((await request(handler, "GET", `${songUrl}&track=${tracks[1].id}`)).body(), "other");
+  assert.equal((await request(handler, "GET", `${songUrl}&track=${tracks[0].id}`)).statusCode, 403);
+  release.saleMode = "both";
+  release.downloadPriceCents = 500;
+  assert.equal((await buy({})).statusCode, 200);
+  const bothAlbum = sessions.get("cs_live_3");
+  assert.equal(bothAlbum.amount_total, 500);
+  const bothAlbumUrl = `/api/artist-releases?action=purchase&purchase_id=${bothAlbum.metadata.purchaseId}&session_id=cs_live_3`;
+  assert.equal(JSON.parse((await request(handler, "GET", bothAlbumUrl)).body()).tracks.length, 2);
+  assert.equal((await buy({ trackId: tracks[0].id, amount: 1 })).statusCode, 200);
+  const bothSong = sessions.get("cs_live_4");
+  assert.equal(bothSong.amount_total, 125);
+  const bothSongUrl = `/api/artist-releases?action=download&purchase_id=${bothSong.metadata.purchaseId}&session_id=cs_live_4`;
+  assert.equal((await request(handler, "GET", `${bothSongUrl}&track=${tracks[0].id}`)).body(), "first");
+  assert.equal((await request(handler, "GET", `${bothSongUrl}&track=${tracks[1].id}`)).statusCode, 403);
+  release.tracks = [tracks[0]];
+  assert.equal((await request(handler, "GET", bothAlbumUrl)).statusCode, 404);
+  release.tracks = tracks;
+  release.status = "draft";
+  assert.equal((await request(handler, "GET", `${songUrl}&track=${tracks[1].id}`)).statusCode, 404);
+});
+
+test("album purchase page offers a separate verified download link for every song", async () => {
+  const source = fs.readFileSync(path.join(__dirname, "..", "music-purchase.js"), "utf8")
+    .replace("loadPurchase();", "await loadPurchase();");
+  const status = {};
+  const links = [];
+  const document = {
+    querySelector: (selector) => selector === "#purchase-status" ? status : { append: (link) => links.push(link) },
+    createElement: () => ({})
+  };
+  await vm.runInNewContext(`(async () => {\n${source}\n})()`, {
+    document, location: { protocol: "https:", hostname: "example.com", search: "?artist_purchase=abc&session_id=cs_live_123" },
+    fetch: async () => ({ ok: true, json: async () => ({ title: "Album", tracks: [
+      { id: "one", title: "First", format: "mp3" }, { id: "two", title: "Second", format: "wav" }
+    ] }) }),
+    URLSearchParams
+  });
+  assert.equal(links.length, 2);
+  assert.equal(links[0].textContent, "Download First (MP3)");
+  assert.equal(links[1].textContent, "Download Second (WAV)");
+  assert.match(links[0].href, /action=download.*track=one/);
+  assert.match(links[1].href, /action=download.*track=two/);
 });
 
 test("artist Stripe onboarding creates and reuses an artist-owned account", async () => {
@@ -599,6 +1064,133 @@ test("release covers are served only for published tracks of approved artists", 
   assert.equal(published.body(), "img");
 });
 
+test("private release covers require the owner or a review administrator", async () => {
+  const coverPath = "artistUploads/artist-1/rel1-12345678-1234-1234-1234-123456789012/cover.png";
+  const db = new FakeDatabase();
+  const release = { artistUid: "artist-1", status: "draft", coverPath, rightsConfirmed: true };
+  db.records.set("artistReleases", new Map([["rel1", release]]));
+  db.records.set("artists", new Map([["artist-1", { status: "pending", slug: "north-star" }]]));
+  db.records.set("artistSlugs", new Map([["north-star", { artistUid: "artist-1", status: "pending" }]]));
+  let storageReads = 0;
+  const handler = mediaHandler({
+    database: () => db,
+    authenticate: async (req, adminOnly) => {
+      if (!req.headers.authorization) throw marketplace.statusError("Sign in to continue.", 401);
+      const users = {
+        "Bearer owner": { uid: "artist-1", email_verified: true },
+        "Bearer other": { uid: "artist-2", email_verified: true },
+        "Bearer admin": { uid: "admin", admin: true }
+      };
+      const user = users[req.headers.authorization];
+      if (!user) throw marketplace.statusError("Invalid session.", 401);
+      if (adminOnly && !user.admin) throw marketplace.statusError("Administrator access is required.", 403);
+      return user;
+    },
+    bucket: () => ({ file: () => ({
+      getMetadata: async () => { storageReads++; return [{ contentType: "image/png", size: 3 }]; },
+      createReadStream: () => Readable.from([Buffer.from("img")])
+    }) })
+  });
+  const url = "/api/artist-media?release=rel1&asset=cover";
+  const preview = (mode, authorization) => request(handler, "GET", `${url}&preview=${mode}`, undefined, authorization);
+  assert.equal((await request(handler, "GET", url, undefined, "")).statusCode, 404);
+  assert.equal((await preview("owner", "")).statusCode, 401);
+  assert.equal((await preview("owner", "Bearer other")).statusCode, 404);
+  assert.equal((await preview("review", "Bearer owner")).statusCode, 403);
+  assert.equal((await preview("review", "Bearer admin")).statusCode, 404);
+  assert.equal(storageReads, 0);
+  for (const status of ["draft", "submitted", "published"]) {
+    release.status = status;
+    const own = await preview("owner", "Bearer owner");
+    assert.equal(own.statusCode, 200);
+    assert.equal(own.body(), "img");
+    assert.equal(own.headers["cache-control"], "private, no-store");
+    assert.equal(own.headers["access-control-allow-origin"], "*");
+    if (status !== "draft") {
+      const admin = await preview("review", "Bearer admin");
+      assert.equal(admin.statusCode, 200);
+      assert.equal(admin.headers["cache-control"], "private, no-store");
+    }
+    assert.equal((await request(handler, "GET", url, undefined, "")).statusCode, 404);
+  }
+  const readsBeforeInvalid = storageReads;
+  release.coverPath = coverPath.replace("artist-1", "artist-2");
+  assert.equal((await preview("owner", "Bearer owner")).statusCode, 404);
+  assert.equal((await preview("review", "Bearer admin")).statusCode, 404);
+  release.coverPath = coverPath;
+  db.records.get("artists").get("artist-1").status = "suspended";
+  assert.equal((await preview("owner", "Bearer owner")).statusCode, 404);
+  assert.equal((await request(handler, "GET", `${url}&preview=invalid`)).statusCode, 400);
+  assert.equal(storageReads, readsBeforeInvalid);
+  db.records.get("artists").get("artist-1").status = "approved";
+  db.records.get("artistSlugs").get("north-star").status = "approved";
+  const publicImage = await request(handler, "GET", url, undefined, "");
+  assert.equal(publicImage.statusCode, 200);
+  assert.equal(publicImage.headers["cache-control"], "public, max-age=300");
+});
+
+test("cover previews use authenticated requests, report failures and revoke stale images", async () => {
+  const source = fs.readFileSync(path.join(__dirname, "..", "artist-cover-preview.js"), "utf8")
+    .replace("export function", "function");
+  const created = [];
+  const revoked = [];
+  const requests = [];
+  let fetchResponse;
+  const user = { getIdToken: async () => "owner-token" };
+  let currentUser = user;
+  const context = {
+    document: { createElement: () => ({
+      hidden: false, textContent: "", listeners: {},
+      setAttribute() {}, addEventListener(name, callback) { this.listeners[name] = callback; }
+    }) },
+    URL: {
+      createObjectURL(blob) { const url = `blob:${created.length}`; created.push({ url, blob }); return url; },
+      revokeObjectURL(url) { revoked.push(url); }
+    },
+    fetch: async (url, options) => { requests.push({ url, options }); return fetchResponse; }
+  };
+  vm.runInNewContext(`${source}\nglobalThis.create = createCoverPreviews;`, context);
+  const previews = context.create("https://api.example.com", "owner", () => currentUser);
+  const container = () => ({ children: [], append(...children) { this.children.push(...children); } });
+  const first = container();
+  fetchResponse = { ok: true, blob: async () => ({ type: "image/png", size: 3 }) };
+  await previews.add(first, { id: "release-1", title: "Album" });
+  assert.match(requests[0].url, /release=release-1&preview=owner/);
+  assert.equal(requests[0].options.headers.Authorization, "Bearer owner-token");
+  assert.equal(requests[0].options.cache, "no-store");
+  assert.equal(first.children[0].src, "blob:0");
+  assert.equal(first.children[0].alt, "Album cover artwork");
+  assert.equal(first.children[0].hidden, false);
+  first.children[0].listeners.error();
+  assert.match(first.children[1].textContent, /could not be displayed/);
+  previews.clear();
+  assert.deepEqual(revoked, ["blob:0"]);
+
+  fetchResponse = { ok: false, json: async () => ({ error: "Access denied." }) };
+  const failed = container();
+  await previews.add(failed, { id: "release-1", title: "Album" });
+  assert.match(failed.children[1].textContent, /Access denied/);
+  assert.equal(failed.children[0].hidden, true);
+
+  let finishBlob;
+  fetchResponse = { ok: true, blob: () => new Promise((resolve) => { finishBlob = resolve; }) };
+  const stale = container();
+  const pending = previews.add(stale, { id: "release-1", title: "Album" });
+  await new Promise((resolve) => setImmediate(resolve));
+  previews.clear();
+  currentUser = null;
+  finishBlob({ type: "image/png", size: 3 });
+  await pending;
+  assert.equal(created.length, 1);
+  assert.equal(stale.children[0].hidden, true);
+
+  const selected = container();
+  previews.addLocal(selected, { type: "image/png", size: 3 }, "Selected");
+  assert.equal(selected.children[0].src, "blob:1");
+  previews.clear();
+  assert.deepEqual(revoked, ["blob:0", "blob:1"]);
+});
+
 test("artist identifiers, URLs, and upload paths reject unsafe values", () => {
   const uuid = "12345678-1234-1234-1234-123456789012";
   assert.equal(marketplace.validateSlug("North-Star"), "north-star");
@@ -681,9 +1273,10 @@ test("approved storefront renders with metadata from the page", async () => {
   const source = fs.readFileSync(path.join(__dirname, "..", "artist.js"), "utf8");
   const selectors = [
     "#storefront-status", "#storefront-profile", "#storefront-name",
-    "#storefront-bio", "#storefront-socials"
+    "#storefront-bio", "#storefront-socials", "#artist-support-status"
   ];
   const elements = Object.fromEntries(selectors.map((selector) => [selector, { hidden: true, append() {} }]));
+  elements["#artist-support-form"] = { querySelector: () => ({}), addEventListener() {} };
   for (const [attribute, name] of [
     ["property", "og:title"], ["property", "og:description"],
     ["name", "description"], ["name", "twitter:title"], ["name", "twitter:description"]
@@ -708,7 +1301,78 @@ test("approved storefront renders with metadata from the page", async () => {
   assert.equal(elements['meta[name="twitter:title"]'].content, "North Star | Wave Engine Music");
 });
 
-test("switching from a rejected artist to a new account enables the profile form", async () => {
+test("artist support form validates amounts, opens checkout and verifies the return", async () => {
+  const source = fs.readFileSync(path.join(__dirname, "..", "artist.js"), "utf8");
+  async function storefront(search = "", confirmed = true) {
+    const listeners = {};
+    const button = { disabled: false };
+    const amount = { value: "" };
+    const form = {
+      elements: { amount }, querySelector: () => button,
+      addEventListener(name, callback) { listeners[name] = callback; }
+    };
+    const elements = new Map([
+      ["#artist-support-form", form], ["#artist-support-status", { textContent: "" }]
+    ]);
+    function element(selector) {
+      if (!elements.has(selector)) elements.set(selector, { hidden: true, append() {} });
+      return elements.get(selector);
+    }
+    const requests = [];
+    const locations = [];
+    let response = { ok: true, json: async () => ({ url: "https://checkout.stripe.com/session" }) };
+    const location = {
+      protocol: "https:", hostname: "example.com", origin: "https://example.com",
+      pathname: "/artist/north-star", search, assign: (url) => locations.push(url)
+    };
+    await vm.runInNewContext(`(async () => {\n${source}\n})()`, {
+      document: { querySelector: element, createElement: () => ({}), head: { append() {} } },
+      location, URL, URLSearchParams,
+      fetch: async (url, options) => {
+        requests.push({ url, options });
+        if (url.includes("artist-profile")) return { ok: true, json: async () => ({
+          profile: { artistName: "North Star", slug: "north-star", socialLinks: {} }
+        }) };
+        if (url.includes("contribution-status")) return { ok: true, json: async () => ({ confirmed }) };
+        return response;
+      }
+    });
+    return { element, listeners, amount, button, requests, locations, setResponse(value) { response = value; } };
+  }
+  const page = await storefront();
+  for (const invalid of ["0.49", "10.999", "1e2", "1000000", "-1"]) {
+    page.amount.value = invalid;
+    await page.listeners.submit({ preventDefault() {} });
+    assert.match(page.element("#artist-support-status").textContent, /amount/i);
+    assert.equal(page.button.disabled, false);
+  }
+  assert.equal(page.requests.length, 1);
+  page.amount.value = "10.10";
+  await page.listeners.submit({ preventDefault() {} });
+  assert.deepEqual(JSON.parse(page.requests[1].options.body), { slug: "north-star", amountCents: 1010 });
+  assert.equal(page.locations[0], "https://checkout.stripe.com/session");
+  assert.equal(page.button.disabled, true);
+
+  const failed = await storefront();
+  failed.amount.value = "5";
+  failed.setResponse({ ok: false, json: async () => ({ error: "Artist not ready." }) });
+  await failed.listeners.submit({ preventDefault() {} });
+  assert.equal(failed.element("#artist-support-status").textContent, "Artist not ready.");
+  assert.equal(failed.button.disabled, false);
+
+  const returned = await storefront("?contribution=success&session_id=cs_test_123");
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.match(returned.element("#artist-support-status").textContent, /confirmed/i);
+  assert.match(returned.requests[1].url, /action=contribution-status/);
+  assert.equal(returned.requests[1].options.referrerPolicy, "no-referrer");
+  const unconfirmed = await storefront("?contribution=success&session_id=cs_test_123", false);
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.match(unconfirmed.element("#artist-support-status").textContent, /could not be verified/i);
+  const cancelled = await storefront("?contribution=cancelled");
+  assert.match(cancelled.element("#artist-support-status").textContent, /cancelled/i);
+});
+
+test("storefront button reflects profile status and resets when switching accounts", async () => {
   const source = fs.readFileSync(path.join(__dirname, "..", "artist-dashboard.js"), "utf8")
     .replace(/^import[\s\S]*?from "[^"]+";\r?\n/gm, "");
   const elements = new Map();
@@ -730,7 +1394,12 @@ test("switching from a rejected artist to a new account enables the profile form
   element("#banner-preview").style = {};
   element("#artist-profile-form").elements = controls;
   element("#artist-release-form").elements = {
-    genre: { querySelector: () => null, querySelectorAll: () => [], options: [], addEventListener() {} }
+    genre: { querySelector: () => null, querySelectorAll: () => [], options: [], addEventListener() {} },
+    releaseType: { value: "single", addEventListener() {} },
+    saleMode: { value: "none", addEventListener() {} },
+    albumAudio: { files: [], addEventListener() {} },
+    cover: { files: [], addEventListener() {} },
+    downloadPrice: { value: "" }
   };
   const document = { querySelector: element, createElement: () => ({}) };
   let onAuth;
@@ -739,12 +1408,13 @@ test("switching from a rejected artist to a new account enables the profile form
     location: { protocol: "https:", hostname: "example.com" },
     firebaseClient: async () => ({}), getAuth: () => ({}), getStorage: () => ({}),
     onAuthStateChanged: (_auth, callback) => { onAuth = callback; },
+    createCoverPreviews: () => ({ clear() {}, add() {}, addLocal() {} }),
     fetch: async (url) => {
       if (url.includes("action=config")) return { ok: true, json: async () => ({ storageBucket: "bucket" }) };
       if (url.includes("artist-releases")) return { ok: true, json: async () => ({ releases: [] }) };
       if (url.includes("artist-profile")) {
-        return currentAccount === "rejected"
-          ? { ok: true, json: async () => ({ profile: { status: "rejected", artistName: "Artist", slug: "artist", socialLinks: {} } }) }
+        return currentAccount !== "new"
+          ? { ok: true, json: async () => ({ profile: { status: currentAccount, artistName: "Artist", slug: "artist", socialLinks: {} } }) }
           : { ok: false, json: async () => ({ error: "No artist profile is registered for this account." }) };
       }
       throw new Error(`Unexpected request: ${url}`);
@@ -755,10 +1425,23 @@ test("switching from a rejected artist to a new account enables the profile form
   const user = { email: "artist@example.com", emailVerified: true, getIdToken: async () => "token" };
   await onAuth(user);
   assert.ok(controls.every((control) => control.disabled));
+  assert.match(element("#artist-storefront-notice").textContent, /inactive/);
+  currentAccount = "pending";
+  await onAuth(user);
+  assert.equal(element("#artist-storefront-link").hidden, true);
+  assert.equal(element("#artist-storefront-unavailable").hidden, false);
+  assert.match(element("#artist-storefront-notice").textContent, /awaiting review/);
+  currentAccount = "approved";
+  await onAuth(user);
+  assert.equal(element("#artist-storefront-link").hidden, false);
+  assert.equal(element("#artist-storefront-link").href, "/artist/artist");
+  assert.equal(element("#artist-storefront-unavailable").hidden, true);
+  assert.equal(element("#artist-storefront-notice").textContent, "");
   await onAuth(null);
   currentAccount = "new";
   await onAuth(user);
   assert.ok(controls.every((control) => !control.disabled));
+  assert.equal(element("#artist-profile-link").hidden, true);
 });
 
 test("banner position accepts whole numbers from 0 to 100 and defaults to center", () => {
@@ -779,15 +1462,16 @@ test("draft form offers genre selections without a mood control", () => {
   }
 });
 
-test("editing a draft preserves its legacy genre and moods while new drafts have no moods", async () => {
+test("editing drafts preserves metadata and supports both album and song prices", async () => {
   const source = fs.readFileSync(path.join(__dirname, "..", "artist-dashboard.js"), "utf8")
     .replace(/^import[\s\S]*?from "[^"]+";\r?\n/gm, "");
   const elements = new Map();
   function element(selector) {
     if (!elements.has(selector)) elements.set(selector, {
-      listeners: {}, hidden: false, textContent: "",
+      listeners: {}, children: [], hidden: false, textContent: "",
       addEventListener(name, callback) { this.listeners[name] = callback; },
-      replaceChildren() {}, append() {}, querySelectorAll: () => [],
+      replaceChildren(...children) { this.children = children; },
+      append(...children) { this.children.push(...children); }, querySelectorAll: () => [],
       contains: () => false, reset() {}, scrollIntoView() {}
     });
     return elements.get(selector);
@@ -805,18 +1489,34 @@ test("editing a draft preserves its legacy genre and moods while new drafts have
   const releaseForm = element("#artist-release-form");
   releaseForm.elements = {
     title: { value: "" }, description: { value: "" }, downloadPrice: { value: "" }, genre,
-    audio: { value: "", files: [] }, cover: { value: "", files: [] }
+    audio: { value: "", files: [] }, cover: {
+      value: "", files: [], listeners: {},
+      addEventListener(name, callback) { this.listeners[name] = callback; }
+    },
+    releaseType: { value: "single", addEventListener() {} },
+    saleMode: { value: "none", addEventListener() {} },
+    albumAudio: { files: [], addEventListener() {} }
   };
   element("#artist-profile-form").elements = [];
   element("#artist-profile-form").elements.bannerPositionY = { value: "50", addEventListener() {} };
   element("#artist-profile-form").elements.banner = { files: [], addEventListener() {} };
   element("#banner-preview").style = {};
   const submitted = [];
-  const document = { querySelector: element, createElement: () => ({ dataset: {} }) };
+  let releaseList = [];
+  const previewManagers = [];
+  const document = { querySelector: element, createElement: () => ({
+    dataset: {}, children: [], append(...children) { this.children.push(...children); }, addEventListener() {}
+  }) };
   const context = {
     document, location: { protocol: "https:", hostname: "example.com" },
     firebaseClient: async () => ({}), getAuth: () => ({}), getStorage: () => ({}),
     onAuthStateChanged() {},
+    createCoverPreviews: () => {
+      const manager = { added: [], local: [], clear() {}, add(_container, release) { this.added.push(release); },
+        addLocal(_container, file) { this.local.push(file); } };
+      previewManagers.push(manager);
+      return manager;
+    },
     fetch: async (url, options = {}) => {
       if (url.includes("action=config")) return { ok: true, json: async () => ({ storageBucket: "bucket" }) };
       if (url.includes("artist-releases") && options.method === "POST") {
@@ -824,12 +1524,12 @@ test("editing a draft preserves its legacy genre and moods while new drafts have
         submitted.push(body);
         return { ok: true, json: async () => ({ release: { ...body, id: body.id || "new-id" } }) };
       }
-      if (url.includes("artist-releases")) return { ok: true, json: async () => ({ releases: [] }) };
+      if (url.includes("artist-releases")) return { ok: true, json: async () => ({ releases: releaseList }) };
       throw new Error(`Unexpected request: ${url}`);
     },
     URL, URLSearchParams
   };
-  await vm.runInNewContext(`(async () => {\n${source}\nglobalThis.testEditDraft = editDraft;\nglobalThis.testSetUser = (user) => { currentUser = user; };\n})()`, context);
+  await vm.runInNewContext(`(async () => {\n${source}\nglobalThis.testEditDraft = editDraft;\nglobalThis.testLoadReleases = loadReleases;\nglobalThis.testSetUser = (user) => { currentUser = user; currentProfile = { status: "approved" }; };\n})()`, context);
   context.testSetUser({ uid: "artist-1", getIdToken: async () => "token" });
   context.testEditDraft({ id: "old-id", title: "Existing", genre: "Unlisted genre", moods: ["inspired"] });
   assert.equal(genre.value, "Unlisted genre");
@@ -859,4 +1559,71 @@ test("editing a draft preserves its legacy genre and moods while new drafts have
   assert.deepEqual(submitted[1].moods, []);
   assert.equal(submitted[2].genre, "Rock");
   assert.deepEqual(submitted[2].moods, []);
+
+  context.testEditDraft({
+    id: "album-id", title: "Album", genre: "Rock", releaseType: "album", saleMode: "both",
+    downloadPriceCents: 500, moods: [], coverPath: "cover",
+    tracks: [{ id: "track-1", title: "Song", audioPath: "audio", downloadPriceCents: 125 }]
+  });
+  assert.equal(previewManagers[1].added.at(-1).title, "Album");
+  const selectedCover = { name: "cover.png", type: "image/png", size: 5 };
+  releaseForm.elements.cover.files = [selectedCover];
+  releaseForm.elements.cover.listeners.change();
+  assert.equal(previewManagers[1].local[0], selectedCover);
+  releaseForm.elements.cover.files = [];
+  assert.equal(element("#artist-price-label").hidden, false);
+  assert.equal(releaseForm.elements.downloadPrice.required, true);
+  const songPriceLabel = element("#artist-album-tracks").children[0].children[1];
+  assert.equal(songPriceLabel.hidden, false);
+  assert.equal(songPriceLabel.children[0].required, true);
+  await releaseForm.listeners.submit({ preventDefault() {} });
+  assert.equal(submitted[3].saleMode, "both");
+  assert.equal(submitted[3].downloadPriceCents, 500);
+  assert.equal(submitted[3].tracks[0].downloadPriceCents, 125);
+  releaseList = ["draft", "submitted", "published"].map((status) => ({
+    id: status, title: status, status, releaseType: "single", coverPath: "cover", audioPath: "audio"
+  }));
+  await context.testLoadReleases();
+  assert.deepEqual(previewManagers[0].added.map((release) => release.status), ["draft", "submitted", "published"]);
+});
+
+test("admin release review displays shared covers and notes missing artwork", async () => {
+  const source = fs.readFileSync(path.join(__dirname, "..", "artist-admin.js"), "utf8")
+    .replace(/^import[\s\S]*?from "[^"]+";\r?\n/gm, "");
+  const elements = new Map();
+  function element(selector) {
+    if (!elements.has(selector)) elements.set(selector, {
+      children: [], addEventListener() {}, replaceChildren(...children) { this.children = children; },
+      append(...children) { this.children.push(...children); }
+    });
+    return elements.get(selector);
+  }
+  const added = [];
+  let cleared = 0;
+  let onAuth;
+  const context = {
+    document: { querySelector: element, createElement: () => ({
+      children: [], addEventListener() {}, append(...children) { this.children.push(...children); }
+    }) },
+    location: { protocol: "https:", hostname: "example.com" },
+    firebaseClient: async () => ({}), getAuth: () => ({}),
+    onAuthStateChanged: (_auth, callback) => { onAuth = callback; },
+    createCoverPreviews: (_api, mode) => {
+      assert.equal(mode, "review");
+      return { clear() { cleared++; }, add(_card, release) { added.push(release.id); } };
+    },
+    URL
+  };
+  await vm.runInNewContext(`(async () => {\n${source}\nglobalThis.testRenderReleases = renderReleases;\n})()`, context);
+  context.testRenderReleases([
+    { id: "album", title: "Album", artistName: "Artist", status: "submitted", releaseType: "album", tracks: [], hasCover: true },
+    { id: "single", title: "Single", artistName: "Artist", status: "published", hasCover: true },
+    { id: "no-cover", title: "No cover", artistName: "Artist", status: "submitted", hasCover: false }
+  ]);
+  assert.deepEqual(added, ["album", "single"]);
+  assert.ok(element("#artist-release-reviews").children[2].children.some((child) =>
+    child.textContent === "No cover artwork uploaded."));
+  await onAuth(null);
+  assert.equal(element("#artist-release-reviews").children.length, 0);
+  assert.equal(cleared, 2);
 });

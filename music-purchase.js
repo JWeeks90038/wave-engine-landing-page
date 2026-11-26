@@ -19,12 +19,17 @@ async function loadPurchase() {
       if (!response.ok) throw new Error(data.error || "Your purchase could not be loaded.");
       status.textContent = `Payment confirmed. Download ${data.title}:`;
       query.set("action", "download");
-      const link = document.createElement("a");
-      link.className = "cta-button";
-      link.href = `${artistApiBase}/api/artist-releases?${query}`;
-      link.rel = "noreferrer";
-      link.textContent = `Download ${data.format.toUpperCase()}`;
-      downloads.append(link);
+      for (const track of data.tracks || [{ format: data.format }]) {
+        if (track.id) query.set("track", track.id);
+        const link = document.createElement("a");
+        link.className = "cta-button";
+        link.href = `${artistApiBase}/api/artist-releases?${query}`;
+        link.rel = "noreferrer";
+        link.textContent = track.title
+          ? `Download ${track.title} (${track.format.toUpperCase()})`
+          : `Download ${track.format.toUpperCase()}`;
+        downloads.append(link);
+      }
       return;
     }
     const query = new URLSearchParams({ action: "purchase", session_id: sessionId });

@@ -98,9 +98,11 @@ and refund policy with counsel before enabling sales.
 
 The initial artist workflow adds email-verified account registration, one artist
 profile per Firebase user, unique artist slugs, private profile/release uploads,
-single-track drafts, and an administrator approval screen. Approved profiles are
+single and album drafts, and an administrator approval screen. Approved profiles are
 available at `/artist/{slug}` and appear on the music page. Artists with approved
-profiles can confirm their rights and submit a saved track for review. Only
+profiles can open their storefront from Artist Studio, confirm their rights and
+submit a saved track for review. A storefront remains unavailable while its
+profile awaits review. Only
 tracks approved by an administrator can be streamed publicly; draft and
 submitted tracks remain private. Artist sales are disabled until configured. Existing
 `musicTracks` records and Stripe checkout are unchanged.
@@ -109,26 +111,37 @@ approved tracks and a profile link; selecting another artist stops the previous
 artist's playback.
 Artists can search and select one optional genre for each draft; existing custom
 genre and mood data is retained when an older draft is edited.
+An album contains 1–20 MP3 or WAV songs (up to 100 MiB each) and one shared
+cover, which is required before submission. Add songs in the desired order and
+edit their titles in Artist Studio. Albums are reviewed, published and withdrawn
+as one release; reviewers can listen to each song separately. Artists can see
+the selected and saved cover in Artist Studio, and administrators can see it
+while reviewing submitted releases. Unpublished artwork remains private.
 
 #### Artist downloads and Stripe Connect
 
 Artists may set an optional USD download price from $0.50 to $100.00 on a
-draft and confirm the rights to sell downloads when submitting it for review.
+single. An album can be streaming-only, sold for one album price, sold as
+individually priced songs, or offered both ways; each listed price must be $0.50–$100.00. Artists
+confirm the rights to sell downloads when submitting a priced release for review.
 The artist must complete Stripe Standard account onboarding; checkout verifies
 that charges and payouts are enabled and Stripe's fee payer is the connected
 account. Stripe processes direct card charges on that account. The application
 fee is 10% of the listed price, rounded to the nearest cent; Stripe deducts
 processing fees from the artist. Payout timing and requirements are managed by
-Stripe. Downloads deliver the one MP3 or WAV uploaded for the approved track.
-Price changes require withdrawing the track and submitting it for review again.
+Stripe. An album purchase provides a separate download link for every song;
+individual purchases provide only the purchased song. Downloads use the uploaded
+MP3 or WAV files. Price changes require withdrawing the release and submitting
+it for review again.
 
 Artist checkout uses `MUSIC_STRIPE_MODE`, `ARTIST_STRIPE_SECRET_KEY`, and
 `MUSIC_SITE_URL` described above. Register and configure Connect with Stripe,
 ensure the key can create and retrieve connected accounts, account links,
 Checkout Sessions and PaymentIntents on connected accounts, and enable the
 requested mode in a separate environment. `ARTIST_SALES_ENABLED=true` enables
-onboarding and checkout; leave it unset until the entire flow has been tested
-and reviewed. Production requires `MUSIC_STRIPE_MODE=live` and the matching live
+download checkout; onboarding is available when either artist sales or
+contributions are enabled. Leave these flags unset until the relevant flows have
+been tested and reviewed. Production requires `MUSIC_STRIPE_MODE=live` and the matching live
 artist key. Store the artist key only as a server-side secret, never in the
 repository or browser. The existing `STRIPE_SECRET_KEY` for apparel and Wave
 Engine downloads is unchanged. Never use live credentials in a staging
@@ -147,12 +160,36 @@ receipt-based file delivery or refund workflow.
 
 Purchases use a private, server-side Firestore record and a bearer return link;
 payment is verified with the artist's connected Stripe account. Links expire
-10 minutes after the charge. If the track is unpublished or its approved audio
+10 minutes after the charge. If the release is unpublished or its approved audio
 is removed or replaced, downloads stop and support must resolve the purchase.
 An already-open checkout can still complete after a track is withdrawn, so
 support may need to refund or manually resolve it. The audio stream is not DRM.
 Anonymous checkout creates Stripe sessions and Firestore records; implement
 appropriate abuse monitoring and retention policies before launch.
+
+#### Artist contributions
+
+The artist storefront offers a one-time contribution in USD. Supporters choose
+any amount from $0.50 to $999,999.99 (Stripe's USD limits) on the artist page
+and pay by card through Stripe Checkout. The artist must have an approved
+profile and a ready connected Stripe account. The direct charge uses the artist's
+account: Wave Engine receives a 5% application fee, rounded to the nearest cent,
+and Stripe deducts processing fees from the artist. For small contributions,
+processing fees can leave the artist with little or no net proceeds.
+
+Set `ARTIST_CONTRIBUTIONS_ENABLED=true` to enable new contribution checkouts
+and artist Stripe onboarding independently of download sales. It is disabled
+by default. The return page verifies payment with Stripe; it can still verify
+an existing checkout after the flag is turned off. Stripe keeps the payment
+records; no separate contribution record is created in Firestore. Test in
+separate Stripe test-mode and Firebase staging environments before enabling
+live contributions, including onboarding, payment, cancellation, fees, payout,
+refunds and disputes. Confirm Stripe account eligibility, applicable terms and
+refund responsibilities with appropriate advisers. Support must handle
+refunds and disputes in the artist's connected account and application-fee
+refunds separately where appropriate. An already-open checkout can still complete
+after a profile is deactivated or contributions are disabled; resolve any
+resulting issues through support. Monitor anonymous checkout creation for abuse.
 
 The artist APIs use the existing Firebase Admin credentials and Firestore
 project. The browser uploads directly to Firebase Storage; the
@@ -187,10 +224,13 @@ Firebase Authentication's authorized domains. The existing administrator
 account and `admin: true` custom claim can review applications at
 `/artist-admin`. Configure the staging deployment with the Firebase Admin
 credentials and `FIREBASE_STORAGE_BUCKET` used by the music API. The Vercel
-rewrite serves the shared storefront shell for `/artist/{slug}`; confirm that
-the staging host uses this Vercel configuration before testing clean artist
-URLs. Social metadata is updated client-side in this first iteration;
-crawler-specific server rendering is not included.
+rewrite serves `/artist/{slug}` through the profile API, which adds approved
+profile metadata and the artist's public avatar to the initial HTML for social
+sharing. Profiles without an avatar use the Wave Engine social image. Set
+`MUSIC_SITE_URL` to the staging site's HTTPS origin when testing; otherwise
+share metadata defaults to `https://waveenginemusic.com`. Share the clean
+`/artist/{slug}` URL on a host using this Vercel configuration. Social
+platforms control the preview shape and may cache previews after an image change.
 
 No new package dependencies were added. Costs are limited to existing Vercel
 function usage, Firebase Auth, Firestore, and Storage upload/egress usage; no

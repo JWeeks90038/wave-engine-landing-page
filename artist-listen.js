@@ -22,6 +22,27 @@ function formatTime(seconds) {
   return `${Math.floor(minutes / 60)}:${String(minutes % 60).padStart(2, "0")}:${remaining}`;
 }
 
+function purchaseButton(label, id, trackId) {
+  const button = element("button", label, "cta-button music-download-wav artist-download");
+  button.type = "button";
+  button.addEventListener("click", async () => {
+    button.disabled = true;
+    try {
+      const response = await fetch(`${apiBase}/api/artist-releases?action=checkout`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, ...(trackId ? { trackId } : {}) })
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Artist checkout is unavailable.");
+      location.assign(data.url);
+    } catch (error) {
+      status.textContent = error.message || "Artist checkout is unavailable.";
+      button.disabled = false;
+    }
+  });
+  return button;
+}
+
 function trackPlayer(track) {
   const container = document.createElement("div");
   container.className = "artist-public-track";
@@ -40,7 +61,8 @@ function trackPlayer(track) {
   const audio = document.createElement("audio");
   audio.preload = "none";
   audio.hidden = true;
-  audio.src = `${apiBase}/api/artist-releases?action=stream&id=${encodeURIComponent(track.id)}`;
+  audio.src = `${apiBase}/api/artist-releases?action=stream&id=${encodeURIComponent(track.id)}` +
+    (track.trackId ? `&track=${encodeURIComponent(track.trackId)}` : "");
   audio.addEventListener("error", () => { status.textContent = `Unable to play ${track.title}. Please try again later.`; });
 
   const panel = element("div", "", "music-player");
@@ -151,31 +173,36 @@ function trackPlayer(track) {
   container.append(details);
 
   if (Number.isSafeInteger(track.downloadPriceCents)) {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "cta-button music-download-wav artist-download";
-    button.textContent = `Download ${track.format || "MP3"}`;
-    button.addEventListener("click", async () => {
-      button.disabled = true;
-      try {
-        const response = await fetch(`${apiBase}/api/artist-releases?action=checkout`, {
-          method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: track.id })
-        });
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.error || "Artist checkout is unavailable.");
-        location.assign(data.url);
-      } catch (error) {
-        status.textContent = error.message || "Artist checkout is unavailable.";
-        button.disabled = false;
-      }
-    });
-    actions.append(button);
-  } else {
+    actions.append(purchaseButton(`Download ${track.format || "MP3"} · $${(track.downloadPriceCents / 100).toFixed(2)}`,
+      track.id, track.trackId));
+  } else if (!track.trackId) {
     const unavailable = element("button", "Download coming soon", "cta-button artist-download");
     unavailable.type = "button";
     unavailable.disabled = true;
     actions.append(unavailable);
   }
+  return container;
+}
+
+function albumPlayer(album) {
+  const container = element("section", "", "artist-public-album");
+  const heading = element("div", "", "artist-album-heading");
+  if (album.coverUrl) {
+    const cover = document.createElement("img");
+    cover.className = "music-cover artist-track-cover";
+    cover.src = new URL(album.coverUrl, apiBase).href;
+    cover.alt = `${album.title} album cover`;
+    cover.loading = "lazy";
+    heading.append(cover);
+  }
+  const details = element("div", "", "music-details");
+  details.append(element("h3", album.title));
+  details.append(element("p", `Album · ${album.tracks.length} ${album.tracks.length === 1 ? "song" : "songs"}`, "music-meta"));
+  if (Number.isSafeInteger(album.downloadPriceCents)) {
+    details.append(purchaseButton(`Download album · $${(album.downloadPriceCents / 100).toFixed(2)}`, album.id));
+  }
+  heading.append(details);
+  container.append(heading, ...album.tracks.map(trackPlayer));
   return container;
 }
 
@@ -194,8 +221,8 @@ try {
     const parts = location.pathname.split("/").filter(Boolean);
     const slug = parts[0] === "artist" ? parts[1] : new URLSearchParams(location.search).get("slug");
     const artist = data.artists.find((entry) => entry.slug === slug);
-    list.replaceChildren(...(artist ? artist.tracks.map(trackPlayer) : []));
-    status.textContent = artist && artist.tracks.length ? "" : "No tracks are currently available.";
+    list.replaceChildren(...(artist ? [...artist.tracks.map(trackPlayer), ...(artist.albums || []).map(albumPlayer)] : []));
+    status.textContent = artist && (artist.tracks.length || (artist.albums || []).length) ? "" : "No tracks are currently available.";
   } else {
     let activeButton;
     function selectArtist(artist, button) {
@@ -211,8 +238,9 @@ try {
       profile.textContent = "View artist profile";
       for (const audio of selection.querySelectorAll("audio")) audio.pause();
       selection.replaceChildren(heading, profile);
-      if (artist.tracks.length) {
+      if (artist.tracks.length || (artist.albums || []).length) {
         selection.append(...artist.tracks.slice(0, 3).map(trackPlayer));
+        selection.append(...(artist.albums || []).slice(0, 1).map(albumPlayer));
       }
       else {
         const empty = document.createElement("p");

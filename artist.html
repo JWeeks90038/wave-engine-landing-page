@@ -3,14 +3,18 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- artist-meta:start -->
     <title>Independent Artist | Wave Engine Music</title>
     <meta name="description" content="Discover independent artists on Wave Engine Music." />
     <meta property="og:type" content="profile" />
     <meta property="og:title" content="Independent Artist | Wave Engine Music" />
     <meta property="og:description" content="Discover independent artists on Wave Engine Music." />
     <meta property="og:image" content="https://waveenginemusic.com/Images/wave-engine-social-card-4k-v1.png" />
+    <meta name="twitter:card" content="summary" />
     <meta name="twitter:title" content="Independent Artist | Wave Engine Music" />
     <meta name="twitter:description" content="Discover independent artists on Wave Engine Music." />
+    <meta name="twitter:image" content="https://waveenginemusic.com/Images/wave-engine-social-card-4k-v1.png" />
+    <!-- artist-meta:end -->
     <meta name="theme-color" content="#050816" />
     <link rel="icon" type="image/jpeg" href="../Images/we_favicon.jpg" />
     <link rel="stylesheet" href="../style.css" />
@@ -40,8 +44,25 @@
               <div id="storefront-socials" class="artist-socials"></div>
             </div>
           </div>
+          <section class="artist-support" aria-labelledby="artist-support-title">
+            <h2 id="artist-support-title">Support This Artist</h2>
+            <p>Choose an amount to contribute securely through Stripe.</p>
+            <p>Contributions require artist Stripe setup and must be enabled by Wave Engine.</p>
+            <p><a href="/legal/policies#artist-payments">Contribution terms and policies</a></p>
+            <form id="artist-support-form" class="music-admin-form">
+              <label>Contribution amount (USD)
+                <input name="amount" type="text" inputmode="decimal" autocomplete="off" placeholder="10.00" aria-describedby="artist-support-help" required />
+              </label>
+              <p id="artist-support-help">Enter an amount from $0.50 to $999,999.99.</p>
+              <div class="music-actions">
+                <button class="cta-button cta-primary" type="submit">Contribute</button>
+              </div>
+              <p id="artist-support-status" role="status" aria-live="polite"></p>
+            </form>
+          </section>
           <section class="artist-releases-public">
             <h2>Music</h2>
+            <p>Downloads are for personal listening. Links expire 10 minutes after payment and may stop working sooner if the release is withdrawn. <a href="/legal/policies#music-license">Music download terms</a></p>
             <p id="artist-discovery-status" role="status" aria-live="polite">Loading tracks...</p>
             <div id="artist-discovery-list" class="artist-profile-tracks"></div>
           </section>

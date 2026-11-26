@@ -131,7 +131,7 @@ function validateReleaseInput(uid, releaseId, body) {
   if (typeof body.genre !== "string" || body.genre.trim().length > 80) {
     throw statusError("Genres must be 80 characters or fewer.", 400);
   }
-  if (body.releaseType !== "single") throw statusError("Single-track drafts are supported in this phase.", 400);
+  if (!["single", "album"].includes(body.releaseType)) throw statusError("Choose a single or album.", 400);
   if (!Array.isArray(body.moods) || body.moods.length > 5 ||
       body.moods.some((mood) => typeof mood !== "string" || !MOODS.has(mood))) {
     throw statusError("Choose up to five supported moods.", 400);
@@ -151,6 +151,46 @@ function validateReleaseInput(uid, releaseId, body) {
   if (!validPath(coverPath, "cover\\.(?:jpg|jpeg|png|webp)")) {
     throw statusError("Upload valid cover artwork to this draft.", 400);
   }
+  let albumFields = {};
+  if (body.releaseType === "album") {
+    if (!["none", "album", "tracks", "both"].includes(body.saleMode)) {
+      throw statusError("Choose how album downloads will be sold.", 400);
+    }
+    const albumSales = ["album", "both"].includes(body.saleMode);
+    const trackSales = ["tracks", "both"].includes(body.saleMode);
+    if (!Array.isArray(body.tracks) || body.tracks.length > 20) {
+      throw statusError("Albums may contain up to 20 tracks.", 400);
+    }
+    if (audioPath || (!albumSales && body.downloadPriceCents != null)) {
+      throw statusError("Invalid album audio or pricing.", 400);
+    }
+    if (albumSales && body.downloadPriceCents == null) {
+      throw statusError("Set a download price for the album.", 400);
+    }
+    const ids = new Set();
+    const paths = new Set();
+    const tracks = body.tracks.map((track) => {
+      if (!track || typeof track.id !== "string" ||
+          !new RegExp(`^${UUID_PATTERN}$`).test(track.id) || ids.has(track.id) ||
+          typeof track.title !== "string" || !track.title.trim() || track.title.trim().length > 160 ||
+          !track.audioPath || !validPath(track.audioPath, "audio\\.(?:mp3|wav)") || paths.has(track.audioPath)) {
+        throw statusError("Each album track must have a unique ID, title and uploaded audio.", 400);
+      }
+      if (track.downloadPriceCents != null &&
+          (!trackSales || !Number.isSafeInteger(track.downloadPriceCents) ||
+            track.downloadPriceCents < 50 || track.downloadPriceCents > 10000)) {
+        throw statusError("Track prices must be between $0.50 and $100.00.", 400);
+      }
+      if (trackSales && track.downloadPriceCents == null) {
+        throw statusError("Set a download price for every album track.", 400);
+      }
+      ids.add(track.id);
+      paths.add(track.audioPath);
+      return { id: track.id, title: track.title.trim(), audioPath: track.audioPath,
+        downloadPriceCents: track.downloadPriceCents == null ? null : track.downloadPriceCents };
+    });
+    albumFields = { saleMode: body.saleMode, tracks };
+  }
   return {
     title: body.title.trim(),
     description: body.description.trim(),
@@ -159,8 +199,24 @@ function validateReleaseInput(uid, releaseId, body) {
     moods: [...new Set(body.moods)],
     downloadPriceCents: body.downloadPriceCents === undefined ? null : body.downloadPriceCents,
     audioPath,
-    coverPath
+    coverPath,
+    ...albumFields
   };
+}
+
+function releaseHasSales(release) {
+  return release.downloadPriceCents != null ||
+    (release.releaseType === "album" && ["tracks", "both"].includes(release.saleMode) &&
+      release.tracks.some((track) => track.downloadPriceCents != null));
+}
+
+function releaseAudio(release) {
+  if (release.releaseType === "album") {
+    return release.tracks.map((track) => ({
+      ...track, audioGeneration: release.trackGenerations && release.trackGenerations[track.id]
+    }));
+  }
+  return [{ title: release.title, audioPath: release.audioPath, audioGeneration: release.audioGeneration }];
 }
 
 function escapeRegExp(value) {
@@ -190,6 +246,8 @@ module.exports = {
   bucket,
   database,
   profileResponse,
+  releaseAudio,
+  releaseHasSales,
   setArtistUploadClaim,
   statusError,
   validateArtistName,

@@ -24,6 +24,60 @@ function addSocialLink(container, label, href) {
   container.append(link);
 }
 
+function contributionCents(value) {
+  const match = /^(\d{1,6})(?:\.(\d{1,2}))?$/.exec(value.trim());
+  if (!match) throw new Error("Enter an amount from $0.50 to $999,999.99 USD, with at most two decimal places.");
+  const amount = Number(match[1]) * 100 + Number((match[2] || "").padEnd(2, "0"));
+  if (amount < 50 || amount > 99999999) {
+    throw new Error("Enter an amount from $0.50 to $999,999.99 USD.");
+  }
+  return amount;
+}
+
+function setupContributions(slug) {
+  const form = document.querySelector("#artist-support-form");
+  const message = document.querySelector("#artist-support-status");
+  const button = form.querySelector('button[type="submit"]');
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (button.disabled) return;
+    button.disabled = true;
+    try {
+      const amountCents = contributionCents(form.elements.amount.value);
+      message.textContent = "Opening secure Stripe Checkout...";
+      const response = await fetch(`${apiBase}/api/artist-releases?action=contribute`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slug, amountCents }),
+        cache: "no-store"
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Unable to start your contribution.");
+      location.assign(data.url);
+    } catch (error) {
+      message.textContent = error.message || "Unable to start your contribution.";
+      button.disabled = false;
+    }
+  });
+
+  const params = new URLSearchParams(location.search);
+  if (params.get("contribution") === "cancelled") {
+    message.textContent = "Checkout cancelled. If you completed payment, check your Stripe receipt.";
+  } else if (params.get("contribution") === "success") {
+    message.textContent = "Confirming your contribution...";
+    const query = new URLSearchParams({
+      action: "contribution-status", slug, session_id: params.get("session_id") || ""
+    });
+    fetch(`${apiBase}/api/artist-releases?${query}`, { cache: "no-store", referrerPolicy: "no-referrer" })
+      .then(async (response) => {
+        const data = await response.json();
+        if (!response.ok || data.confirmed !== true) throw new Error(data.error || "Payment could not be verified.");
+        message.textContent = "Thank you! Your contribution has been confirmed.";
+      })
+      .catch((error) => { message.textContent = `${error.message} Please contact support if you were charged.`; });
+  }
+}
+
 try {
   const slug = slugFromLocation();
   if (!/^[a-z0-9](?:[a-z0-9-]{1,28}[a-z0-9])$/.test(slug)) {
@@ -60,12 +114,15 @@ try {
   for (const selector of ['meta[property="og:description"]', 'meta[name="description"]', 'meta[name="twitter:description"]']) {
     document.querySelector(selector).content = profile.biography || `Discover ${profile.artistName} on Wave Engine Music.`;
   }
-  const canonical = document.createElement("link");
-  canonical.rel = "canonical";
-  canonical.href = `${location.origin}/artist/${encodeURIComponent(profile.slug)}`;
-  document.head.append(canonical);
+  if (!document.querySelector('link[rel="canonical"]')) {
+    const canonical = document.createElement("link");
+    canonical.rel = "canonical";
+    canonical.href = `${location.origin}/artist/${encodeURIComponent(profile.slug)}`;
+    document.head.append(canonical);
+  }
   profileSection.hidden = false;
   status.textContent = "";
+  setupContributions(profile.slug);
 } catch (error) {
   status.textContent = error.message || "Artist profile not found.";
 }

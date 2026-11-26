@@ -1,10 +1,15 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "cleanUrls": true,
+  "functions": {
+    "api/artist-profile.js": {
+      "includeFiles": "artist.html"
+    }
+  },
   "rewrites": [
     {
       "source": "/artist/:slug",
-      "destination": "/artist?slug=:slug"
+      "destination": "/api/artist-profile?page=1&slug=:slug"
     }
   ],
   "redirects": [

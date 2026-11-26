@@ -17,11 +17,12 @@ function pageFile(pathname) {
 test("internal page links use clean URLs that resolve to existing pages", () => {
   const config = JSON.parse(fs.readFileSync(path.join(root, "vercel.json"), "utf8"));
   assert.equal(config.cleanUrls, true);
+  assert.equal(config.functions["api/artist-profile.js"].includeFiles, "artist.html");
   assert.ok(config.redirects.some((route) =>
     route.source === "/index.html" && route.destination === "/" && route.permanent
   ));
   assert.ok(config.rewrites.some((route) =>
-    route.source === "/artist/:slug" && route.destination === "/artist?slug=:slug"
+    route.source === "/artist/:slug" && route.destination === "/api/artist-profile?page=1&slug=:slug"
   ));
 
   for (const file of pages) {
@@ -48,4 +49,15 @@ test("sitemap URLs match the pages' clean canonical URLs", () => {
     assert.ok(html.includes(`rel="canonical" href="${url.href}"`), url.href);
     assert.doesNotMatch(html, /<meta\s+name=["']robots["']\s+content=["'][^"']*\bnoindex\b/i, url.href);
   }
+});
+
+test("artist support links to the fee terms without displaying them in the support section", () => {
+  const artist = fs.readFileSync(path.join(root, "artist.html"), "utf8");
+  const policy = fs.readFileSync(path.join(root, "legal", "policies.html"), "utf8");
+  const support = /<section class="artist-support"[\s\S]*?<\/section>/.exec(artist);
+  assert.ok(support);
+  assert.match(support[0], /href="\/legal\/policies#artist-payments"/);
+  assert.doesNotMatch(support[0], /Wave Engine receives 5%|Stripe processing fees are paid by the artist/i);
+  assert.match(policy, /id="artist-payments"/);
+  assert.match(policy, /5% of each artist contribution/);
 });

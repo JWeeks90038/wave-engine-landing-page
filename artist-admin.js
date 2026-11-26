@@ -1,5 +1,6 @@
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js";
 import { firebaseClient } from "./firebase-client.js";
+import { createCoverPreviews } from "./artist-cover-preview.js";
 
 const isLocal = location.protocol === "file:" || ["localhost", "127.0.0.1"].includes(location.hostname);
 const apiBase = isLocal ? "http://127.0.0.1:8787" :
@@ -12,6 +13,8 @@ const releaseReviews = document.querySelector("#artist-release-reviews");
 let auth;
 let currentUser;
 let reviewUrls = [];
+let reviewLoad = 0;
+const reviewCovers = createCoverPreviews(apiBase, "review", () => currentUser);
 
 function show(message) {
   status.textContent = message;
@@ -31,15 +34,16 @@ async function request(path, method = "GET", body) {
   return data;
 }
 
-async function loadReviewAudio(id) {
+async function loadReviewAudio(id, trackId, user) {
   const chunks = [];
   let start = 0;
   let total;
   let contentType;
   do {
-    const response = await fetch(`${apiBase}/api/artist-releases?action=review&id=${encodeURIComponent(id)}`, {
+    const response = await fetch(`${apiBase}/api/artist-releases?action=review&id=${encodeURIComponent(id)}` +
+      (trackId ? `&track=${encodeURIComponent(trackId)}` : ""), {
       headers: {
-        Authorization: `Bearer ${await currentUser.getIdToken()}`,
+        Authorization: `Bearer ${await user.getIdToken()}`,
         Range: `bytes=${start}-${start + 2 * 1024 * 1024 - 1}`
       },
       cache: "no-store"
@@ -106,64 +110,86 @@ function renderApplications(artists) {
 }
 
 async function loadApplications() {
+  const user = currentUser;
+  const load = ++reviewLoad;
   const [profiles, tracks] = await Promise.all([
     request("/api/artist-admin"),
     request("/api/artist-admin?type=releases")
   ]);
+  if (user !== currentUser || load !== reviewLoad) return;
   renderApplications(profiles.artists);
   renderReleases(tracks.releases);
 }
 
 function renderReleases(releases) {
+  reviewCovers.clear();
   for (const url of reviewUrls) URL.revokeObjectURL(url);
   reviewUrls = [];
   releaseReviews.replaceChildren();
   for (const release of releases) {
+    const isAlbum = release.releaseType === "album";
+    const hasSales = release.downloadPriceCents != null ||
+      (isAlbum && ["tracks", "both"].includes(release.saleMode) && release.tracks.some((track) => track.downloadPriceCents != null));
     const card = document.createElement("article");
     const heading = document.createElement("h3");
     heading.textContent = `${release.title} — ${release.artistName}`;
     const details = document.createElement("p");
     details.textContent = `${release.genre || "Genre not set"} · ${release.status === "submitted" ? "Awaiting review" : "Public streaming"}`;
     card.append(heading, details);
+    if (release.hasCover) {
+      reviewCovers.add(card, release);
+    } else {
+      const artwork = document.createElement("p");
+      artwork.textContent = "No cover artwork uploaded.";
+      card.append(artwork);
+    }
     if (release.status === "submitted") {
       const rights = document.createElement("p");
       rights.textContent = release.rightsConfirmed
-        ? "Artist confirmed the rights to upload and publicly stream this track."
+        ? "Artist confirmed the rights to upload and publicly stream this release."
         : "Rights confirmation is missing.";
       card.append(rights);
-      if (release.downloadPriceCents != null) {
+      if (hasSales) {
         const sale = document.createElement("p");
-        sale.textContent = `Download price: $${(release.downloadPriceCents / 100).toFixed(2)}. ${
+        sale.textContent = `${release.downloadPriceCents == null ? "Songs priced individually" :
+          `Download price: $${(release.downloadPriceCents / 100).toFixed(2)}`}. ${
           release.salesRightsConfirmed ? "Artist confirmed rights to sell downloads." : "Sales rights confirmation is missing."
         }`;
         card.append(sale);
       }
-      const preview = document.createElement("button");
-      preview.type = "button";
-      preview.className = "cta-button";
-      preview.textContent = "Load track for review";
-      preview.addEventListener("click", async () => {
-        preview.disabled = true;
-        try {
-          const url = URL.createObjectURL(await loadReviewAudio(release.id));
-          reviewUrls.push(url);
-          const audio = document.createElement("audio");
-          audio.controls = true;
-          audio.src = url;
-          audio.setAttribute("aria-label", `Review ${release.title}`);
-          card.append(audio);
-          preview.remove();
-        } catch (error) {
-          preview.disabled = false;
-          show(error.message);
-        }
-      });
-      card.append(preview);
+      for (const track of isAlbum ? release.tracks : [{ title: release.title }]) {
+        const preview = document.createElement("button");
+        preview.type = "button";
+        preview.className = "cta-button";
+        preview.textContent = `Load ${track.title} for review` +
+          (track.downloadPriceCents != null ? ` ($${(track.downloadPriceCents / 100).toFixed(2)})` : "");
+        preview.addEventListener("click", async () => {
+          preview.disabled = true;
+          const user = currentUser;
+          const load = reviewLoad;
+          try {
+            const audioBlob = await loadReviewAudio(release.id, track.id, user);
+            if (user !== currentUser || load !== reviewLoad) return;
+            const url = URL.createObjectURL(audioBlob);
+            reviewUrls.push(url);
+            const audio = document.createElement("audio");
+            audio.controls = true;
+            audio.src = url;
+            audio.setAttribute("aria-label", `Review ${track.title}`);
+            preview.after(audio);
+            preview.remove();
+          } catch (error) {
+            preview.disabled = false;
+            show(error.message);
+          }
+        });
+        card.append(preview);
+      }
     }
     const actions = document.createElement("div");
     actions.className = "music-actions";
     const choices = release.status === "submitted"
-      ? [["approve-release", "Approve track"], ["reject-release", "Return to draft"]]
+      ? [["approve-release", "Approve release"], ["reject-release", "Return to draft"]]
       : [["unpublish-release", "Remove from public streaming"]];
     for (const [action, label] of choices) {
       const button = document.createElement("button");
@@ -171,13 +197,13 @@ function renderReleases(releases) {
       button.className = "cta-button";
       button.textContent = label;
       if (action === "approve-release" && (!release.artistApproved || !release.rightsConfirmed ||
-          (release.downloadPriceCents != null && !release.salesRightsConfirmed))) button.disabled = true;
+          (hasSales && !release.salesRightsConfirmed))) button.disabled = true;
       button.addEventListener("click", async () => {
         button.disabled = true;
         try {
           await request("/api/artist-admin", "POST", { action, id: release.id });
           await loadApplications();
-          show(action === "approve-release" ? "Track approved for public streaming." : "Track returned to a private draft.");
+          show(action === "approve-release" ? "Release approved for public streaming." : "Release returned to a private draft.");
         } catch (error) {
           button.disabled = false;
           show(error.message);
@@ -214,6 +240,12 @@ try {
   const app = await firebaseClient(apiBase);
   auth = getAuth(app);
   onAuthStateChanged(auth, async (user) => {
+    reviewLoad++;
+    reviewCovers.clear();
+    for (const url of reviewUrls) URL.revokeObjectURL(url);
+    reviewUrls = [];
+    applications.replaceChildren();
+    releaseReviews.replaceChildren();
     currentUser = user;
     content.hidden = true;
     login.hidden = Boolean(user);
@@ -223,6 +255,7 @@ try {
     }
     try {
       const token = await user.getIdTokenResult(true);
+      if (user !== currentUser) return;
       if (token.claims.admin !== true) {
         await signOut(auth);
         show("Administrator access is required.");
@@ -230,8 +263,10 @@ try {
       }
       content.hidden = false;
       await loadApplications();
-      show("Review artist applications and submitted tracks before making them public.");
+      if (user !== currentUser) return;
+      show("Review artist applications and submitted releases before making them public.");
     } catch (error) {
+      if (user !== currentUser) return;
       show(`Unable to load applications: ${error.message}`);
     }
   });

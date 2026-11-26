@@ -60,6 +60,11 @@
           <section id="artist-profile-section" hidden>
             <h2 id="artist-profile-title">Artist profile</h2>
             <p id="artist-profile-notice" class="artist-notice"></p>
+            <div id="artist-profile-link" class="artist-profile-link" hidden>
+              <a id="artist-storefront-link" class="cta-button cta-primary" hidden>View your storefront</a>
+              <button id="artist-storefront-unavailable" class="cta-button" type="button" disabled hidden>View your storefront</button>
+              <p id="artist-storefront-notice"></p>
+            </div>
             <form id="artist-profile-form" class="music-admin-form">
               <label>Artist or project name <input name="artistName" maxlength="100" required /></label>
               <label>Artist URL <input name="slug" minlength="3" maxlength="30" pattern="[a-zA-Z0-9-]+" autocomplete="off" required /></label>
@@ -80,21 +85,33 @@
               <div id="banner-preview" class="artist-banner" aria-label="Banner preview"></div>
               <button class="cta-button cta-primary" type="submit">Save artist profile</button>
             </form>
-            <p id="artist-profile-link" class="artist-profile-link"></p>
           </section>
 
           <section id="artist-releases-section" hidden>
             <h2>Your music drafts</h2>
             <p>Drafts remain private until approved. Streaming is free; optional downloads use your price. Wave Engine receives 10%, and Stripe charges you processing fees.</p>
+            <p>For contributions, Wave Engine receives 5% and Stripe charges you processing fees. Complete Stripe setup to accept contributions.</p>
+            <p>Artist uploads and payments are subject to the <a href="/legal/policies#terms">Terms of Service</a>.</p>
             <div class="music-actions">
               <button id="artist-connect" class="cta-button" type="button">Set up Stripe payouts</button>
               <button id="artist-connect-status" class="cta-button" type="button">Check payout status</button>
             </div>
             <form id="artist-release-form" class="music-admin-form">
               <h3 id="artist-release-title">New single draft</h3>
-              <label>Track title <input name="title" maxlength="160" required /></label>
+              <label>Release type
+                <select name="releaseType"><option value="single">Single</option><option value="album">Album (up to 20 songs)</option></select>
+              </label>
+              <label><span id="artist-title-label">Track title</span> <input name="title" maxlength="160" required /></label>
               <label>Description <textarea name="description" maxlength="2000" rows="3"></textarea></label>
-              <label>Download price in USD (optional; $0.50–$100.00)
+              <label id="artist-sale-mode-label" hidden>Album downloads
+                <select name="saleMode">
+                  <option value="none">Streaming only</option>
+                  <option value="album">Sell the whole album</option>
+                  <option value="tracks">Sell songs individually</option>
+                  <option value="both">Sell the album and individual songs</option>
+                </select>
+              </label>
+              <label id="artist-price-label"><span id="artist-price-text">Download price in USD (optional; $0.50–$100.00)</span>
                 <input name="downloadPrice" type="number" min="0.50" max="100.00" step="0.01" placeholder="Leave blank for streaming only" />
               </label>
               <label>Search genres
@@ -368,12 +385,21 @@
                 </select>
               </label>
               <p id="artist-genre-search-status" role="status" aria-live="polite">Search to narrow the genre list.</p>
-              <label>Audio (MP3 or WAV; up to 100 MiB)
+              <label id="artist-single-audio">Audio (MP3 or WAV; up to 100 MiB)
                 <input name="audio" type="file" accept=".mp3,.wav,audio/mpeg,audio/wav,audio/x-wav" />
               </label>
+              <div id="artist-album-audio" hidden>
+                <label>Add album songs (MP3 or WAV; up to 20 files, 100 MiB each)
+                  <input name="albumAudio" type="file" multiple accept=".mp3,.wav,audio/mpeg,audio/wav,audio/x-wav" />
+                </label>
+                <p>Set each song title and, when selling songs individually, its download price. Songs appear in the order listed.</p>
+                <div id="artist-album-tracks"></div>
+              </div>
               <label>Cover artwork (PNG, JPEG or WebP; up to 10 MiB)
                 <input name="cover" type="file" accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp" />
               </label>
+              <div id="artist-release-cover-preview"></div>
+              <p>Albums require one cover shared by every song before submission.</p>
               <div class="music-actions">
                 <button class="cta-button cta-primary" type="submit">Save private draft</button>
                 <button id="artist-release-cancel" class="cta-button" type="button" hidden>Cancel edit</button>

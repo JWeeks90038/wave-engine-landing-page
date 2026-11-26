@@ -8,6 +8,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js";
 import { getStorage, ref, uploadBytesResumable, deleteObject } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-storage.js";
 import { firebaseClient } from "./firebase-client.js";
+import { createCoverPreviews } from "./artist-cover-preview.js";
 
 const isLocal = location.protocol === "file:" || ["localhost", "127.0.0.1"].includes(location.hostname);
 const apiBase = isLocal ? "http://127.0.0.1:8787" :
@@ -22,6 +23,7 @@ const profileForm = document.querySelector("#artist-profile-form");
 const releaseSection = document.querySelector("#artist-releases-section");
 const releaseForm = document.querySelector("#artist-release-form");
 const releasesList = document.querySelector("#artist-releases");
+const coverPreview = document.querySelector("#artist-release-cover-preview");
 const genreSearch = document.querySelector("#artist-genre-search");
 const genreSearchStatus = document.querySelector("#artist-genre-search-status");
 const uploadSpecs = {
@@ -35,7 +37,19 @@ let storage;
 let currentUser = null;
 let currentProfile = null;
 let editingRelease = null;
+let albumTracks = [];
 let busy = false;
+let releaseLoad = 0;
+const releaseCovers = createCoverPreviews(apiBase, "owner", () => currentUser);
+const formCover = createCoverPreviews(apiBase, "owner", () => currentUser);
+
+function sellsAlbum(mode) {
+  return mode === "album" || mode === "both";
+}
+
+function sellsTracks(mode) {
+  return mode === "tracks" || mode === "both";
+}
 
 function show(message) {
   status.textContent = message;
@@ -45,8 +59,15 @@ function setBusy(value) {
   busy = value;
   const blocked = currentProfile && ["rejected", "suspended"].includes(currentProfile.status);
   for (const control of profileForm.elements) control.disabled = value || Boolean(blocked);
+  for (const control of releaseForm.querySelectorAll("input, textarea, select")) {
+    control.disabled = value ||
+      (control.name === "releaseType" && Boolean(editingRelease)) ||
+      (control.name === "downloadPrice" && releaseForm.elements.releaseType.value === "album" &&
+        !sellsAlbum(releaseForm.elements.saleMode.value)) ||
+      (control.className === "artist-track-price" && !sellsTracks(releaseForm.elements.saleMode.value));
+  }
   for (const button of account.querySelectorAll("button")) {
-    if (!profileForm.contains(button)) button.disabled = value;
+    if (!profileForm.contains(button) && button.id !== "artist-storefront-unavailable") button.disabled = value;
   }
 }
 
@@ -156,7 +177,7 @@ function renderProfile(profile) {
   document.querySelector("#artist-profile-notice").textContent = blocked
     ? "This profile is not active. Contact Wave Engine support for assistance."
     : profile.status === "approved"
-      ? "Your profile is approved. Submit saved tracks for review before they can be streamed."
+      ? "Your profile is approved. Submit saved releases for review before they can be streamed."
       : "Your profile is private while it awaits administrator review.";
   profileForm.elements.artistName.value = profile.artistName;
   profileForm.elements.slug.value = profile.slug;
@@ -169,27 +190,33 @@ function renderProfile(profile) {
   if (!bannerPreviewObjectUrl) updateBannerPreview(profile.bannerUrl || "");
   else updateBannerPreview();
   for (const control of profileForm.elements) control.disabled = blocked || busy;
-  const link = document.querySelector("#artist-profile-link");
-  link.replaceChildren();
-  if (profile.status === "approved") {
-    const anchor = document.createElement("a");
-    anchor.href = `/artist/${encodeURIComponent(profile.slug)}`;
-    anchor.textContent = `View your storefront: ${anchor.href}`;
-    link.append(anchor);
-  } else {
-    link.textContent = "Your storefront will become public after approval.";
-  }
+  const approved = profile.status === "approved";
+  document.querySelector("#artist-profile-link").hidden = false;
+  const link = document.querySelector("#artist-storefront-link");
+  link.hidden = !approved;
+  link.href = approved ? `/artist/${encodeURIComponent(profile.slug)}` : "";
+  document.querySelector("#artist-storefront-unavailable").hidden = approved;
+  document.querySelector("#artist-storefront-notice").textContent = approved ? "" :
+    profile.status === "pending" ? "Your profile is awaiting review. Your storefront will be available after approval." :
+      "Your storefront is unavailable while your profile is inactive.";
 }
 
 async function loadProfile() {
-  const data = await apiRequest("/api/artist-profile?me=1");
-  if (data.tokenRefreshRequired) await currentUser.getIdToken(true);
+  const user = currentUser;
+  const data = await apiRequest("/api/artist-profile?me=1", { user });
+  if (user !== currentUser) return;
+  if (data.tokenRefreshRequired) await user.getIdToken(true);
+  if (user !== currentUser) return;
   renderProfile(data.profile);
   await loadReleases();
 }
 
 async function loadReleases() {
+  const user = currentUser;
+  const load = ++releaseLoad;
   const data = await apiRequest("/api/artist-releases");
+  if (user !== currentUser || load !== releaseLoad) return;
+  releaseCovers.clear();
   releasesList.replaceChildren();
   for (const release of data.releases) {
     const card = document.createElement("article");
@@ -199,11 +226,22 @@ async function loadReleases() {
     const labels = { draft: "Private draft", submitted: "Awaiting review", published: "Public streaming" };
     details.textContent = `${release.genre || "Genre not set"} · ${labels[release.status] || "Unknown status"}`;
     const files = document.createElement("p");
+    const isAlbum = release.releaseType === "album";
+    const tracks = isAlbum ? release.tracks || [] : [];
+    const hasSales = release.downloadPriceCents != null ||
+      (isAlbum && sellsTracks(release.saleMode) && tracks.some((track) => track.downloadPriceCents != null));
     files.textContent = [
-      release.audioPath ? "Audio uploaded" : "Audio not uploaded",
+      isAlbum ? `${tracks.length} ${tracks.length === 1 ? "song" : "songs"} uploaded` :
+        release.audioPath ? "Audio uploaded" : "Audio not uploaded",
       release.coverPath ? "Artwork uploaded" : "Artwork not uploaded"
     ].join(" · ");
     card.append(heading, details, files);
+    if (release.coverPath) releaseCovers.add(card, release);
+    if (isAlbum && tracks.length) {
+      const songs = document.createElement("p");
+      songs.textContent = tracks.map((track) => track.title).join(" · ");
+      card.append(songs);
+    }
     if (release.downloadPriceCents != null) {
       const price = document.createElement("p");
       price.textContent = `Download price: $${(release.downloadPriceCents / 100).toFixed(2)}`;
@@ -216,32 +254,32 @@ async function loadReleases() {
       edit.textContent = "Edit draft";
       edit.addEventListener("click", () => editDraft(release));
       card.append(edit);
-      if (currentProfile.status === "approved" && release.audioPath) {
+      if (currentProfile.status === "approved" && (isAlbum ? tracks.length && release.coverPath : release.audioPath)) {
         const label = document.createElement("label");
         label.className = "artist-rights-confirmation";
         const confirmation = document.createElement("input");
         confirmation.type = "checkbox";
         const text = document.createElement("span");
-        text.textContent = release.downloadPriceCents == null
-          ? "I confirm I have the rights to upload and publicly stream this track and authorize Wave Engine to host and stream it."
-          : "I confirm I have the rights to upload, stream, and sell downloads of this track and authorize Wave Engine to host and deliver it.";
+        text.textContent = !hasSales
+          ? "I confirm I have the rights to upload and publicly stream this release and authorize Wave Engine to host and stream it."
+          : "I confirm I have the rights to upload, stream, and sell downloads of this release and authorize Wave Engine to host and deliver it.";
         label.append(confirmation, text);
         const submit = document.createElement("button");
         submit.type = "button";
         submit.className = "cta-button cta-primary";
-        submit.textContent = "Submit saved track for review";
+        submit.textContent = "Submit saved release for review";
         submit.addEventListener("click", async () => {
           if (busy) return;
-          if (!confirmation.checked) return show("Confirm your rights before submitting this track.");
+          if (!confirmation.checked) return show("Confirm your rights before submitting this release.");
           setBusy(true);
           try {
             await apiRequest("/api/artist-releases", {
               method: "POST", body: { action: "submit", id: release.id, rightsConfirmed: true,
-                salesRightsConfirmed: release.downloadPriceCents != null }
+                salesRightsConfirmed: hasSales }
             });
             if (editingRelease && editingRelease.id === release.id) resetReleaseForm();
             await loadReleases();
-            show("Track submitted for review. It remains private until approved.");
+            show("Release submitted for review. It remains private until approved.");
           } catch (error) { show(error.message); }
           finally { setBusy(false); }
         });
@@ -258,7 +296,7 @@ async function loadReleases() {
         try {
           await apiRequest("/api/artist-releases", { method: "POST", body: { action: "withdraw", id: release.id } });
           await loadReleases();
-          show("Track returned to a private draft.");
+          show("Release returned to a private draft.");
         } catch (error) { show(error.message); }
         finally { setBusy(false); }
       });
@@ -291,8 +329,111 @@ function filterGenres() {
 genreSearch.addEventListener("input", filterGenres);
 releaseForm.elements.genre.addEventListener("change", filterGenres);
 
+function priceCents(raw) {
+  raw = raw.trim();
+  if (!raw) return null;
+  if (!/^\d+(?:\.\d{1,2})?$/.test(raw)) throw new Error("Enter a valid download price.");
+  const cents = Math.round(Number(raw) * 100);
+  if (cents < 50 || cents > 10000) throw new Error("Download prices must be between $0.50 and $100.00.");
+  return cents;
+}
+
+function renderAlbumTracks() {
+  const container = document.querySelector("#artist-album-tracks");
+  container.replaceChildren();
+  if (releaseForm.elements.releaseType.value !== "album") return;
+  for (const [index, track] of albumTracks.entries()) {
+    const row = document.createElement("div");
+    row.className = "artist-album-track";
+    const titleLabel = document.createElement("label");
+    titleLabel.textContent = `Song ${index + 1} title`;
+    const title = document.createElement("input");
+    title.value = track.title;
+    title.maxLength = 160;
+    title.required = true;
+    title.addEventListener("input", () => { track.title = title.value; });
+    titleLabel.append(title);
+    const priceLabel = document.createElement("label");
+    priceLabel.textContent = "Song download price in USD ($0.50–$100.00)";
+    priceLabel.hidden = !sellsTracks(releaseForm.elements.saleMode.value);
+    const price = document.createElement("input");
+    price.type = "number";
+    price.className = "artist-track-price";
+    price.min = "0.50";
+    price.max = "100.00";
+    price.step = "0.01";
+    price.value = track.price || "";
+    price.disabled = priceLabel.hidden;
+    price.required = !priceLabel.hidden;
+    price.addEventListener("input", () => { track.price = price.value; });
+    priceLabel.append(price);
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "cta-button";
+    remove.textContent = "Remove song";
+    remove.addEventListener("click", () => { albumTracks.splice(index, 1); renderAlbumTracks(); });
+    row.append(titleLabel, priceLabel, remove);
+    container.append(row);
+  }
+}
+
+function updateReleaseType() {
+  const album = releaseForm.elements.releaseType.value === "album";
+  if (!editingRelease) document.querySelector("#artist-release-title").textContent = album ? "New album draft" : "New single draft";
+  document.querySelector("#artist-title-label").textContent = album ? "Album title" : "Track title";
+  document.querySelector("#artist-price-text").textContent = album
+    ? "Album download price in USD ($0.50–$100.00)"
+    : "Download price in USD (optional; $0.50–$100.00)";
+  document.querySelector("#artist-sale-mode-label").hidden = !album;
+  document.querySelector("#artist-single-audio").hidden = album;
+  document.querySelector("#artist-album-audio").hidden = !album;
+  const showPrice = !album || sellsAlbum(releaseForm.elements.saleMode.value);
+  document.querySelector("#artist-price-label").hidden = !showPrice;
+  releaseForm.elements.downloadPrice.disabled = !showPrice;
+  releaseForm.elements.downloadPrice.required = album && sellsAlbum(releaseForm.elements.saleMode.value);
+  renderAlbumTracks();
+}
+
+releaseForm.elements.releaseType.addEventListener("change", updateReleaseType);
+releaseForm.elements.saleMode.addEventListener("change", updateReleaseType);
+releaseForm.elements.cover.addEventListener("change", () => {
+  formCover.clear();
+  coverPreview.replaceChildren();
+  const file = releaseForm.elements.cover.files[0];
+  if (!file) {
+    if (editingRelease && editingRelease.coverPath) formCover.add(coverPreview, editingRelease);
+    return;
+  }
+  try {
+    validateUpload(file, "cover");
+    extension(file, ["jpg", "jpeg", "png", "webp"]);
+    formCover.addLocal(coverPreview, file, releaseForm.elements.title.value.trim() || "Selected");
+  } catch (error) {
+    show(error.message);
+  }
+});
+releaseForm.elements.albumAudio.addEventListener("change", () => {
+  const files = Array.from(releaseForm.elements.albumAudio.files);
+  try {
+    if (albumTracks.length + files.length > 20) throw new Error("An album can contain at most 20 songs.");
+    for (const file of files) { validateUpload(file, "audio"); extension(file, ["mp3", "wav"]); }
+    albumTracks.push(...files.map((file) => ({
+      id: crypto.randomUUID(), title: file.name.replace(/\.[^.]+$/, ""), file, audioPath: "", price: ""
+    })));
+    renderAlbumTracks();
+  } catch (error) { show(error.message); }
+  releaseForm.elements.albumAudio.value = "";
+});
+
 function editDraft(release) {
   editingRelease = release;
+  releaseForm.elements.releaseType.value = release.releaseType || "single";
+  releaseForm.elements.releaseType.disabled = true;
+  releaseForm.elements.saleMode.value = release.saleMode || "none";
+  albumTracks = (release.tracks || []).map((track) => ({
+    ...track, price: track.downloadPriceCents == null ? "" : (track.downloadPriceCents / 100).toFixed(2)
+  }));
+  updateReleaseType();
   releaseForm.elements.title.value = release.title || "";
   releaseForm.elements.description.value = release.description || "";
   releaseForm.elements.downloadPrice.value = release.downloadPriceCents == null ? "" : (release.downloadPriceCents / 100).toFixed(2);
@@ -311,16 +452,24 @@ function editDraft(release) {
   filterGenres();
   releaseForm.elements.audio.value = "";
   releaseForm.elements.cover.value = "";
+  formCover.clear();
+  coverPreview.replaceChildren();
+  if (release.coverPath) formCover.add(coverPreview, release);
   document.querySelector("#artist-release-title").textContent = `Edit draft: ${release.title}`;
   document.querySelector("#artist-release-cancel").hidden = false;
   releaseForm.scrollIntoView({ behavior: "smooth" });
 }
 
 function resetReleaseForm() {
+  formCover.clear();
+  coverPreview.replaceChildren();
   editingRelease = null;
+  albumTracks = [];
   const oldGenre = releaseForm.elements.genre.querySelector("option[data-legacy-genre]");
   if (oldGenre) oldGenre.remove();
   releaseForm.reset();
+  releaseForm.elements.releaseType.disabled = false;
+  updateReleaseType();
   genreSearch.value = "";
   filterGenres();
   document.querySelector("#artist-release-title").textContent = "New single draft";
@@ -343,13 +492,16 @@ async function initializeAccount(user) {
   }
   try {
     await loadProfile();
+    if (user !== currentUser) return;
     show("Artist Studio is ready. Drafts are private until approved for streaming.");
   } catch (error) {
+    if (user !== currentUser) return;
     if (/No artist profile is registered/.test(error.message)) {
       currentProfile = null;
       setBusy(busy);
       profileSection.hidden = false;
       releaseSection.hidden = true;
+      document.querySelector("#artist-profile-link").hidden = true;
       document.querySelector("#artist-profile-title").textContent = "Create your artist profile";
       document.querySelector("#artist-profile-notice").textContent = "Artist profiles are reviewed before they become public.";
       profileForm.elements.slug.readOnly = false;
@@ -459,50 +611,85 @@ releaseForm.addEventListener("submit", async (event) => {
   if (busy) return;
   const uploaded = [];
   let isSaved = false;
+  let updateAttempted = false;
+  let releaseId = "";
   setBusy(true);
   try {
     const title = releaseForm.elements.title.value.trim();
     const description = releaseForm.elements.description.value.trim();
     const genre = releaseForm.elements.genre.value.trim();
-    const rawPrice = releaseForm.elements.downloadPrice.value.trim();
-    if (rawPrice && !/^\d+(?:\.\d{1,2})?$/.test(rawPrice)) throw new Error("Enter a valid download price.");
-    const downloadPriceCents = rawPrice ? Math.round(Number(rawPrice) * 100) : null;
-    if (downloadPriceCents !== null && (downloadPriceCents < 50 || downloadPriceCents > 10000)) {
-      throw new Error("Download prices must be between $0.50 and $100.00.");
+    const releaseType = releaseForm.elements.releaseType.value;
+    const isAlbum = releaseType === "album";
+    const saleMode = isAlbum ? releaseForm.elements.saleMode.value : "";
+    const downloadPriceCents = !isAlbum || sellsAlbum(saleMode)
+      ? priceCents(releaseForm.elements.downloadPrice.value) : null;
+    if (isAlbum && sellsAlbum(saleMode) && downloadPriceCents === null) {
+      throw new Error("Set a download price for the album.");
     }
     const moods = editingRelease ? editingRelease.moods || [] : [];
     const audio = releaseForm.elements.audio.files[0];
     const cover = releaseForm.elements.cover.files[0];
-    validateUpload(audio, "audio");
+    const selectedTracks = isAlbum ? albumTracks.map((track) => ({
+      ...track, title: track.title.trim(),
+      downloadPriceCents: sellsTracks(saleMode) ? priceCents(track.price) : null
+    })) : [];
+    if (isAlbum && (!selectedTracks.length || selectedTracks.length > 20)) {
+      throw new Error("Choose between 1 and 20 songs for an album.");
+    }
+    for (const track of selectedTracks) {
+      if (!track.title || track.title.length > 160) throw new Error("Enter a title for every album song.");
+      if (sellsTracks(saleMode) && track.downloadPriceCents === null) throw new Error("Set a price for every album song.");
+      if (track.file) { validateUpload(track.file, "audio"); extension(track.file, ["mp3", "wav"]); }
+    }
+    if (!isAlbum) validateUpload(audio, "audio");
     validateUpload(cover, "cover");
 
     let release = editingRelease;
     if (!release) {
       const created = await apiRequest("/api/artist-releases", {
         method: "POST",
-        body: { action: "create", title, description, genre, downloadPriceCents, moods, releaseType: "single", audioPath: "", coverPath: "" }
+        body: { action: "create", title, description, genre, downloadPriceCents, moods, releaseType,
+          audioPath: "", coverPath: "", ...(isAlbum ? { saleMode, tracks: [] } : {}) }
       });
       release = created.release;
+      editingRelease = release;
+      releaseForm.elements.releaseType.disabled = true;
+      document.querySelector("#artist-release-title").textContent = `Edit draft: ${release.title}`;
+      document.querySelector("#artist-release-cancel").hidden = false;
     }
+    releaseId = release.id;
 
     let audioPath = release.audioPath || "";
     let coverPath = release.coverPath || "";
-    if (audio) {
+    if (!isAlbum && audio) {
       audioPath = await uploadPrivateAsset(audio, "audio", currentUser.uid, release.id);
       uploaded.push(audioPath);
+    }
+    const tracks = [];
+    for (const track of selectedTracks) {
+      let trackPath = track.audioPath;
+      if (track.file) {
+        trackPath = await uploadPrivateAsset(track.file, "audio", currentUser.uid, release.id);
+        uploaded.push(trackPath);
+      }
+      tracks.push({ id: track.id, title: track.title, audioPath: trackPath, downloadPriceCents: track.downloadPriceCents });
     }
     if (cover) {
       coverPath = await uploadPrivateAsset(cover, "cover", currentUser.uid, release.id);
       uploaded.push(coverPath);
     }
+    updateAttempted = true;
     const saved = await apiRequest("/api/artist-releases", {
       method: "POST",
-      body: { action: "update", id: release.id, title, description, genre, downloadPriceCents, moods, releaseType: "single", audioPath, coverPath }
+      body: { action: "update", id: release.id, title, description, genre, downloadPriceCents, moods, releaseType,
+        audioPath, coverPath, ...(isAlbum ? { saleMode, tracks } : {}) }
     });
     isSaved = true;
     const oldPaths = [
       audio && release.audioPath && release.audioPath !== audioPath ? release.audioPath : "",
-      cover && release.coverPath && release.coverPath !== coverPath ? release.coverPath : ""
+      cover && release.coverPath && release.coverPath !== coverPath ? release.coverPath : "",
+      ...(isAlbum ? (release.tracks || []).filter((track) => !tracks.some((entry) => entry.audioPath === track.audioPath))
+        .map((track) => track.audioPath) : [])
     ].filter(Boolean);
     const cleanupFailures = await cleanupUploads(oldPaths);
     resetReleaseForm();
@@ -511,8 +698,23 @@ releaseForm.addEventListener("submit", async (event) => {
       ? `Draft saved, but old uploads could not be removed: ${cleanupFailures.join(", ")}`
       : `Draft saved: ${saved.release.title}. It remains private.`);
   } catch (error) {
-    const failures = isSaved ? [] : await cleanupUploads(uploaded);
-    show(`${error.message}${failures.length ? ` Upload cleanup failed for ${failures.join(", ")}.` : ""}`);
+    let preserveUploads = isSaved;
+    let verificationError = "";
+    if (!isSaved && updateAttempted && uploaded.length) {
+      try {
+        const data = await apiRequest("/api/artist-releases");
+        const persisted = data.releases.find((entry) => entry.id === releaseId);
+        const referenced = persisted ? [persisted.audioPath, persisted.coverPath,
+          ...(persisted.tracks || []).map((track) => track.audioPath)] : [];
+        preserveUploads = uploaded.some((path) => referenced.includes(path));
+      } catch (verificationFailure) {
+        preserveUploads = true;
+        verificationError = ` Could not verify whether the draft saved; uploaded files were retained: ${verificationFailure.message}`;
+      }
+    }
+    const failures = preserveUploads ? [] : await cleanupUploads(uploaded);
+    show(`${error.message}${verificationError}${preserveUploads && !isSaved && !verificationError
+      ? " Some uploaded files are referenced by the saved draft; refresh before retrying." : ""}${failures.length ? ` Upload cleanup failed for ${failures.join(", ")}.` : ""}`);
     try { await loadReleases(); } catch (refreshError) { show(`${status.textContent} Draft list refresh failed: ${refreshError.message}`); }
   } finally {
     setBusy(false);
@@ -537,7 +739,7 @@ document.querySelector("#artist-connect-status").addEventListener("click", async
     const data = await apiRequest("/api/artist-releases?action=connect");
     show(data.ready ? "Stripe is ready to accept payments and make payouts." :
       data.connected ? "Stripe onboarding or verification is incomplete. Continue setup to see requirements." :
-        "Set up Stripe payouts before selling downloads.");
+        "Set up Stripe payouts before selling downloads or accepting contributions.");
   } catch (error) { show(error.message); }
   finally { setBusy(false); }
 });
@@ -554,6 +756,12 @@ try {
   auth = getAuth(app);
   storage = getStorage(app, `gs://${config.storageBucket}`);
   onAuthStateChanged(auth, async (user) => {
+    releaseLoad++;
+    releaseCovers.clear();
+    formCover.clear();
+    coverPreview.replaceChildren();
+    releasesList.replaceChildren();
+    if (currentUser !== user) resetReleaseForm();
     currentUser = user;
     account.hidden = !user;
     authPanel.hidden = Boolean(user);
