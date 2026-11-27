@@ -333,7 +333,11 @@ sharing. Profiles without an avatar use the Wave Engine social image. Set
 `MUSIC_SITE_URL` to the staging site's HTTPS origin when testing; otherwise
 share metadata defaults to `https://waveenginemusic.com`. Share the clean
 `/artist/{slug}` URL on a host using this Vercel configuration. Social
-platforms control the preview shape and may cache previews after an image change.
+platforms control whether a preview appears and its shape, and may cache previews
+after an image change. Artist image URLs support both GET and HEAD requests for
+social crawlers. Uploaded avatar formats, dimensions, and file sizes must meet
+each platform's requirements; some platforms do not support WebP or large images.
+Use the platform's sharing debugger or post inspector to refresh a cached preview.
 
 No new package dependencies were added. Costs are limited to existing Vercel
 function usage, Firebase Auth, Firestore, and Storage upload/egress usage; no

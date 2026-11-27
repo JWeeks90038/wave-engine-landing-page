@@ -1351,6 +1351,7 @@ test("artist images are served only for approved profiles", async () => {
     slug: "north-star", status: "pending", avatarPath: path
   }]]));
   let storageReads = 0;
+  let streams = 0;
   const handler = mediaHandler({
     database: () => db,
     bucket: () => ({
@@ -1359,12 +1360,13 @@ test("artist images are served only for approved profiles", async () => {
           storageReads++;
           return [{ contentType: "image/png", size: 3 }];
         },
-        createReadStream: () => Readable.from([Buffer.from("img")])
+        createReadStream: () => { streams++; return Readable.from([Buffer.from("img")]); }
       })
     })
   });
   const hidden = await request(handler, "GET", "/api/artist-media?slug=north-star&asset=avatar", undefined, "");
   assert.equal(hidden.statusCode, 404);
+  assert.equal((await request(handler, "HEAD", "/api/artist-media?slug=north-star&asset=avatar", undefined, "")).statusCode, 404);
   assert.equal(storageReads, 0);
 
   db.records.get("artists").get("artist-1").status = "approved";
@@ -1374,6 +1376,16 @@ test("artist images are served only for approved profiles", async () => {
   assert.equal(publicImage.headers["content-type"], "image/png");
   assert.equal(publicImage.body(), "img");
   assert.equal(storageReads, 1);
+  const head = await request(handler, "HEAD", "/api/artist-media?slug=north-star&asset=avatar", undefined, "");
+  assert.equal(head.statusCode, 200);
+  for (const header of ["content-type", "content-length", "cache-control", "x-content-type-options"]) {
+    assert.equal(head.headers[header], publicImage.headers[header]);
+  }
+  assert.equal(head.body(), "");
+  assert.equal(streams, 1);
+  assert.match(head.headers["access-control-allow-methods"], /HEAD/);
+  const options = await request(handler, "OPTIONS", "/api/artist-media");
+  assert.match(options.headers["access-control-allow-methods"], /HEAD/);
 });
 
 test("release covers are served only for published tracks of approved artists", async () => {
@@ -1431,6 +1443,8 @@ test("private release covers require the owner or a review administrator", async
   const url = "/api/artist-media?release=rel1&asset=cover";
   const preview = (mode, authorization) => request(handler, "GET", `${url}&preview=${mode}`, undefined, authorization);
   assert.equal((await request(handler, "GET", url, undefined, "")).statusCode, 404);
+  assert.equal((await request(handler, "HEAD", `${url}&preview=owner`, undefined, "Bearer other")).statusCode, 404);
+  assert.equal((await request(handler, "HEAD", url, undefined, "")).statusCode, 404);
   assert.equal((await preview("owner", "")).statusCode, 401);
   assert.equal((await preview("owner", "Bearer other")).statusCode, 404);
   assert.equal((await preview("review", "Bearer owner")).statusCode, 403);

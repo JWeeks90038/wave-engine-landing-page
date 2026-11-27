@@ -9,10 +9,13 @@ function createHandler({
   return async (request, response) => {
     if (request.method === "OPTIONS") {
       setCorsHeaders(response);
+      response.setHeader("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
       response.writeHead(204);
       return response.end();
     }
-    if (request.method !== "GET") return sendJson(response, 405, { error: "Method not allowed." });
+    if (request.method !== "GET" && request.method !== "HEAD") {
+      return sendJson(response, 405, { error: "Method not allowed." });
+    }
     const params = new URL(request.url, "http://localhost").searchParams;
 
     try {
@@ -127,11 +130,13 @@ function createHandler({
         throw new Error("Invalid artist image metadata.");
       }
       setCorsHeaders(response);
+      response.setHeader("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
       response.setHeader("Cache-Control", preview ? "private, no-store" : "public, max-age=300");
       response.setHeader("Content-Type", metadata.contentType);
       response.setHeader("Content-Length", String(metadata.size));
       response.setHeader("X-Content-Type-Options", "nosniff");
       response.writeHead(200);
+      if (request.method === "HEAD") return response.end();
       await new Promise((resolve, reject) => {
         const source = file.createReadStream();
         source.on("error", reject);
