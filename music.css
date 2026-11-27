@@ -438,23 +438,27 @@ body.artist-custom-theme {
 }
 .artist-storefront-header {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: center;
-  gap: clamp(1rem, 3vw, 2rem);
+  justify-items: center;
+  gap: 1rem;
+  padding: clamp(1.5rem, 4vw, 2.5rem) 0;
+  text-align: center;
 }
-.artist-avatar {
-  width: clamp(88px, 18vw, 150px);
+.artist-storefront-header .artist-avatar {
+  width: clamp(110px, 20vw, 176px);
+  max-width: 100%;
   aspect-ratio: 1;
   object-fit: cover;
   border: 3px solid rgba(255, 255, 255, 0.8);
   border-radius: 50%;
   background: #101a2d;
 }
-.artist-storefront-header > div { min-width: 0; }
+.artist-storefront-header > div { min-width: 0; width: 100%; }
 .artist-storefront-header .eyebrow { margin: 0 0 0.6rem; }
-.artist-storefront-header #storefront-bio { max-width: 55rem; color: #c4d2e8; line-height: 1.7; white-space: pre-wrap; }
+.artist-storefront-header h1 { margin: 0; text-align: center; overflow-wrap: anywhere; }
+.artist-storefront-header #storefront-bio { max-width: 55rem; margin: 1rem auto; color: #c4d2e8; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; }
+.artist-storefront-header .artist-featured-message { width: min(100%, 55rem); margin-top: 0; }
 #storefront-studio-link[hidden] { display: none; }
-.artist-socials { display: flex; flex-wrap: wrap; align-items: center; gap: 0.8rem 1.2rem; }
+.artist-socials { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0.8rem 1.2rem; }
 .artist-support {
   margin-top: 1.4rem;
   padding: 1.25rem;
@@ -474,8 +478,4 @@ body.artist-custom-theme {
 @media (min-width: 650px) {
   .music-card.has-cover { grid-template-columns: auto minmax(0, 1fr); }
   .music-cover { width: 180px; }
-}
-@media (max-width: 560px) {
-  .artist-storefront-header { grid-template-columns: 1fr; justify-items: start; }
-  .artist-storefront-header .artist-avatar { grid-row: 1; }
 }
