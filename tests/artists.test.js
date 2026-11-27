@@ -172,7 +172,7 @@ test("artist profile creation reserves a unique slug and stays private until app
     artistName: "North Star",
     slug: "north-star",
     biography: "Independent music.",
-    socialLinks: { website: "https://example.com" }
+    socialLinks: { website: "https://example.com", facebook: "https://facebook.com/northstar" }
   };
   const created = await request(handler, "POST", "/api/artist-profile", input);
   assert.equal(created.statusCode, 201);
@@ -180,7 +180,16 @@ test("artist profile creation reserves a unique slug and stays private until app
   assert.equal(JSON.parse(created.body()).tokenRefreshRequired, true);
   assert.deepEqual(claimChanges, [["artist-1", true]]);
   assert.equal(db.records.get("artists").get("artist-1").status, "pending");
+  assert.equal(JSON.parse(created.body()).profile.socialLinks.facebook, "https://facebook.com/northstar");
+  assert.equal(db.records.get("artists").get("artist-1").socialLinks.facebook, "https://facebook.com/northstar");
   assert.equal(db.records.get("artistSlugs").get("north-star").status, "pending");
+
+  const updated = await request(handler, "POST", "/api/artist-profile", {
+    action: "update", artistName: "North Star", biography: "Updated",
+    socialLinks: { facebook: "https://facebook.com/northstar" }
+  });
+  assert.equal(updated.statusCode, 200);
+  assert.equal(JSON.parse(updated.body()).profile.socialLinks.facebook, "https://facebook.com/northstar");
 
   const hidden = await request(handler, "GET", "/api/artist-profile?slug=north-star", undefined, "");
   assert.equal(hidden.statusCode, 404);
@@ -1524,6 +1533,8 @@ test("artist identifiers, URLs, and upload paths reject unsafe values", () => {
   assert.equal(marketplace.validateSlug("North-Star"), "north-star");
   assert.throws(() => marketplace.validateSlug("api"));
   assert.throws(() => marketplace.validateSocialLinks({ website: "javascript:alert(1)" }));
+  assert.throws(() => marketplace.validateSocialLinks({ facebook: "http://facebook.com/artist" }));
+  assert.throws(() => marketplace.validateSocialLinks({ facebook: "https://user:pass@facebook.com/artist" }));
   assert.throws(() => marketplace.validateProfileAssetPath(
     "artist-1", "avatar", "artistUploads/artist-1/profile-../../../avatar.png"
   ));
@@ -1669,7 +1680,7 @@ test("approved storefront renders with metadata from the page", async () => {
   }
   const document = {
     querySelector: (selector) => elements[selector] || null,
-    createElement: () => ({}),
+    createElement: () => ({ setAttribute(name, value) { this[name] = value; } }),
     head: { append() {} }
   };
   const context = {
@@ -1678,7 +1689,11 @@ test("approved storefront renders with metadata from the page", async () => {
     fetch: async () => ({ ok: true, json: async () => ({
       profile: {
         artistName: "North Star", slug: "north-star", biography: "Independent music.",
-        socialLinks: { website: "https://example.com/music", instagram: "https://instagram.com/artist" }
+        socialLinks: {
+          website: "https://example.com/music", facebook: "https://facebook.com/artist",
+          instagram: "https://instagram.com/artist", youtube: "https://youtube.com/artist",
+          tiktok: "https://tiktok.com/@artist"
+        }
       }
     }) }),
     URL, URLSearchParams
@@ -1692,11 +1707,22 @@ test("approved storefront renders with metadata from the page", async () => {
   assert.equal(links[0].href, "https://example.com/music");
   assert.equal(links[0].target, "_blank");
   assert.equal(links[0].rel, "noopener noreferrer");
-  assert.equal(links[1].textContent, "Instagram");
+  for (const [index, label, emoji, url] of [
+    [1, "Facebook", "📘", "https://facebook.com/artist"],
+    [2, "Instagram", "📷", "https://instagram.com/artist"],
+    [3, "YouTube", "▶️", "https://youtube.com/artist"],
+    [4, "TikTok", "🎵", "https://tiktok.com/@artist"]
+  ]) {
+    assert.equal(links[index].textContent, `${emoji} ${label}`);
+    assert.equal(links[index]["aria-label"], `Visit artist's ${label} profile`);
+    assert.equal(links[index].href, url);
+    assert.equal(links[index].target, "_blank");
+    assert.equal(links[index].rel, "noopener noreferrer");
+  }
   for (const invalid of ["", "http://example.com", "javascript:alert(1)", "https://user:pass@example.com"]) {
     context.testAddSocialLink(elements["#storefront-socials"], "Visit Artist Website", invalid, "artist-website-link");
   }
-  assert.equal(links.length, 2);
+  assert.equal(links.length, 5);
 });
 
 test("artist support form validates amounts, opens checkout and verifies the return", async () => {
@@ -1782,9 +1808,9 @@ test("verification updates automatically and storefront state resets when switch
     });
     return elements.get(selector);
   }
-  const controls = ["artistName", "slug", "biography", "website", "instagram", "youtube", "tiktok"]
+  const controls = ["artistName", "slug", "biography", "website", "facebook", "instagram", "youtube", "tiktok"]
     .map(() => ({ value: "", disabled: false }));
-  for (const [index, name] of ["artistName", "slug", "biography", "website", "instagram", "youtube", "tiktok"].entries()) {
+  for (const [index, name] of ["artistName", "slug", "biography", "website", "facebook", "instagram", "youtube", "tiktok"].entries()) {
     controls[name] = controls[index];
   }
   const profileControls = { value: "50", addEventListener() {} };
@@ -2156,7 +2182,7 @@ test("profile editor saves image sets and safely handles uncertain saves and acc
   const form = element("#artist-profile-form");
   const controls = [];
   for (const [name, value] of Object.entries({
-    artistName: "Artist", slug: "artist", biography: "Bio", website: "", instagram: "", youtube: "", tiktok: "",
+    artistName: "Artist", slug: "artist", biography: "Bio", website: "", facebook: " https://facebook.com/artist ", instagram: "", youtube: "", tiktok: "",
     bannerPositionY: "50", accentColor: "#123456", backgroundColor: "#abcdef", featuredMessage: " Hello "
   })) controls[name] = { value, addEventListener() {} };
   for (const name of ["avatar", "banner", "backgroundImages", "galleryImages"]) {
@@ -2178,7 +2204,7 @@ test("profile editor saves image sets and safely handles uncertain saves and acc
   };
   const user = { uid: "artist-1", getIdToken: async () => "token" };
   const other = { uid: "other", getIdToken: async () => "other-token" };
-  const profile = { status: "approved", artistName: "Artist", slug: "artist", socialLinks: {},
+  const profile = { status: "approved", artistName: "Artist", slug: "artist", socialLinks: { facebook: "https://facebook.com/artist" },
     galleryImages: [{ url: "/existing" }] };
   const submitted = [];
   const deleted = [];
@@ -2232,6 +2258,8 @@ test("profile editor saves image sets and safely handles uncertain saves and acc
   }
   assert.equal(element("#artist-gallery-selection").textContent, "1 saved; 3 selected; 2 slots remaining.");
   await submit();
+  assert.equal(submitted[0].socialLinks.facebook, "https://facebook.com/artist");
+  assert.equal(controls.facebook.value, "https://facebook.com/artist");
   assert.equal(submitted[0].appearance.accentColor, "#123456");
   assert.equal(submitted[0].appearance.backgroundColor, "#abcdef");
   assert.equal(submitted[0].appearance.featuredMessage, "Hello");

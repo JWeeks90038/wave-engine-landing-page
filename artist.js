@@ -10,7 +10,7 @@ function slugFromLocation() {
   return pathSlug || new URLSearchParams(location.search).get("slug") || "";
 }
 
-function addSocialLink(container, label, href, className = "") {
+function addSocialLink(container, label, href, className = "", emoji = "") {
   if (!href) return;
   let url;
   try { url = new URL(href); }
@@ -18,7 +18,8 @@ function addSocialLink(container, label, href, className = "") {
   if (url.protocol !== "https:" || url.username || url.password) return;
   const link = document.createElement("a");
   link.href = url.href;
-  link.textContent = label;
+  link.textContent = emoji ? `${emoji} ${label}` : label;
+  if (emoji) link.setAttribute("aria-label", `Visit artist's ${label} profile`);
   if (className) link.className = className;
   link.target = "_blank";
   link.rel = "noopener noreferrer";
@@ -182,8 +183,11 @@ try {
   }
   const socials = document.querySelector("#storefront-socials");
   addSocialLink(socials, "Visit Artist Website", profile.socialLinks && profile.socialLinks.website, "artist-website-link");
-  for (const [key, label] of [["instagram", "Instagram"], ["youtube", "YouTube"], ["tiktok", "TikTok"]]) {
-    addSocialLink(socials, label, profile.socialLinks && profile.socialLinks[key]);
+  for (const [key, label, emoji] of [
+    ["facebook", "Facebook", "📘"], ["instagram", "Instagram", "📷"],
+    ["youtube", "YouTube", "▶️"], ["tiktok", "TikTok", "🎵"]
+  ]) {
+    addSocialLink(socials, label, profile.socialLinks && profile.socialLinks[key], "artist-social-link", emoji);
   }
   for (const selector of ['meta[property="og:title"]', 'meta[name="twitter:title"]']) {
     document.querySelector(selector).content = `${profile.artistName} | Wave Engine Music`;

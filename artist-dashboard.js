@@ -160,6 +160,7 @@ function profileFormData() {
     biography: String(values.get("biography") || "").trim(),
     socialLinks: {
       website: String(values.get("website") || "").trim(),
+      facebook: String(values.get("facebook") || "").trim(),
       instagram: String(values.get("instagram") || "").trim(),
       youtube: String(values.get("youtube") || "").trim(),
       tiktok: String(values.get("tiktok") || "").trim()
@@ -333,7 +334,7 @@ function renderProfile(profile) {
   profileForm.elements.slug.value = profile.slug;
   profileForm.elements.slug.readOnly = true;
   profileForm.elements.biography.value = profile.biography || "";
-  for (const field of ["website", "instagram", "youtube", "tiktok"]) {
+  for (const field of ["website", "facebook", "instagram", "youtube", "tiktok"]) {
     profileForm.elements[field].value = profile.socialLinks && profile.socialLinks[field] || "";
   }
   profileForm.elements.bannerPositionY.value = Number.isInteger(profile.bannerPositionY) ? profile.bannerPositionY : 50;

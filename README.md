@@ -193,7 +193,9 @@ On the music page, selecting or hovering over an artist's circle displays their
 approved tracks and a profile link; selecting another artist stops the previous
 artist's playback. Close the preview with its button or Escape; closing it also
 stops playback. On artist profiles, a supplied website appears as a "Visit Artist
-Website" button. Song prices appear in Stripe Checkout; album prices appear beside
+Website" button. Facebook, Instagram, YouTube, and TikTok links supplied in
+Artist Studio appear as clickable emoji and labels. Social links must use HTTPS.
+Song prices appear in Stripe Checkout; album prices appear beside
 the album download button.
 On an artist storefront, the Artist Studio navigation link appears only when
 the signed-in, email-verified owner is viewing their own profile.

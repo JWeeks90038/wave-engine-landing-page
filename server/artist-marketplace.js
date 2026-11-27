@@ -82,9 +82,9 @@ function validateSocialLinks(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw statusError("Enter valid social links.", 400);
   }
-  const keys = ["website", "instagram", "youtube", "tiktok"];
+  const keys = ["website", "facebook", "instagram", "youtube", "tiktok"];
   if (Object.keys(value).some((key) => !keys.includes(key))) {
-    throw statusError("Only website, Instagram, YouTube, and TikTok links are supported.", 400);
+    throw statusError("Only website, Facebook, Instagram, YouTube, and TikTok links are supported.", 400);
   }
   const result = {};
   for (const key of keys) {
