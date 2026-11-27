@@ -407,7 +407,8 @@ body.artist-custom-theme {
 .artist-socials .artist-social-link:hover,
 .artist-socials .artist-social-link:focus-visible { border-color: #fff; box-shadow: 0 0 0 2px rgba(211, 230, 255, 0.4); }
 .artist-socials .artist-social-link:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
-.artist-socials .artist-website-link {
+.artist-website:not(:empty) { margin-bottom: 0.8rem; }
+.artist-website .artist-website-link {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -423,12 +424,12 @@ body.artist-custom-theme {
   box-shadow: 0 8px 22px rgba(32, 90, 163, 0.28);
 }
 .artist-website-link::after { content: "\2197"; }
-.artist-socials .artist-website-link:hover,
-.artist-socials .artist-website-link:focus-visible {
+.artist-website .artist-website-link:hover,
+.artist-website .artist-website-link:focus-visible {
   border-color: #d3e6ff;
   background: linear-gradient(135deg, #326bb1, #204478);
 }
-.artist-socials .artist-website-link:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
+.artist-website .artist-website-link:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
 .artist-album-track {
   display: grid;
   gap: 0.75rem;

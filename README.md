@@ -328,15 +328,17 @@ account and `admin: true` custom claim can review applications at
 `/artist-admin`. Configure the staging deployment with the Firebase Admin
 credentials and `FIREBASE_STORAGE_BUCKET` used by the music API. The Vercel
 rewrite serves `/artist/{slug}` through the profile API, which adds approved
-profile metadata and the artist's public avatar to the initial HTML for social
-sharing. Profiles without an avatar use the Wave Engine social image. Set
+profile metadata and a social image with the artist's avatar cropped into a
+circle on a dark 1200×630 background. Profiles without an avatar use the Wave
+Engine social image. Set
 `MUSIC_SITE_URL` to the staging site's HTTPS origin when testing; otherwise
 share metadata defaults to `https://waveenginemusic.com`. Share the clean
 `/artist/{slug}` URL on a host using this Vercel configuration. Social
 platforms control whether a preview appears and its shape, and may cache previews
 after an image change. Artist image URLs support both GET and HEAD requests for
-social crawlers. Uploaded avatar formats, dimensions, and file sizes must meet
-each platform's requirements; some platforms do not support WebP or large images.
+social crawlers. Social platforms may crop the image or display it differently.
+Generating social images requires Node.js 20.9 or newer and the `sharp` dependency;
+source avatars are limited to 40 million pixels when generating share previews.
 Use the platform's sharing debugger or post inspector to refresh a cached preview.
 
 No new package dependencies were added. Costs are limited to existing Vercel
@@ -465,7 +467,7 @@ These values also live in `server/app-config.js`.
 Notes:
 
 - The backend uses `gpt-image-2` with a square `2880x2880` output and returns PNG data for download.
-- The backend requires Node.js 18 or newer because it uses the built-in `fetch` API.
+- The backend requires Node.js 20.9 or newer.
 - GitHub Pages is static-only, so the backend must run separately or be deployed to a separate server/serverless environment and the public endpoint URL must be updated in `album-generator.html`.
 - The default storage adapter writes a JSON file locally. On Vercel, writes fall back to the instance temp directory, so you should replace `server/storage/database.js` with a persistent adapter for production durability.
 - Install a Solana wallet such as Phantom, Solflare, or Backpack in the browser to buy credits locally.
@@ -579,7 +581,7 @@ availability warning, but all purchasing controls remain disabled until inventor
 
 ### Test locally before launch
 
-Node.js 18 or newer and `npm install` are required. In Stripe's **test mode**, create separate
+Node.js 20.9 or newer and `npm install` are required. In Stripe's **test mode**, create separate
 one-time USD Prices for $29.99. The live Price IDs in the catalog cannot be used with
 test keys. In a private PowerShell terminal set the following values (replace placeholders; do
 not commit or share keys):

@@ -28,7 +28,9 @@ function sendProfilePage(response, profile, { head = false, status = 200 } = {})
   const description = profile
     ? (profile.biography || `Discover ${profile.artistName} on Wave Engine Music.`).replace(/\s+/g, " ").trim().slice(0, 200)
     : "Discover independent artists on Wave Engine Music.";
-  const image = new URL(profile && profile.avatarUrl ? profile.avatarUrl : "/Images/wave-engine-social-card-4k-v1.png", origin).href;
+  const imageUrl = new URL(profile && profile.avatarUrl ? profile.avatarUrl : "/Images/wave-engine-social-card-4k-v1.png", origin);
+  if (profile && profile.avatarUrl) imageUrl.searchParams.set("variant", "share");
+  const image = imageUrl.href;
   const imageAlt = profile && profile.avatarUrl ? `${profile.artistName} profile image` : "Wave Engine Music";
   const canonical = profile ? new URL(`/artist/${encodeURIComponent(profile.slug)}`, origin).href : "";
   const metadata = [
@@ -38,6 +40,11 @@ function sendProfilePage(response, profile, { head = false, status = 200 } = {})
     `<meta property="og:title" content="${escapeHtml(title)}" />`,
     `<meta property="og:description" content="${escapeHtml(description)}" />`,
     `<meta property="og:image" content="${escapeHtml(image)}" />`,
+    ...(profile && profile.avatarUrl ? [
+      '<meta property="og:image:type" content="image/jpeg" />',
+      '<meta property="og:image:width" content="1200" />',
+      '<meta property="og:image:height" content="630" />'
+    ] : []),
     `<meta property="og:image:alt" content="${escapeHtml(imageAlt)}" />`,
     '<meta name="twitter:card" content="summary" />',
     `<meta name="twitter:title" content="${escapeHtml(title)}" />`,

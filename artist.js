@@ -190,7 +190,8 @@ try {
     banner.style.backgroundPosition = `center ${positionY}%`;
   }
   const socials = document.querySelector("#storefront-socials");
-  addSocialLink(socials, "Visit Artist Website", profile.socialLinks && profile.socialLinks.website, "artist-website-link");
+  addSocialLink(document.querySelector("#storefront-website"), "Visit Artist Website",
+    profile.socialLinks && profile.socialLinks.website, "artist-website-link");
   for (const [key, label] of [
     ["facebook", "Facebook"], ["instagram", "Instagram"],
     ["youtube", "YouTube"], ["tiktok", "TikTok"]

@@ -1,5 +1,16 @@
 const { sendJson, setCorsHeaders } = require("./api-utils");
 const marketplace = require("./artist-marketplace");
+const sharp = require("sharp");
+
+async function createShareImage(file) {
+  const [input] = await file.download();
+  const mask = Buffer.from('<svg width="560" height="560" xmlns="http://www.w3.org/2000/svg"><circle cx="280" cy="280" r="280" fill="#fff"/></svg>');
+  const avatar = await sharp(input, { limitInputPixels: 40000000, sequentialRead: true })
+    .rotate().resize(560, 560, { fit: "cover" })
+    .composite([{ input: mask, blend: "dest-in" }]).png().toBuffer();
+  return sharp({ create: { width: 1200, height: 630, channels: 3, background: "#101a2d" } })
+    .composite([{ input: avatar, left: 320, top: 35 }]).jpeg({ quality: 85 }).toBuffer();
+}
 
 function createHandler({
   database = marketplace.database,
@@ -25,6 +36,10 @@ function createHandler({
       }
       const preview = params.get("preview");
       if (preview !== null && !["owner", "review"].includes(preview)) {
+        return sendJson(response, 400, { error: "Invalid artist image request." });
+      }
+      const variant = params.get("variant");
+      if (variant !== null && (variant !== "share" || asset !== "avatar" || preview)) {
         return sendJson(response, 400, { error: "Invalid artist image request." });
       }
       if (preview) response.setHeader("Cache-Control", "private, no-store");
@@ -129,14 +144,16 @@ function createHandler({
           Number(metadata.size) > 10 * 1024 * 1024) {
         throw new Error("Invalid artist image metadata.");
       }
+      const shareImage = variant === "share" ? await createShareImage(file) : null;
       setCorsHeaders(response);
       response.setHeader("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
       response.setHeader("Cache-Control", preview ? "private, no-store" : "public, max-age=300");
-      response.setHeader("Content-Type", metadata.contentType);
-      response.setHeader("Content-Length", String(metadata.size));
+      response.setHeader("Content-Type", shareImage ? "image/jpeg" : metadata.contentType);
+      response.setHeader("Content-Length", String(shareImage ? shareImage.length : metadata.size));
       response.setHeader("X-Content-Type-Options", "nosniff");
       response.writeHead(200);
       if (request.method === "HEAD") return response.end();
+      if (shareImage) return response.end(shareImage);
       await new Promise((resolve, reject) => {
         const source = file.createReadStream();
         source.on("error", reject);

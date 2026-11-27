@@ -4,6 +4,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
 const { Readable, Writable } = require("node:stream");
+const sharp = require("sharp");
 const { createHandler: profileHandler } = require("../server/artist-profile-handler");
 const { createHandler: releaseHandler } = require("../server/artist-releases-handler");
 const { createHandler: adminHandler } = require("../server/artist-admin-handler");
@@ -302,7 +303,10 @@ test("artist share pages render approved profile metadata and public avatar with
     assert.match(html, /<meta name="twitter:card" content="summary"/);
     assert.match(html, /<link rel="canonical" href="https:\/\/staging\.example\.com\/artist\/north-star"/);
     const image = /<meta property="og:image" content="([^"]+)"/.exec(html)[1].replace(/&amp;/g, "&");
-    assert.match(image, /^https:\/\/staging\.example\.com\/api\/artist-media\?slug=north-star&asset=avatar&v=/);
+    assert.match(image, /^https:\/\/staging\.example\.com\/api\/artist-media\?slug=north-star&asset=avatar&v=[a-f0-9]+&variant=share$/);
+    assert.match(html, /og:image:type" content="image\/jpeg"/);
+    assert.match(html, /og:image:width" content="1200"/);
+    assert.match(html, /og:image:height" content="630"/);
     assert.ok(html.includes(`<meta name="twitter:image" content="${image.replace(/&/g, "&amp;")}"`));
     assert.doesNotMatch(html, /attacker\.example/);
     const head = await request(handler, "HEAD", `/api/artist-profile?page=1&slug=${slug}`);
@@ -310,21 +314,43 @@ test("artist share pages render approved profile metadata and public avatar with
     assert.equal(head.body(), "");
     assert.equal(Number(head.headers["content-length"]), Buffer.byteLength(html));
 
+    const avatar = await sharp({ create: { width: 400, height: 600, channels: 3, background: "#ff0000" } }).png().toBuffer();
     const media = mediaHandler({
       database: () => db,
       bucket: () => ({ file: (filePath) => ({
         getMetadata: async () => {
           assert.equal(filePath, avatarPath);
-          return [{ contentType: "image/png", size: 5 }];
+          return [{ contentType: "image/png", size: avatar.length }];
         },
-        createReadStream: () => Readable.from([Buffer.from("image")])
+        download: async () => [avatar],
+        createReadStream: () => Readable.from([avatar])
       }) })
     });
     const imageUrl = new URL(image);
     const imageResponse = await request(media, "GET", `${imageUrl.pathname}${imageUrl.search}`);
     assert.equal(imageResponse.statusCode, 200);
-    assert.equal(imageResponse.headers["content-type"], "image/png");
-    assert.equal(imageResponse.body(), "image");
+    assert.equal(imageResponse.headers["content-type"], "image/jpeg");
+    const imageBytes = Buffer.concat(imageResponse.chunks);
+    assert.equal(Number(imageResponse.headers["content-length"]), imageBytes.length);
+    const info = await sharp(imageBytes).metadata();
+    assert.equal(info.width, 1200);
+    assert.equal(info.height, 630);
+    const { data: pixels, info: rawInfo } = await sharp(imageBytes).raw().toBuffer({ resolveWithObject: true });
+    const pixel = (x, y) => Array.from(pixels.subarray((y * rawInfo.width + x) * 3, (y * rawInfo.width + x) * 3 + 3));
+    const center = pixel(600, 315);
+    const outsideCircle = pixel(325, 40);
+    assert.ok(center[0] > 200 && center[1] < 30 && center[2] < 30, `center pixel: ${center}`);
+    assert.ok(outsideCircle[0] < 35 && outsideCircle[1] < 45 && outsideCircle[2] < 60, `corner pixel: ${outsideCircle}`);
+    const imageHead = await request(media, "HEAD", `${imageUrl.pathname}${imageUrl.search}`);
+    assert.equal(imageHead.statusCode, 200);
+    assert.equal(imageHead.headers["content-type"], "image/jpeg");
+    assert.equal(imageHead.headers["content-length"], imageResponse.headers["content-length"]);
+    assert.equal(imageHead.body(), "");
+    imageUrl.searchParams.delete("variant");
+    const original = await request(media, "GET", `${imageUrl.pathname}${imageUrl.search}`);
+    assert.equal(original.headers["content-type"], "image/png");
+    assert.deepEqual(Buffer.concat(original.chunks), avatar);
+    assert.equal((await request(media, "GET", `${imageUrl.pathname}${imageUrl.search}&variant=share&preview=owner`)).statusCode, 400);
 
     profile.avatarPath = `artistUploads/${uid}/profile-87654321-1234-1234-1234-123456789012/avatar.png`;
     const updatedAvatar = await request(handler, "GET", `/api/artist-profile?page=1&slug=${slug}`);
@@ -334,6 +360,8 @@ test("artist share pages render approved profile metadata and public avatar with
     const noAvatar = await request(handler, "GET", `/api/artist-profile?page=1&slug=${slug}`);
     assert.match(noAvatar.body(), /og:image" content="https:\/\/staging\.example\.com\/Images\/wave-engine-social-card-4k-v1\.png"/);
     profile.status = "pending";
+    imageUrl.searchParams.set("variant", "share");
+    assert.equal((await request(media, "GET", `${imageUrl.pathname}${imageUrl.search}`)).statusCode, 404);
     const privatePage = await request(handler, "GET", `/api/artist-profile?page=1&slug=${slug}&me=1`);
     assert.equal(privatePage.statusCode, 404);
     assert.match(privatePage.body(), /name="robots" content="noindex"/);
@@ -343,6 +371,31 @@ test("artist share pages render approved profile metadata and public avatar with
     if (previousSite === undefined) delete process.env.MUSIC_SITE_URL;
     else process.env.MUSIC_SITE_URL = previousSite;
   }
+});
+
+test("artist share images convert WebP avatars without changing the original", async () => {
+  const uid = "artist-1";
+  const slug = "north-star";
+  const avatarPath = `artistUploads/${uid}/profile-12345678-1234-1234-1234-123456789012/avatar.webp`;
+  const avatar = await sharp({ create: { width: 300, height: 300, channels: 3, background: "#00ff00" } }).webp().toBuffer();
+  const db = new FakeDatabase();
+  db.records.set("artists", new Map([[uid, { status: "approved", slug, avatarPath }]]));
+  db.records.set("artistSlugs", new Map([[slug, { artistUid: uid, status: "approved" }]]));
+  const handler = mediaHandler({
+    database: () => db,
+    bucket: () => ({ file: () => ({
+      getMetadata: async () => [{ contentType: "image/webp", size: avatar.length }],
+      download: async () => [avatar],
+      createReadStream: () => Readable.from([avatar])
+    }) })
+  });
+  const share = await request(handler, "GET", `/api/artist-media?slug=${slug}&asset=avatar&variant=share`, undefined, "");
+  assert.equal(share.statusCode, 200);
+  assert.equal(share.headers["content-type"], "image/jpeg");
+  assert.equal((await sharp(Buffer.concat(share.chunks)).metadata()).width, 1200);
+  const original = await request(handler, "GET", `/api/artist-media?slug=${slug}&asset=avatar`, undefined, "");
+  assert.equal(original.headers["content-type"], "image/webp");
+  assert.deepEqual(Buffer.concat(original.chunks), avatar);
 });
 
 test("artist admin approval is privileged and makes the storefront public", async () => {
@@ -1680,10 +1733,12 @@ test("approved storefront renders with metadata from the page", async () => {
   const source = fs.readFileSync(path.join(__dirname, "..", "artist.js"), "utf8");
   const selectors = [
     "#storefront-status", "#storefront-profile", "#storefront-name",
-    "#storefront-bio", "#storefront-socials", "#artist-support-status"
+    "#storefront-bio", "#storefront-website", "#storefront-socials", "#artist-support-status"
   ];
   const elements = Object.fromEntries(selectors.map((selector) => [selector, { hidden: true, append() {} }]));
   const links = [];
+  const websiteLinks = [];
+  elements["#storefront-website"].append = (link) => { websiteLinks.push(link); links.push(link); };
   elements["#storefront-socials"].append = (link) => links.push(link);
   elements["#artist-support-form"] = { querySelector: () => ({}), addEventListener() {} };
   for (const [attribute, name] of [
@@ -1719,6 +1774,7 @@ test("approved storefront renders with metadata from the page", async () => {
   assert.equal(elements["#storefront-profile"].hidden, false);
   assert.equal(elements["#storefront-status"].textContent, "");
   assert.equal(elements['meta[name="twitter:title"]'].content, "North Star | Wave Engine Music");
+  assert.equal(websiteLinks.length, 1);
   assert.equal(links[0].textContent, "Visit Artist Website");
   assert.equal(links[0].className, "artist-website-link");
   assert.equal(links[0].href, "https://example.com/music");
