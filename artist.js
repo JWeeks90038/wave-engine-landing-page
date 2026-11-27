@@ -10,7 +10,7 @@ function slugFromLocation() {
   return pathSlug || new URLSearchParams(location.search).get("slug") || "";
 }
 
-function addSocialLink(container, label, href, className = "", emoji = "") {
+function addSocialLink(container, label, href, className = "", icon = "") {
   if (!href) return;
   let url;
   try { url = new URL(href); }
@@ -18,8 +18,16 @@ function addSocialLink(container, label, href, className = "", emoji = "") {
   if (url.protocol !== "https:" || url.username || url.password) return;
   const link = document.createElement("a");
   link.href = url.href;
-  link.textContent = emoji ? `${emoji} ${label}` : label;
-  if (emoji) link.setAttribute("aria-label", `Visit artist's ${label} profile`);
+  if (icon) {
+    link.setAttribute("aria-label", `Visit artist's ${label} profile`);
+    link.title = label;
+    const image = document.createElement("img");
+    image.src = `/Images/social/${icon}.svg`;
+    image.alt = "";
+    link.append(image);
+  } else {
+    link.textContent = label;
+  }
   if (className) link.className = className;
   link.target = "_blank";
   link.rel = "noopener noreferrer";
@@ -183,11 +191,11 @@ try {
   }
   const socials = document.querySelector("#storefront-socials");
   addSocialLink(socials, "Visit Artist Website", profile.socialLinks && profile.socialLinks.website, "artist-website-link");
-  for (const [key, label, emoji] of [
-    ["facebook", "Facebook", "📘"], ["instagram", "Instagram", "📷"],
-    ["youtube", "YouTube", "▶️"], ["tiktok", "TikTok", "🎵"]
+  for (const [key, label] of [
+    ["facebook", "Facebook"], ["instagram", "Instagram"],
+    ["youtube", "YouTube"], ["tiktok", "TikTok"]
   ]) {
-    addSocialLink(socials, label, profile.socialLinks && profile.socialLinks[key], "artist-social-link", emoji);
+    addSocialLink(socials, label, profile.socialLinks && profile.socialLinks[key], `artist-social-link artist-social-${key}`, key);
   }
   for (const selector of ['meta[property="og:title"]', 'meta[name="twitter:title"]']) {
     document.querySelector(selector).content = `${profile.artistName} | Wave Engine Music`;

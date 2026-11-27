@@ -1680,7 +1680,10 @@ test("approved storefront renders with metadata from the page", async () => {
   }
   const document = {
     querySelector: (selector) => elements[selector] || null,
-    createElement: () => ({ setAttribute(name, value) { this[name] = value; } }),
+    createElement: () => ({
+      children: [], append(child) { this.children.push(child); },
+      setAttribute(name, value) { this[name] = value; }
+    }),
     head: { append() {} }
   };
   const context = {
@@ -1707,14 +1710,16 @@ test("approved storefront renders with metadata from the page", async () => {
   assert.equal(links[0].href, "https://example.com/music");
   assert.equal(links[0].target, "_blank");
   assert.equal(links[0].rel, "noopener noreferrer");
-  for (const [index, label, emoji, url] of [
-    [1, "Facebook", "📘", "https://facebook.com/artist"],
-    [2, "Instagram", "📷", "https://instagram.com/artist"],
-    [3, "YouTube", "▶️", "https://youtube.com/artist"],
-    [4, "TikTok", "🎵", "https://tiktok.com/@artist"]
+  for (const [index, label, icon, url] of [
+    [1, "Facebook", "facebook", "https://facebook.com/artist"],
+    [2, "Instagram", "instagram", "https://instagram.com/artist"],
+    [3, "YouTube", "youtube", "https://youtube.com/artist"],
+    [4, "TikTok", "tiktok", "https://tiktok.com/@artist"]
   ]) {
-    assert.equal(links[index].textContent, `${emoji} ${label}`);
     assert.equal(links[index]["aria-label"], `Visit artist's ${label} profile`);
+    assert.equal(links[index].children[0].src, `/Images/social/${icon}.svg`);
+    assert.equal(links[index].children[0].alt, "");
+    assert.match(fs.readFileSync(path.join(__dirname, "..", "Images", "social", `${icon}.svg`), "utf8"), /<svg/);
     assert.equal(links[index].href, url);
     assert.equal(links[index].target, "_blank");
     assert.equal(links[index].rel, "noopener noreferrer");

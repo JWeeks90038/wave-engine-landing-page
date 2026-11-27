@@ -194,7 +194,9 @@ approved tracks and a profile link; selecting another artist stops the previous
 artist's playback. Close the preview with its button or Escape; closing it also
 stops playback. On artist profiles, a supplied website appears as a "Visit Artist
 Website" button. Facebook, Instagram, YouTube, and TikTok links supplied in
-Artist Studio appear as clickable emoji and labels. Social links must use HTTPS.
+Artist Studio appear as clickable circular logo icons. Social links must use HTTPS.
+The social icons are unmodified [Font Awesome Free 6.7.2 brand icons](https://github.com/FortAwesome/Font-Awesome/tree/6.7.2/svgs/brands),
+copyright Fonticons, Inc., licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
 Song prices appear in Stripe Checkout; album prices appear beside
 the album download button.
 On an artist storefront, the Artist Studio navigation link appears only when

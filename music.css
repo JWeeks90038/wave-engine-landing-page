@@ -392,16 +392,20 @@ body.artist-custom-theme {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 44px;
-  padding: 0.5rem 0.8rem;
+  width: 48px;
+  height: 48px;
   border: 1px solid rgba(157, 197, 255, 0.35);
   border-radius: 999px;
   background: rgba(32, 68, 115, 0.2);
-  color: #e6ecfb;
   text-decoration: none;
 }
+.artist-socials .artist-social-link img { width: 23px; height: 23px; object-fit: contain; filter: invert(1); }
+.artist-socials .artist-social-facebook { background: #1877f2; }
+.artist-socials .artist-social-instagram { background: linear-gradient(135deg, #833ab4, #c13584, #f77737); }
+.artist-socials .artist-social-youtube { background: #d90000; }
+.artist-socials .artist-social-tiktok { background: #080808; }
 .artist-socials .artist-social-link:hover,
-.artist-socials .artist-social-link:focus-visible { border-color: #d3e6ff; background: rgba(50, 107, 177, 0.4); }
+.artist-socials .artist-social-link:focus-visible { border-color: #fff; box-shadow: 0 0 0 2px rgba(211, 230, 255, 0.4); }
 .artist-socials .artist-social-link:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
 .artist-socials .artist-website-link {
   display: inline-flex;
