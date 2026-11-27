@@ -1986,7 +1986,10 @@ test("editing drafts preserves metadata and supports both album and song prices"
     },
     releaseType: { value: "single", addEventListener() {} },
     saleMode: { value: "none", addEventListener() {} },
-    albumAudio: { files: [], addEventListener() {} }
+    albumAudio: {
+      files: [], listeners: {},
+      addEventListener(name, callback) { this.listeners[name] = callback; }
+    }, reviewRights: { checked: false }
   };
   element("#artist-profile-form").elements = [];
   element("#artist-profile-form").elements.bannerPositionY = { value: "50", addEventListener() {} };
@@ -1994,6 +1997,7 @@ test("editing drafts preserves metadata and supports both album and song prices"
   addCustomizationControls(element("#artist-profile-form").elements, element);
   element("#banner-preview").style = {};
   const submitted = [];
+  let failSubmission = false;
   let releaseList = [];
   const previewManagers = [];
   const document = { querySelector: element, addEventListener() {}, createElement: () => ({
@@ -2003,6 +2007,9 @@ test("editing drafts preserves metadata and supports both album and song prices"
     document, location: { protocol: "https:", hostname: "example.com" },
     firebaseClient: async () => ({}), getAuth: () => ({}), getStorage: () => ({}),
     onAuthStateChanged() {},
+    crypto: { randomUUID: () => "12345678-1234-1234-1234-123456789012" },
+    ref: (_storage, path) => path,
+    uploadBytesResumable: () => ({ on(_event, _progress, _error, complete) { complete(); } }),
     createCoverPreviews: () => {
       const manager = { added: [], local: [], clear() {}, add(_container, release) { this.added.push(release); },
         addLocal(_container, file) { this.local.push(file); } };
@@ -2014,6 +2021,9 @@ test("editing drafts preserves metadata and supports both album and song prices"
       if (url.includes("artist-releases") && options.method === "POST") {
         const body = JSON.parse(options.body);
         submitted.push(body);
+        if (body.action === "submit" && failSubmission) {
+          return { ok: false, json: async () => ({ error: "Review unavailable." }) };
+        }
         return { ok: true, json: async () => ({ release: { ...body, id: body.id || "new-id" } }) };
       }
       if (url.includes("artist-releases")) return { ok: true, json: async () => ({ releases: releaseList }) };
@@ -2072,6 +2082,56 @@ test("editing drafts preserves metadata and supports both album and song prices"
   assert.equal(submitted[3].saleMode, "both");
   assert.equal(submitted[3].downloadPriceCents, 500);
   assert.equal(submitted[3].tracks[0].downloadPriceCents, 125);
+  const reviewEvent = { preventDefault() {}, submitter: { id: "artist-release-submit-review" } };
+  context.testEditDraft({
+    id: "album-id", title: "Album", genre: "Rock", releaseType: "album", saleMode: "both",
+    downloadPriceCents: 500, coverPath: "cover",
+    tracks: [{ id: "track-1", title: "Song", audioPath: "audio", downloadPriceCents: 125 }]
+  });
+  await releaseForm.listeners.submit(reviewEvent);
+  assert.equal(submitted.length, 4);
+  assert.match(element("#artist-status").textContent, /confirm your rights/i);
+  assert.match(element("#artist-release-status").textContent, /confirm your rights/i);
+  releaseForm.elements.reviewRights.checked = true;
+  await releaseForm.listeners.submit(reviewEvent);
+  assert.equal(submitted[4].action, "update");
+  assert.deepEqual(submitted[5], {
+    action: "submit", id: "album-id", rightsConfirmed: true, salesRightsConfirmed: true
+  });
+  assert.match(element("#artist-status").textContent, /submitted for review/i);
+
+  context.testEditDraft({
+    id: "missing-cover", title: "Album", releaseType: "album", saleMode: "none",
+    tracks: [{ id: "track-1", title: "Song", audioPath: "audio" }]
+  });
+  await releaseForm.listeners.submit(reviewEvent);
+  assert.equal(submitted.length, 6);
+  assert.match(element("#artist-status").textContent, /album cover/i);
+
+  context.testEditDraft({ id: "single-id", title: "Song", releaseType: "single", audioPath: "audio" });
+  failSubmission = true;
+  await releaseForm.listeners.submit(reviewEvent);
+  assert.equal(submitted[6].action, "update");
+  assert.deepEqual(submitted[7], {
+    action: "submit", id: "single-id", rightsConfirmed: true, salesRightsConfirmed: false
+  });
+  assert.match(element("#artist-status").textContent, /draft saved.*submission could not be confirmed.*Review unavailable/i);
+
+  failSubmission = false;
+  releaseForm.elements.releaseType.value = "album";
+  releaseForm.elements.saleMode.value = "none";
+  releaseForm.elements.title.value = "New album";
+  releaseForm.elements.albumAudio.files = [{ name: "song.mp3", type: "audio/mpeg", size: 5 }];
+  releaseForm.elements.albumAudio.listeners.change();
+  releaseForm.elements.cover.files = [{ name: "cover.png", type: "image/png", size: 5 }];
+  await releaseForm.listeners.submit(reviewEvent);
+  assert.equal(submitted[8].action, "create");
+  assert.equal(submitted[9].action, "update");
+  assert.match(submitted[9].tracks[0].audioPath, /audio\.mp3$/);
+  assert.match(submitted[9].coverPath, /cover\.png$/);
+  assert.equal(submitted[10].action, "submit");
+  assert.equal(submitted[10].id, "new-id");
+  assert.match(element("#artist-release-status").textContent, /submitted for review/i);
   releaseList = ["draft", "submitted", "published"].map((status) => ({
     id: status, title: status, status, releaseType: "single", coverPath: "cover", audioPath: "audio"
   }));

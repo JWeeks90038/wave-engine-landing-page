@@ -427,11 +427,20 @@
               </label>
               <div id="artist-release-cover-preview"></div>
               <p>Albums require one cover shared by every song before submission.</p>
+              <div id="artist-release-review-actions" hidden>
+                <label class="artist-rights-confirmation">
+                  <input name="reviewRights" type="checkbox" />
+                  <span>I confirm I have the rights to upload and publicly stream this release, and to sell downloads if offered, and authorize Wave Engine to host and deliver it.</span>
+                </label>
+              </div>
               <div class="music-actions">
                 <button class="cta-button cta-primary" type="submit">Save private draft</button>
+                <button id="artist-release-submit-review" class="cta-button" type="submit" hidden>Save and submit for review</button>
                 <button id="artist-release-cancel" class="cta-button" type="button" hidden>Cancel edit</button>
               </div>
+              <p id="artist-release-status" role="status" aria-live="polite"></p>
             </form>
+            <p>Saved drafts appear below. Confirm your rights and submit a draft for review when it is ready.</p>
             <div id="artist-releases" class="music-admin-list"></div>
           </section>
         </section>

@@ -222,6 +222,7 @@
 }
 .music-admin-form input[type="checkbox"] { width: auto; }
 .music-admin-form button:disabled { opacity: 0.6; cursor: wait; }
+#artist-release-submit-review[hidden] { display: none; }
 .music-admin-list { display: grid; gap: 0.75rem; margin-top: 1rem; }
 .music-admin-list article { padding: 1rem; border: 1px solid var(--line); border-radius: 16px; }
 .music-admin-list h3 { margin: 0 0 0.5rem; }

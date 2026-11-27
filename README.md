@@ -178,7 +178,9 @@ profile per Firebase user, unique artist slugs, private profile/release uploads,
 single and album drafts, and an administrator approval screen. Approved profiles are
 available at `/artist/{slug}` and appear on the music page. Artists with approved
 profiles can open their storefront from Artist Studio, confirm their rights and
-submit a saved track for review. A storefront remains unavailable while its
+save and submit a release for review directly, or submit a saved draft from the
+release list. Submitted releases appear on `/artist-admin` (Artist review), not
+the Music Admin track list. A storefront remains unavailable while its
 profile awaits review. Only
 tracks approved by an administrator can be streamed publicly; draft and
 submitted tracks remain private. Artist sales are disabled until configured. Existing

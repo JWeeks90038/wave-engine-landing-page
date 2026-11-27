@@ -63,6 +63,11 @@ function show(message) {
   status.textContent = message;
 }
 
+function showRelease(message) {
+  document.querySelector("#artist-release-status").textContent = message;
+  show(message);
+}
+
 function setBusy(value) {
   busy = value;
   const blocked = currentProfile && ["rejected", "suspended"].includes(currentProfile.status);
@@ -341,6 +346,8 @@ function renderProfile(profile) {
   else updateBannerPreview();
   for (const control of profileForm.elements) control.disabled = blocked || busy;
   const approved = profile.status === "approved";
+  document.querySelector("#artist-release-review-actions").hidden = !approved;
+  document.querySelector("#artist-release-submit-review").hidden = !approved;
   document.querySelector("#artist-profile-link").hidden = false;
   const link = document.querySelector("#artist-storefront-link");
   link.hidden = !approved;
@@ -437,6 +444,14 @@ async function loadReleases() {
           finally { setBusy(false); }
         });
         card.append(label, submit);
+      } else {
+        const notice = document.createElement("p");
+        notice.textContent = currentProfile.status !== "approved"
+          ? "Your artist profile must be approved before you can submit this draft."
+          : isAlbum
+            ? "Add at least one song and an album cover before submitting this draft."
+            : "Add audio before submitting this draft.";
+        card.append(notice);
       }
     } else if (["submitted", "published"].includes(release.status)) {
       const withdraw = document.createElement("button");
@@ -840,8 +855,12 @@ profileForm.addEventListener("submit", async (event) => {
 releaseForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (busy) return;
+  const submitForReview = event.submitter && event.submitter.id === "artist-release-submit-review";
   const uploaded = [];
   let isSaved = false;
+  let submissionAttempted = false;
+  let submissionSucceeded = false;
+  let cleanupFailures = [];
   let updateAttempted = false;
   let releaseId = "";
   setBusy(true);
@@ -864,6 +883,16 @@ releaseForm.addEventListener("submit", async (event) => {
       ...track, title: track.title.trim(),
       downloadPriceCents: sellsTracks(saleMode) ? priceCents(track.price) : null
     })) : [];
+    if (submitForReview) {
+      if (!currentProfile || currentProfile.status !== "approved") throw new Error("Your artist profile must be approved before submitting.");
+      if (!releaseForm.elements.reviewRights.checked) throw new Error("Confirm your rights before submitting this release.");
+      if (!isAlbum && !audio && !(editingRelease && editingRelease.audioPath)) {
+        throw new Error("Upload audio before submitting this release.");
+      }
+      if (isAlbum && !cover && !(editingRelease && editingRelease.coverPath)) {
+        throw new Error("Upload album cover artwork before submitting.");
+      }
+    }
     if (isAlbum && (!selectedTracks.length || selectedTracks.length > 20)) {
       throw new Error("Choose between 1 and 20 songs for an album.");
     }
@@ -922,12 +951,22 @@ releaseForm.addEventListener("submit", async (event) => {
       ...(isAlbum ? (release.tracks || []).filter((track) => !tracks.some((entry) => entry.audioPath === track.audioPath))
         .map((track) => track.audioPath) : [])
     ].filter(Boolean);
-    const cleanupFailures = await cleanupUploads(oldPaths);
+    cleanupFailures = await cleanupUploads(oldPaths);
     resetReleaseForm();
+    if (submitForReview) {
+      submissionAttempted = true;
+      const hasSales = downloadPriceCents != null ||
+        (isAlbum && sellsTracks(saleMode) && tracks.some((track) => track.downloadPriceCents != null));
+      await apiRequest("/api/artist-releases", {
+        method: "POST", body: { action: "submit", id: release.id, rightsConfirmed: true, salesRightsConfirmed: hasSales }
+      });
+      submissionSucceeded = true;
+    }
     await loadReleases();
-    show(cleanupFailures.length
-      ? `Draft saved, but old uploads could not be removed: ${cleanupFailures.join(", ")}`
-      : `Draft saved: ${saved.release.title}. It remains private.`);
+    const message = submitForReview
+      ? "Release submitted for review. It remains private until approved."
+      : `Draft saved: ${saved.release.title}. It remains private. Submit it for review from the list below when ready.`;
+    showRelease(cleanupFailures.length ? `${message} Old uploads could not be removed: ${cleanupFailures.join(", ")}.` : message);
   } catch (error) {
     let preserveUploads = isSaved;
     let verificationError = "";
@@ -944,9 +983,12 @@ releaseForm.addEventListener("submit", async (event) => {
       }
     }
     const failures = preserveUploads ? [] : await cleanupUploads(uploaded);
-    show(`${error.message}${verificationError}${preserveUploads && !isSaved && !verificationError
-      ? " Some uploaded files are referenced by the saved draft; refresh before retrying." : ""}${failures.length ? ` Upload cleanup failed for ${failures.join(", ")}.` : ""}`);
-    try { await loadReleases(); } catch (refreshError) { show(`${status.textContent} Draft list refresh failed: ${refreshError.message}`); }
+    showRelease(`${isSaved ? (submissionAttempted && !submissionSucceeded
+      ? "Draft saved, but submission could not be confirmed. Refresh the release list before retrying. "
+      : submissionSucceeded ? "Release submitted, but the release list could not be refreshed. "
+        : "Draft saved, but the release list could not be refreshed. ") : ""}${error.message}${verificationError}${preserveUploads && !isSaved && !verificationError
+      ? " Some uploaded files are referenced by the saved draft; refresh before retrying." : ""}${failures.length ? ` Upload cleanup failed for ${failures.join(", ")}.` : ""}${cleanupFailures.length ? ` Old uploads could not be removed: ${cleanupFailures.join(", ")}.` : ""}`);
+    try { await loadReleases(); } catch (refreshError) { showRelease(`${status.textContent} Draft list refresh failed: ${refreshError.message}`); }
   } finally {
     setBusy(false);
   }
